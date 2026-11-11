@@ -67,9 +67,11 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 
 ## Known limits
 
-- Setup adds the hooks plugin to the `plugin` list in `~/.config/opencode/opencode.json`. On its first start after that, OpenCode installs `@opencode-ai/plugin` into `~/.config/opencode` (30-60 s on OpenCode 1.19.4, needs the network). Setup checks the server with `opencode mcp list --pure`, so it does not wait on that install (D-HF-OPENCODE-LIST-1).
+- Setup adds the hooks plugin to the `plugin` list in `~/.config/opencode/opencode.json`. On its first start after that, OpenCode installs `@opencode-ai/plugin` into `~/.config/opencode` (30-60 s on OpenCode 1.19.4, needs the network). Setup checks the server entry with `opencode debug config --pure` (1.19) or `opencode debug config --standalone` (2), so it does not wait on that install (D-HF-OPENCODE-LIST-1) and does not wait on your other MCP servers, which `mcp list` connects one by one (D-OC1-LIST-2).
 
-- OpenCode loads every entry of the `plugin` list and skips an entry whose file is missing, with no error. After `opencode plugin add context-mode` (OpenCode 2, key `plugins`) or `opencode plugin context-mode --global` (1.19, key `plugin`) the config holds `context-mode`; setup then adds no path entry and removes an own path entry (a second one loads the plugin twice). A path entry of ours whose file is gone is replaced. `context-mode doctor --agents opencode` FAILs `hook-registered` for both cases and names `context-mode setup` (D-HF-OPENCODE-GATE-1). On OpenCode 2 with no entry the fix line is `opencode plugin add context-mode` (D-OC2-NATIVE-CMD-1).
+- OpenCode loads every entry of the `plugin` list and skips an entry whose file is missing, with no error. After `opencode plugin add context-mode` (OpenCode 2, key `plugins`) or `opencode plugin context-mode --global` (1.19, key `plugin`) the config holds `context-mode`; setup then adds no path entry and removes an own path entry (a second one loads the plugin twice). A path entry of ours whose file is gone is replaced. `context-mode doctor --agents opencode` FAILs `hook-registered` for both cases and names `context-mode setup` (D-HF-OPENCODE-GATE-1). On OpenCode 2 with no entry the fix line is `opencode plugin add context-mode` (D-OC2-NATIVE-CMD-1). The bare name in `plugins` (in `opencode.json` or `opencode.jsonc`) counts as that entry (D-R54-OC2-BARE-NATIVE-1).
+
+- OpenCode also loads each file in `~/.config/opencode/plugins/` and `<project>/.opencode/plugins/`. A file there that imports `context-mode` or `context-mode/server` counts as the hooks entry: setup adds no list entry next to it, and doctor FAILs a list entry of ours next to it, because the plugin then loads twice (D-R54-OC-PLUGINS-DIR-1).
 
 ## Report a problem
 
