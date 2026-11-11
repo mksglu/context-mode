@@ -397,31 +397,46 @@ function statusOf(row: CheckRow, text: string): PluginStatus {
 
 /** D-OC2-DOCTOR-1: OpenCode 2 (npm @opencode/cli) has no --pure and talks to a background service unless --standalone
  *  is given; OpenCode 1.x keeps --pure (D-HF-OPENCODE-LIST-1). The host version picks the form. */
-function opencodeMajor(bin: string, env: SetupContext["env"]): number {
+function opencodeVersion(bin: string, env: SetupContext["env"]): { major: number } | { error: string } {
   const r = runBin(bin, ["--version"], env);
   const text = `${r.stdout}${r.stderr}`;
   const digits = text.split("").filter((c) => (c >= "0" && c <= "9") || c === ".").join("");
-  return Number(digits.split(".")[0]);
+  // D-OC1-LIST-2 (#1362): no digits is no version. Number("") is 0, which used to pick the 1.x form for any host.
+  if (!digits.split(".")[0]) return { error: `${bin} --version printed no version: ${text.trim().split("\n")[0] ?? ""}` };
+  return { major: Number(digits.split(".")[0]) };
 }
-function opencodeListArgs(major: number): string[] {
-  return major >= 2 ? ["mcp", "list", "--standalone"] : ["mcp", "list", "--pure"];
+function opencodeMajor(bin: string, env: SetupContext["env"]): number {
+  const v = opencodeVersion(bin, env);
+  return "major" in v ? v.major : Number.NaN;
 }
 
-/** D-OC2-LIST-1 (#1308): OpenCode 2.2.5 `mcp list --standalone` prints before its private server has connected the
- *  MCP servers, so it says "No MCP servers configured" for a correct entry. `debug config --standalone` prints the
- *  documents the CLI itself loaded, after its own parse (1.x form mcp.<name> becomes mcp.servers.<name>), so the
- *  check reads that: same file choice, same Windows path, same JSONC rules as the host. */
-const OC2_CONFIG_ARGS = ["debug", "config", "--standalone"];
-function opencode2ListCheck(bin: string, env: SetupContext["env"]): Check {
-  const r = runBin(bin, OC2_CONFIG_ARGS, env);
-  const what = `${bin} ${OC2_CONFIG_ARGS.join(" ")}`;
-  let docs: unknown;
-  try { docs = JSON.parse(`${r.stdout}`); } catch { docs = undefined; }
-  if (r.status !== 0) return { name: "list", ok: false, detail: `${what} exited ${r.status}: ${`${r.stderr}`.trim().split("\n")[0] ?? ""}` };
-  if (!Array.isArray(docs)) return { name: "list", ok: false, detail: `${what} printed no config list: ${`${r.stdout}`.trim().split("\n")[0] ?? ""}` };
-  const listed = docs.some((d) => isObj(d) && isObj(d.info) && isObj(d.info.mcp) && isObj(d.info.mcp.servers) && isObj(d.info.mcp.servers[SERVER_KEY]));
-  const read = docs.filter(isObj).map((d) => d.path).filter((p): p is string => typeof p === "string");
-  return { name: "list", ok: listed, detail: listed ? undefined : `${what} does not load mcp.servers.${SERVER_KEY}; it read: ${read.join(", ") || "no config"}` };
+/** The list check on OpenCode reads the config the CLI itself loaded, after its own parse: same file choice, same
+ *  Windows path, same JSONC rules as the host, and no MCP server is started.
+ *  D-OC2-LIST-1 (#1308): OpenCode 2.2.5 `mcp list --standalone` prints before its private server has connected the
+ *  MCP servers ("No MCP servers configured" for a correct entry). `debug config --standalone` prints one document per
+ *  file it read, the entry at info.mcp.servers.<name>.
+ *  D-OC1-LIST-2 (#1362): OpenCode 1.x `mcp list --pure` connects every MCP server of the user, so one server that never
+ *  answers holds it past the budget (32.6 s on 1.19.5). `debug config --pure` prints the merged config, the entry at
+ *  mcp.<name>; --pure keeps the D-HF-OPENCODE-LIST-1 rule (no plugin install is waited on). */
+const OC_CONFIG_ARGS = { 1: ["debug", "config", "--pure"], 2: ["debug", "config", "--standalone"] } as const;
+function opencodeListCheck(bin: string, major: number, env: SetupContext["env"]): Check {
+  const args = major >= 2 ? OC_CONFIG_ARGS[2] : OC_CONFIG_ARGS[1];
+  const r = runBin(bin, [...args], env);
+  const what = `${bin} ${args.join(" ")}`;
+  const first = (s: unknown) => `${s}`.trim().split("\n")[0] ?? "";
+  let out: unknown;
+  try { out = JSON.parse(`${r.stdout}`); } catch { out = undefined; }
+  if (r.status !== 0) return { name: "list", ok: false, detail: `${what} exited ${r.status}: ${first(r.stderr)}` };
+  if (major >= 2) {
+    if (!Array.isArray(out)) return { name: "list", ok: false, detail: `${what} printed no config list: ${first(r.stdout)}` };
+    const listed = out.some((d) => isObj(d) && isObj(d.info) && isObj(d.info.mcp) && isObj(d.info.mcp.servers) && isObj(d.info.mcp.servers[SERVER_KEY]));
+    const read = out.filter(isObj).map((d) => d.path).filter((p): p is string => typeof p === "string");
+    return { name: "list", ok: listed, detail: listed ? undefined : `${what} does not load mcp.servers.${SERVER_KEY}; it read: ${read.join(", ") || "no config"}` };
+  }
+  if (!isObj(out)) return { name: "list", ok: false, detail: `${what} printed no config: ${first(r.stdout)}` };
+  const mcp = isObj(out.mcp) ? out.mcp : {};
+  const listed = isObj(mcp[SERVER_KEY]);
+  return { name: "list", ok: listed, detail: listed ? undefined : `${what} does not load mcp.${SERVER_KEY}; it loads mcp: ${Object.keys(mcp).join(", ") || "none"}` };
 }
 
 /** D-SETUP-HOST-BROKEN-1 (#1308): a host CLI that cannot start names its own fix. Setup reports SKIPPED with that fix
@@ -444,14 +459,12 @@ function hostBroken(bin: string, out: string): string | undefined {
 
 /** One run of the host list command (claude plugin list takes ~1.8 s): the list check and the plugin status share it. */
 function listState(row: CheckRow, env: SetupContext["env"]): { check?: Check; status: PluginStatus; broken?: string } {
-  let l0 = row.listCommand;
-  if (!l0 || !hostBin(l0.bin, env).file) return { status: undefined };
+  const l = row.listCommand;
+  if (!l || !hostBin(l.bin, env).file) return { status: undefined };
   if (row.id === "opencode") {
-    const major = opencodeMajor(l0.bin, env);
-    if (major >= 2) return { check: opencode2ListCheck(l0.bin, env), status: undefined };
-    l0 = { bin: l0.bin, args: opencodeListArgs(major) };
+    const v = opencodeVersion(l.bin, env);
+    return { check: "major" in v ? opencodeListCheck(l.bin, v.major, env) : { name: "list", ok: false, detail: v.error }, status: undefined };
   }
-  const l = l0;
   const r = runBin(l.bin, l.args, env);
   // Gemini 0.65.0 writes the list to stderr (D-INST-2), so both streams count.
   const out = `${r.stdout}${r.stderr}`;
