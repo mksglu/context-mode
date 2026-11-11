@@ -31,7 +31,7 @@
     "url": "https://github.com/mksglu/context-mode/issues"
   },
   "scripts": {
-    "build": "node build/build.mjs --out release-out",
+    "build": "node scripts/v1-upgrade-stop.mjs",
     "build:release": "node build/build.mjs --out release-out",
     "typecheck": "tsc --noEmit",
     "gate": "node scripts/gate.mjs",
