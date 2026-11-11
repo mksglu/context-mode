@@ -24,6 +24,7 @@ import {
   RUN_WRAPPER_AGENT,
   SEARCH_USAGE_LINE,
   SEARCH_WRAPPER_FILE,
+  shellWord,
   SOURCE_LABEL_MAX_CHARS,
   USER_DENY_REASON_PREFIX,
 } from "../contracts/constants.ts";
@@ -85,9 +86,10 @@ function sourceLabel(command: string): string {
   return Array.from(RUN_LABEL_PREFIX + first).slice(0, SOURCE_LABEL_MAX_CHARS).join("");
 }
 
-// §4 step 9, ADR-0016 template: more: node "<bundle>/search.mjs" <source-id> "<terms>".
+// §4 step 9, ADR-0016 template: more: node '<bundle>/search.mjs' <source-id> '<terms>'.
+// D-CC-POINTER-5: POSIX single-quoted words, so the shell runs no $( ), backtick or $VAR in the description.
 function moreLine(bundleDir: string, sourceId: number, terms: string): string {
-  return RUN_MORE_PREFIX + JSON.stringify(join(bundleDir, SEARCH_WRAPPER_FILE)) + " " + sourceId + " " + JSON.stringify(terms);
+  return RUN_MORE_PREFIX + shellWord(join(bundleDir, SEARCH_WRAPPER_FILE)) + " " + sourceId + " " + shellWord(terms);
 }
 
 function bytes(s: string): number {

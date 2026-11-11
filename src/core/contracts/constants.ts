@@ -64,8 +64,14 @@ export function SUBAGENT_HANDLE_LINE(handle: string, bytes: number, read: boolea
 }
 // D-CC-POINTER-2 (#1358, #1342): the MCP-free twin of the search call, for a caller with a shell on the claude-code
 // row. search.mjs takes the short id and the project dir, so it works from any cwd and with no MCP server.
+// D-CC-POINTER-5: every word is a POSIX single-quoted word, so the shell runs no $( ), backtick or $VAR in it.
 export function SEARCH_TWIN_LINE(searchPath: string, handle: string, terms: string, projectDir: string): string {
-  return " Or run: node " + JSON.stringify(searchPath) + " " + handle + " " + JSON.stringify(terms) + " " + JSON.stringify(projectDir);
+  return " Or run: node " + shellWord(searchPath) + " " + handle + " " + shellWord(terms) + " " + shellWord(projectDir);
+}
+// D-CC-POINTER-5: one POSIX shell word. Inside single quotes sh, bash and Git Bash expand nothing; a ' closes the
+// quote, adds an escaped ', and opens it again.
+export function shellWord(s: string): string {
+  return "'" + s.split("'").join("'\\''") + "'";
 }
 export const HANDLE_PROMPT_WORDS = 3; // D-HA-GEMINI-HINT-1: prompt words the handle-line query may add
 export const MAX_CHUNK_BYTES = 4096; // DECISIONS-r9 §C
