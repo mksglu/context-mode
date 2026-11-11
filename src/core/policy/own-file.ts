@@ -9,7 +9,7 @@ import { AGENT_FILE_EXT, AGENT_HOME_DIR, SHARED_SKILLS_DIR } from "../contracts/
 import {
   claudeDirOf, codexDirOf, copilotDirOf, geminiDirOf, homeDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, vscodeUserDirOf,
 } from "../project/config-dir.ts";
-import { isInsideAny } from "../project/contain.ts";
+import { isInsideAny, isLexicallyInsideAny } from "../project/contain.ts";
 
 /** The dirs this agent reads its own instruction and skill files from, plus the shared skill dir. */
 export function ownDirsOf(agent: AgentId, env: NodeJS.ProcessEnv): string[] {
@@ -28,8 +28,10 @@ export function ownDirsOf(agent: AgentId, env: NodeJS.ProcessEnv): string[] {
   return [...own, shared];
 }
 
-/** True when `abs` is a Markdown file inside one of this agent's own dirs (by realpath components). */
+/** True when `abs` is a Markdown file inside one of this agent's own dirs, by realpath components or, for a link the
+ *  user made under the dir (D-R54-OWN-FILE-LINK-1, #1345: ~/.claude/skills/<s> -> ~/dotfiles/...), by the path as written. */
 export function isOwnFile(agent: AgentId, abs: string, env: NodeJS.ProcessEnv = process.env): boolean {
   if (extname(abs).toLowerCase() !== AGENT_FILE_EXT) return false;
-  return isInsideAny(ownDirsOf(agent, env), abs);
+  const dirs = ownDirsOf(agent, env);
+  return isLexicallyInsideAny(dirs, abs) || isInsideAny(dirs, abs);
 }
