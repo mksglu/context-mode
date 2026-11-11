@@ -276,6 +276,20 @@ describe("ADR-0007 call shape on every host", () => {
     });
   }
 
+  // #1354, #1353: Pi with a JSON-schema model fills every optional field with its zero value.
+  test("Pi whole-schema zero payloads: ctx_search offset:0/after:0 and ctx_resume session:\"\" answer", async () => {
+    const pi = await fakePi();
+    for (const input of [
+      { queries: ["README overview"], scope: "session", sort: "timeline", offset: 0, after: 0 },
+      { queries: ["README overview"], scope: "session", offset: 0, after: 0 },
+    ]) {
+      const out = await pi.get("ctx_search").execute("c1", input);
+      assert.ok(out.content[0].text.length > 0, JSON.stringify(input));
+    }
+    const out = await pi.get("ctx_resume").execute("c2", { session: "" });
+    assert.ok(out.content[0].text.length > 0);
+  });
+
   test("Pi and OpenCode register the description and the schema the MCP hosts get", async () => {
     const pi = await fakePi();
     const registered = new Map();

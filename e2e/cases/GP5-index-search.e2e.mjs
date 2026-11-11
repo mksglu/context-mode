@@ -512,6 +512,9 @@ test("[M2] GP5/search-param-schema-match", async () => {
     offset: { queries: ["x"], offset: 20 },
     sort: { queries: ["x"], sort: "timeline" },
     after: { queries: ["x"], sort: "timeline", after: 1 },
+    // #1354: a whole-schema client fills both cursors with 0; 0 is the first page, not paging.
+    zeroTimeline: { queries: ["x"], sort: "timeline", offset: 0, after: 0 },
+    zeroRelevance: { queries: ["x"], offset: 0, after: 0 },
   };
   const results = {};
   for (const [key, input] of Object.entries(valid)) {
