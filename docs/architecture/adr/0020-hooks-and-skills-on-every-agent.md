@@ -39,7 +39,7 @@ dispatch uses for a large output on that host.
 | kiro | `~/.kiro/hooks/context-mode.json` | SessionStart, UserPromptSubmit, PreToolUse, PostToolUse | D (exit 2, plain text) I (stdout) | D + redirect | `~/.kiro/skills/<name>/SKILL.md` |
 | zcode | `~/.zcode/cli/config.json` `hooks` (merge, `hooks.enabled: true`) | SessionStart, UserPromptSubmit, PreToolUse, PostToolUse | D I | D + redirect | `~/.zcode/skills/<name>/SKILL.md` |
 | pi | in process: `pi install <pkgDir>` (package `pi.extensions`) | session_start, input, tool_call, tool_result | R D | R (`tool_result` rewrite) | package `pi.skills` (shipped in the package) |
-| opencode | in process: `opencode.json` `plugin` list entry -> `<pkgDir>/opencode/plugin.js` | context, prompt, execute.before, execute.after, compaction | D W | D + redirect | `~/.config/opencode/skills/<name>/SKILL.md` |
+| opencode | in process: `opencode.json` `plugin` list entry -> `<pkgDir>/opencode/plugin.js` | context, prompt, execute.before, execute.after, compaction | R D W | R (`execute.after` result rewrite, D-R54-OC-REPLACE-1) | `~/.config/opencode/skills/<name>/SKILL.md` |
 
 Skills are rendered from the single source `skills/` with the agent's own tool name prefix (`toolNamePrefix`).
 
