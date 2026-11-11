@@ -479,11 +479,9 @@ describe("GP11 doctor and upgrade", () => {
 // Network (npm registry), POSIX only (v1 finds siblings with pgrep there), so it is tagged M7 and not in the M6 CI gate.
 describe("GP11 v1 upgrade against main", () => {
   const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-  const OUT = path.join(ROOT, "release-out");
   const V1 = "1.0.169";
 
   test("[M7] GP11/v1-upgrade-against-main-writes-nothing: 1.0.169 upgrade keeps the tree, npm i -g gives 2.x (#1363)", { skip: process.platform === "win32", timeout: 600_000 }, (t) => {
-    assert.ok(existsSync(path.join(OUT, "package.json")), "release-out missing (run build/build.mjs first)");
     const tmp = realpathSync(mkdtempSync(path.join(tmpdir(), "cm-gp11-v1up-")));
     t.after(() => rmSync(tmp, { recursive: true, force: true }));
     const [prefix, home, proj, fakeBin, tmpd, pack] = ["g", "home", "proj", "fakebin", "tmp", "pack"].map((d) => path.join(tmp, d));
@@ -512,12 +510,15 @@ describe("GP11 v1 upgrade against main", () => {
     assert.deepEqual(readdirSync(pkgDir).sort(), before, out);
     assert.ok(out.includes("npm i -g context-mode"), "the stop line names the native npm command\n" + out);
 
-    // The native command repairs it: the packed release tree, installed over the same prefix.
-    const tgz = JSON.parse(npm(["pack", "--json", "--pack-destination", pack], OUT))[0].filename;
+    // The native command repairs it: a release tree at the repo version (release-out may be a 0.0.0-dev build), packed
+    // and installed over the same prefix, the way `npm i -g context-mode` lands it.
+    const want = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
+    assert.ok(want.startsWith("2."), want);
+    const rel = path.join(tmp, "release-out");
+    execFileSync(process.execPath, [path.join(ROOT, "build", "build.mjs"), "--out", rel, "--version", want], { cwd: ROOT, encoding: "utf8", stdio: "pipe" });
+    const tgz = JSON.parse(npm(["pack", "--json", "--pack-destination", pack], rel))[0].filename;
     npm(["i", "-g", "--prefix", prefix, path.join(pack, tgz)]);
     assert.equal(path.basename(realpathSync(bin)), "cli.mjs");
-    const want = JSON.parse(readFileSync(path.join(OUT, "package.json"), "utf8")).version;
-    assert.ok(want.startsWith("2."), want);
     assert.ok(execFileSync(bin, ["--version"], { env, encoding: "utf8" }).includes(want));
   });
 });
