@@ -54,6 +54,8 @@ export interface AgentResult {
   id: AgentId; status: AgentStatus; reason?: string; v1: V1Finding[]; changes: Change[]; checks: Check[]; rolledBack?: boolean;
   /** OPEN-ITEMS H8: the host CLI file setup and doctor ran for this agent (absolute, resolved). */
   bin?: string;
+  /** D-R54-OC-PLUGINS-DIR-1: the fix line when it is not the setup command. */
+  fix?: string;
 }
 export interface SetupResult { exitCode: number; agents: AgentResult[]; backupDir?: string; error?: string; }
 export interface SetupOptions extends SetupContext {
@@ -309,6 +311,20 @@ function nativePluginsKey(doc: unknown, file: string): boolean {
     try { return native(parseHostConfig("opencode", f, text, "jsonc")); } catch { return false; }
   });
 }
+/** D-R54-OC-PLUGINS-DIR-1 (review round 2): a <project>/.opencode/plugins file of ours that OpenCode loads. */
+function projectPluginFile(h: Extract<HookInstall, { kind: "plugin-list" }>): string | undefined {
+  return opencodeDirPlugin([opencodeProjectDir(h.worktree)]);
+}
+
+/** The fix line for an agent FAIL when setup is not the fix: our global entry next to a project plugins file of ours
+ *  is fixed by removing that file (setup never edits a project file). undefined = the setup command. */
+export function fixLineOf(row: CheckRow): string | undefined {
+  const h = row.hookInstall;
+  if (h.kind !== "plugin-list") return undefined;
+  const proj = projectPluginFile(h);
+  return proj !== undefined && pluginListIssue(h)?.startsWith(proj) ? `remove ${proj}` : undefined;
+}
+
 /** The one-line reason hook-registered fails on a plugin-list channel, from the file as it is now. */
 function pluginListIssue(h: Extract<HookInstall, { kind: "plugin-list" }>): string | undefined {
   const text = readOr(h.file);
@@ -321,7 +337,7 @@ function pluginListIssue(h: Extract<HookInstall, { kind: "plugin-list" }>): stri
   if (listed && nativePluginsKey(doc, h.file)) return `${h.file}: context-mode loads twice (native entry and ${h.entry}), every hook fires twice; run: context-mode setup`;
   // D-R54-OC-PLUGINS-DIR-1 (review round 2): the global entry loads the hooks in every project, a project plugins file
   // only in its own project, so the fix is to remove the project file (setup never edits a project file).
-  const proj = listed ? opencodeDirPlugin([opencodeProjectDir(h.worktree)]) : undefined;
+  const proj = listed ? projectPluginFile(h) : undefined;
   if (proj !== undefined) return `${proj}: context-mode loads twice in this project (this file and ${h.entry} in ${h.file}), every hook fires twice; remove ${proj}, the ${h.file} entry loads the hooks in every project`;
   const stale = list.find((e) => isStaleOwnPlugin(e, h.entry));
   if (stale !== undefined) return `${h.file}: plugin file missing, so OpenCode never loads the hooks (${String(stale)}); run: context-mode setup`;
@@ -1179,7 +1195,8 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
     // D-SETUP-HOST-BROKEN-1: the host broke on the install step itself (the list passed): the same SKIPPED line.
     const broken = row.cli ? hostBroken(row.cli.bin, (e as Error).message) : undefined;
     if (broken) return { ...res, status: "SKIPPED", reason: broken };
-    return { ...res, status: "FAIL", reason: (e as Error).message, rolledBack: true };
+    const fix = fixLineOf(row);
+    return { ...res, status: "FAIL", reason: (e as Error).message, rolledBack: true, ...(fix ? { fix } : {}) };
   }
   return res;
 }
@@ -1211,7 +1228,7 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
       else {
         res.checks = await verifyRow(row, ctx);
         const bad = res.checks.filter((c) => !c.ok);
-        if (bad.length) { res.status = "FAIL"; res.reason = bad.map((c) => `${c.name}: ${c.detail}`).join("; "); }
+        if (bad.length) { res.status = "FAIL"; res.reason = bad.map((c) => `${c.name}: ${c.detail}`).join("; "); const fix = fixLineOf(row); if (fix) res.fix = fix; }
       }
     }
     agents.push(res);
