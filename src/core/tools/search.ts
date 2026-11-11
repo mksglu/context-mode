@@ -385,6 +385,11 @@ async function handler(input: CtxSearchInput, ctx: ToolContext): Promise<ToolRep
   if (sort === "relevance" && (input.after ?? 0) !== 0) {
     return invalid("after", 'drop after, or pass sort:"timeline"');
   }
+  // A blank source names no source: whole-schema clients send source:"" too (D-R54-SEARCH-ZERO-1, #1354).
+  if (input.source !== undefined && input.source.trim() === "") {
+    const { source: _blank, ...rest } = input;
+    input = rest;
+  }
   const scope: SearchScope = input.scope ?? "worktree";
   const db = await openDb(ctx.project, { readOnly: true });
   try {
