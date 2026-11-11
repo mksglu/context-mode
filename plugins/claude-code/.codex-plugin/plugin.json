@@ -8,5 +8,5 @@
   "mcpServers": "./.codex-plugin/mcp.json",
   "name": "context-mode",
   "skills": "./codex/skills/",
-  "version": "2.1.7"
+  "version": "2.1.8"
 }

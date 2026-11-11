@@ -1,90 +1,10 @@
 #!/usr/bin/env node
 import{createRequire as __cmRequire}from"node:module";if(typeof process.getBuiltinModule!=="function")process.getBuiltinModule=(id)=>__cmRequire(import.meta.url)(id);
-var __create = Object.create;
 var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-
-// node_modules/sisteransi/src/index.js
-var require_src = __commonJS({
-  "node_modules/sisteransi/src/index.js"(exports, module) {
-    "use strict";
-    var ESC2 = "\x1B";
-    var CSI2 = `${ESC2}[`;
-    var beep = "\x07";
-    var cursor3 = {
-      to(x2, y2) {
-        if (!y2) return `${CSI2}${x2 + 1}G`;
-        return `${CSI2}${y2 + 1};${x2 + 1}H`;
-      },
-      move(x2, y2) {
-        let ret = "";
-        if (x2 < 0) ret += `${CSI2}${-x2}D`;
-        else if (x2 > 0) ret += `${CSI2}${x2}C`;
-        if (y2 < 0) ret += `${CSI2}${-y2}A`;
-        else if (y2 > 0) ret += `${CSI2}${y2}B`;
-        return ret;
-      },
-      up: (count = 1) => `${CSI2}${count}A`,
-      down: (count = 1) => `${CSI2}${count}B`,
-      forward: (count = 1) => `${CSI2}${count}C`,
-      backward: (count = 1) => `${CSI2}${count}D`,
-      nextLine: (count = 1) => `${CSI2}E`.repeat(count),
-      prevLine: (count = 1) => `${CSI2}F`.repeat(count),
-      left: `${CSI2}G`,
-      hide: `${CSI2}?25l`,
-      show: `${CSI2}?25h`,
-      save: `${ESC2}7`,
-      restore: `${ESC2}8`
-    };
-    var scroll = {
-      up: (count = 1) => `${CSI2}S`.repeat(count),
-      down: (count = 1) => `${CSI2}T`.repeat(count)
-    };
-    var erase3 = {
-      screen: `${CSI2}2J`,
-      up: (count = 1) => `${CSI2}1J`.repeat(count),
-      down: (count = 1) => `${CSI2}J`.repeat(count),
-      line: `${CSI2}2K`,
-      lineEnd: `${CSI2}K`,
-      lineStart: `${CSI2}1K`,
-      lines(count) {
-        let clear = "";
-        for (let i2 = 0; i2 < count; i2++)
-          clear += this.line + (i2 < count - 1 ? cursor3.up() : "");
-        if (count)
-          clear += cursor3.left;
-        return clear;
-      }
-    };
-    module.exports = { cursor: cursor3, scroll, erase: erase3, beep };
-  }
-});
 
 // src/entries/cli.ts
 import { spawn as spawn4 } from "node:child_process";
@@ -563,6 +483,14 @@ var V1_SCRIPT_NAMES = Object.freeze([
 var V1_HOOK_COMMAND = "context-mode hook";
 var V1_CODEX_HOOK_COMMAND = "context-mode hook codex";
 var V1_CODEX_HOOKS_DIR = Object.freeze(["hooks", "codex"]);
+var V1_CODEX_SCRIPT_NAMES = Object.freeze([
+  "pretooluse.mjs",
+  "posttooluse.mjs",
+  "sessionstart.mjs",
+  "precompact.mjs",
+  "userpromptsubmit.mjs",
+  "stop.mjs"
+]);
 var V1_CACHE_HEAL_NAME = "context-mode-cache-heal";
 var V1_CACHE_HEAL_EXTS = Object.freeze([".mjs", ".sh"]);
 var V1_STATUSLINE_COMMAND = "context-mode statusline";
@@ -609,6 +537,8 @@ var HOOKS_KEY = "hooks";
 var STATUS_LINE_KEY = "statusLine";
 var PI_PACKAGES_KEY = "packages";
 var OPENCODE_PLUGIN_KEY = "plugin";
+var OPENCODE_PLUGINS_KEY = "plugins";
+var OPENCODE_PACKAGE_FIELD = "package";
 var OPENCODE_NPM_SPEC_PREFIX = `${SERVER_KEY}@`;
 var NPM_VERSION_SEP = "@";
 var OPENCODE_NPM_LATEST = `${OPENCODE_NPM_SPEC_PREFIX}latest`;
@@ -616,7 +546,6 @@ var PI_NPM_LATEST = `${V1_PI_PACKAGE}${NPM_VERSION_SEP}latest`;
 var V1_DATA_DIR_NAME = "context-mode";
 var V1_DATA_ROOT_ENTRIES = Object.freeze(["content", "platform.json"]);
 var V1_SESSIONS_DIR_NAME = "sessions";
-var V1_SCRIPT_EXT = ".mjs";
 var V1_BIN_COMMAND = SERVER_KEY;
 var VSCODE_MCP_SERVERS_KEY = "servers";
 var ZCODE_EVENTS_KEY = "events";
@@ -632,7 +561,7 @@ var V1_REASON = Object.freeze({
   cacheHealFile: "old context-mode cache-heal script file",
   statusLine: "old context-mode statusLine (context-mode statusline): report only, never removed",
   mcpEntry: "old context-mode MCP entry mcpServers.context-mode",
-  codexHook: "old context-mode Codex hook entry: context-mode hook codex or hooks/codex/*.mjs",
+  codexHook: "old context-mode Codex hook entry: context-mode hook codex or hooks/codex/<event>.mjs",
   codexToml: "old context-mode config.toml [mcp_servers.context-mode*] section",
   hookFile: "old context-mode hook file context-mode.json (runs context-mode hook)",
   vscodeMcp: "old context-mode MCP entry servers.context-mode in .vscode/mcp.json: report only, never removed",
@@ -667,6 +596,7 @@ var MCP_COMMAND_FIELD = "command";
 var MCP_ARGS_FIELD = "args";
 var MCP_ENV_FIELD = "env";
 var MCP_ENV_VARS_FIELD = "env_vars";
+var MCP_TOOLS_FIELD = "tools";
 var ZCODE_MCP_FEATURE_KEY = Object.freeze(["features", "mcp"]);
 var CODEX_OMIT_TOOLS_FROM_FIELD = "omit_tools_from";
 var CODEX_OMIT_DEFERRED = Object.freeze(["deferred"]);
@@ -1472,6 +1402,7 @@ function readResult6(p3) {
   const text2 = p3.content === void 0 ? "" : typeof p3.content === "string" ? p3.content : JSON.stringify(p3.content);
   const info = { isError: p3.isError === true, bytes: Buffer.byteLength(text2), text: text2 };
   if (typeof p3.exitCode === "number") info.exitCode = p3.exitCode;
+  if (p3.keep === true) info.keep = true;
   return info;
 }
 function decode9(raw) {
@@ -1548,6 +1479,11 @@ function decode10(raw) {
   const event = Object.prototype.hasOwnProperty.call(OPENCODE_EVENTS, native) ? OPENCODE_EVENTS[native] : void 0;
   if (event === void 0) throw new Error("opencode: unknown hook event " + String(p3.type));
   const ev = { event, agent: "opencode", sessionId: String(p3.sessionID ?? ""), cwd: String(p3.directory ?? "") };
+  if (typeof p3.agentID === "string" && p3.agentID !== "") {
+    ev.agentId = p3.agentID;
+    ev.agentType = p3.agentID;
+  }
+  if (Array.isArray(p3.agentTools)) ev.agentTools = p3.agentTools.filter((t2) => typeof t2 === "string");
   if (event === "UserPromptSubmit" && typeof p3.message === "string") ev.prompt = p3.message;
   if (event === "PreToolUse" || event === "PostToolUse") {
     const name = String(p3.tool ?? "");
@@ -1568,7 +1504,7 @@ function encode10(ev, d, _extra) {
       if (ev.event !== "PreToolUse") return { stdout: "", exitCode: 0 };
       return { stdout: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason, exitCode: 2 };
     case "replace":
-      return { stdout: "", exitCode: 0 };
+      return { stdout: ev.event === "PostToolUse" ? d.output : "", exitCode: 0 };
   }
 }
 
@@ -1773,7 +1709,7 @@ var ADAPTERS = Object.freeze([
   }
 ]);
 var BY_ID = new Map(ADAPTERS.map((r2) => [r2.id, r2]));
-var REPLACE_ROWS = /* @__PURE__ */ new Set(["claude-code", "gemini", "copilot-cli", "pi"]);
+var REPLACE_ROWS = /* @__PURE__ */ new Set(["claude-code", "gemini", "copilot-cli", "pi", "opencode"]);
 function hasReplace(row) {
   return REPLACE_ROWS.has(row.id);
 }
@@ -2108,8 +2044,8 @@ __export(dist_exports, {
 // node_modules/@clack/core/dist/index.mjs
 import { styleText } from "node:util";
 import { stdout, stdin } from "node:process";
-import * as l from "node:readline";
-import l__default from "node:readline";
+import * as f$1 from "node:readline";
+import f__default from "node:readline";
 
 // node_modules/fast-string-truncated-width/dist/utils.js
 var getCodePointsLength = /* @__PURE__ */ (() => {
@@ -2197,7 +2133,7 @@ var getStringTruncatedWidth = (input, truncationOptions = {}, widthOptions = {})
     if (index >= length) {
       break outer;
     }
-    for (let i2 = 0, l2 = PARSE_BLOCKS.length; i2 < l2; i2++) {
+    for (let i2 = 0, l = PARSE_BLOCKS.length; i2 < l; i2++) {
       const [BLOCK_RE, BLOCK_WIDTH] = PARSE_BLOCKS[i2];
       BLOCK_RE.lastIndex = index;
       if (BLOCK_RE.test(input)) {
@@ -2447,25 +2383,77 @@ function wrapAnsi(string, columns, options) {
   return String(string).normalize().split(CRLF_OR_LF).map((line) => exec(line, columns, options)).join("\n");
 }
 
+// node_modules/sisteransi/dist/index.js
+var ESC2 = "\x1B";
+var CSI2 = `${ESC2}[`;
+var cursor = {
+  to(x2, y) {
+    if (!y)
+      return `${CSI2}${x2 + 1}G`;
+    return `${CSI2}${y + 1};${x2 + 1}H`;
+  },
+  move(x2, y) {
+    let ret = "";
+    if (x2 < 0)
+      ret += `${CSI2}${-x2}D`;
+    else if (x2 > 0)
+      ret += `${CSI2}${x2}C`;
+    if (y < 0)
+      ret += `${CSI2}${-y}A`;
+    else if (y > 0)
+      ret += `${CSI2}${y}B`;
+    return ret;
+  },
+  up: (count = 1) => `${CSI2}${count}A`,
+  down: (count = 1) => `${CSI2}${count}B`,
+  forward: (count = 1) => `${CSI2}${count}C`,
+  backward: (count = 1) => `${CSI2}${count}D`,
+  nextLine: (count = 1) => `${CSI2}E`.repeat(count),
+  prevLine: (count = 1) => `${CSI2}F`.repeat(count),
+  left: `${CSI2}G`,
+  hide: `${CSI2}?25l`,
+  show: `${CSI2}?25h`,
+  save: `${ESC2}7`,
+  restore: `${ESC2}8`
+};
+var erase = {
+  screen: `${CSI2}2J`,
+  up: (count = 1) => `${CSI2}1J`.repeat(count),
+  down: (count = 1) => `${CSI2}J`.repeat(count),
+  line: `${CSI2}2K`,
+  lineEnd: `${CSI2}K`,
+  lineStart: `${CSI2}1K`,
+  lines(count) {
+    let clear2 = "";
+    for (let i2 = 0; i2 < count; i2++)
+      clear2 += this.line + (i2 < count - 1 ? cursor.up() : "");
+    if (count)
+      clear2 += cursor.left;
+    return clear2;
+  }
+};
+var clear = {
+  screen: `${ESC2}c`
+};
+
 // node_modules/@clack/core/dist/index.mjs
-var import_sisteransi = __toESM(require_src(), 1);
 import { ReadStream } from "node:tty";
-function findCursor(s, o2, l2) {
-  if (!l2.some((r2) => !r2.disabled))
-    return s;
-  const t2 = s + o2, n3 = Math.max(l2.length - 1, 0), e = t2 < 0 ? n3 : t2 > n3 ? 0 : t2;
-  return l2[e]?.disabled ? findCursor(e, o2 < 0 ? -1 : 1, l2) : e;
+function findCursor(o2, s, l) {
+  if (!l.some((r2) => !r2.disabled))
+    return o2;
+  const t2 = o2 + s, n3 = Math.max(l.length - 1, 0), e = t2 < 0 ? n3 : t2 > n3 ? 0 : t2;
+  return l[e]?.disabled ? findCursor(e, s < 0 ? -1 : 1, l) : e;
 }
-function findTextCursor(s, o2, l2, i2) {
+function findTextCursor(o2, s, l, i2) {
   const t2 = i2.split(`
 `);
-  let n3 = 0, e = s;
+  let n3 = 0, e = o2;
   for (const r2 of t2) {
     if (e <= r2.length)
       break;
     e -= r2.length + 1, n3++;
   }
-  for (n3 = Math.max(0, Math.min(t2.length - 1, n3 + l2)), e = Math.min(e, t2[n3].length) + o2; e < 0 && n3 > 0; )
+  for (n3 = Math.max(0, Math.min(t2.length - 1, n3 + l)), e = Math.min(e, t2[n3].length) + s; e < 0 && n3 > 0; )
     n3--, e += t2[n3].length + 1;
   for (; e > t2[n3].length && n3 < t2.length - 1; )
     e -= t2[n3].length + 1, n3++;
@@ -2580,42 +2568,42 @@ function block({
   overwrite: o2 = true,
   hideCursor: n3 = true
 } = {}) {
-  const s = l.createInterface({
+  const s = f$1.createInterface({
     input: e,
     output: r2,
     prompt: "",
     tabSize: 1
   });
-  l.emitKeypressEvents(e, s), e instanceof ReadStream && e.isTTY && e.setRawMode(true);
-  const t2 = (f2, { name: a2, sequence: w }) => {
-    const c3 = String(f2);
-    if (isActionKey([c3, a2, w], "cancel")) {
-      n3 && r2.write(import_sisteransi.cursor.show), process.exit(0);
+  f$1.emitKeypressEvents(e, s), e instanceof ReadStream && e.isTTY && e.setRawMode(true);
+  const t2 = (l, { name: i2, sequence: p3 }) => {
+    const w = String(l);
+    if (isActionKey([w, i2, p3], "cancel")) {
+      n3 && r2.write(cursor.show), process.exit(0);
       return;
     }
     if (!o2) return;
-    const i2 = a2 === "return" ? 0 : -1, m3 = a2 === "return" ? -1 : 0;
-    l.moveCursor(r2, i2, m3, () => {
-      l.clearLine(r2, 1, () => {
+    const c3 = i2 === "return" ? 0 : -1, a2 = i2 === "return" ? -1 : 0;
+    f$1.moveCursor(r2, c3, a2, () => {
+      f$1.clearLine(r2, 1, () => {
         e.once("keypress", t2);
       });
     });
   };
-  return n3 && r2.write(import_sisteransi.cursor.hide), e.once("keypress", t2), () => {
-    e.off("keypress", t2), n3 && r2.write(import_sisteransi.cursor.show), e instanceof ReadStream && e.isTTY && !R && e.setRawMode(false), s.terminal = false, s.close();
+  return n3 && r2.write(cursor.hide), e.once("keypress", t2), () => {
+    e.off("keypress", t2), n3 && r2.write(cursor.show), e instanceof ReadStream && e.isTTY && !R && e.setRawMode(false), s.terminal = false, s.close();
   };
 }
 var getColumns = (e) => "columns" in e && typeof e.columns == "number" ? e.columns : 80;
 var getRows = (e) => "rows" in e && typeof e.rows == "number" ? e.rows : 20;
 function wrapTextWithPrefix(e, r2, o2, n3 = o2, s = o2, t2) {
-  const f2 = getColumns(e ?? stdout);
-  return wrapAnsi(r2, f2 - o2.length, {
+  const l = getColumns(e ?? stdout), i2 = dist_default2(o2);
+  return wrapAnsi(r2, l - i2, {
     hard: true,
     trim: false
   }).split(`
-`).map((c3, i2, m3) => {
-    const d = t2 ? t2(c3, i2) : c3;
-    return i2 === 0 ? `${n3}${d}` : i2 === m3.length - 1 ? `${s}${d}` : `${o2}${d}`;
+`).map((c3, a2, g2) => {
+    const m3 = t2 ? t2(c3, a2) : c3;
+    return a2 === 0 ? `${n3}${m3}` : a2 === g2.length - 1 ? `${s}${m3}` : `${o2}${m3}`;
   }).join(`
 `);
 }
@@ -2626,7 +2614,7 @@ function runValidation(e, a2) {
   }
   return e(a2);
 }
-var y = class {
+var C$1 = class C {
   input;
   output;
   _abortSignal;
@@ -2708,16 +2696,16 @@ var y = class {
           { once: true }
         );
       }
-      this.rl = l__default.createInterface({
+      this.rl = f__default.createInterface({
         input: this.input,
         tabSize: 2,
         prompt: "",
         escapeCodeTimeout: 50,
         terminal: true
       }), this.rl.prompt(), this.opts.initialUserInput !== void 0 && this._setUserInput(this.opts.initialUserInput, true), this.input.on("keypress", this.onKeypress), setRawMode(this.input, true), this.output.on("resize", this.render), this.render(), this.once("submit", () => {
-        this.output.write(import_sisteransi.cursor.show), this.output.off("resize", this.render), setRawMode(this.input, false), t2(this.value);
+        this.output.write(cursor.show), this.output.off("resize", this.render), setRawMode(this.input, false), t2(this.value);
       }), this.once("cancel", () => {
-        this.output.write(import_sisteransi.cursor.show), this.output.off("resize", this.render), setRawMode(this.input, false), t2(CANCEL_SYMBOL);
+        this.output.write(cursor.show), this.output.off("resize", this.render), setRawMode(this.input, false), t2(CANCEL_SYMBOL);
       });
     });
   }
@@ -2754,18 +2742,18 @@ var y = class {
 `), setRawMode(this.input, false), this.rl?.close(), this.rl = void 0, this.emit(`${this.state}`, this.value), this.unsubscribe();
   }
   restoreCursor() {
-    const t2 = wrapAnsi(this._prevFrame, process.stdout.columns, { hard: true, trim: false }).split(`
+    const t2 = wrapAnsi(this._prevFrame, getColumns(this.output), { hard: true, trim: false }).split(`
 `).length - 1;
-    this.output.write(import_sisteransi.cursor.move(-999, t2 * -1));
+    this.output.write(cursor.move(-999, t2 * -1));
   }
   render() {
-    const t2 = wrapAnsi(this._render(this) ?? "", process.stdout.columns, {
+    const t2 = wrapAnsi(this._render(this) ?? "", getColumns(this.output), {
       hard: true,
       trim: false
     });
     if (t2 !== this._prevFrame) {
       if (this.state === "initial")
-        this.output.write(import_sisteransi.cursor.hide);
+        this.output.write(cursor.hide);
       else {
         const e = diffLines(this._prevFrame, t2), i2 = getRows(this.output);
         if (this.restoreCursor(), e) {
@@ -2776,46 +2764,46 @@ var y = class {
             return;
           }
           if (e.lines.length === 1) {
-            this.output.write(import_sisteransi.cursor.move(0, n3 - r2)), this.output.write(import_sisteransi.erase.lines(1));
+            this.output.write(cursor.move(0, n3 - r2)), this.output.write(erase.lines(1));
             const o2 = t2.split(`
 `);
-            this.output.write(o2[n3]), this._prevFrame = t2, this.output.write(import_sisteransi.cursor.move(0, o2.length - n3 - 1));
+            this.output.write(o2[n3]), this._prevFrame = t2, this.output.write(cursor.move(0, o2.length - n3 - 1));
             return;
           } else if (e.lines.length > 1) {
             if (s < r2)
               n3 = s;
             else {
               const h2 = n3 - r2;
-              h2 > 0 && this.output.write(import_sisteransi.cursor.move(0, h2));
+              h2 > 0 && this.output.write(cursor.move(0, h2));
             }
-            this.output.write(import_sisteransi.erase.down());
-            const f2 = t2.split(`
+            this.output.write(erase.down());
+            const m3 = t2.split(`
 `).slice(n3);
-            this.output.write(f2.join(`
+            this.output.write(m3.join(`
 `)), this._prevFrame = t2;
             return;
           }
         }
-        this.output.write(import_sisteransi.erase.down());
+        this.output.write(erase.down());
       }
       this.output.write(t2), this.state === "initial" && (this.state = "active"), this._prevFrame = t2;
     }
   }
 };
-function p$1(l2, e) {
-  if (l2 === void 0 || e.length === 0)
+function p$1(l, e) {
+  if (l === void 0 || e.length === 0)
     return 0;
-  const i2 = e.findIndex((s) => s.value === l2);
+  const i2 = e.findIndex((s) => s.value === l);
   return i2 !== -1 ? i2 : 0;
 }
-function m(l2, e) {
-  return (e.label ?? String(e.value)).toLowerCase().includes(l2.toLowerCase());
+function m(l, e) {
+  return (e.label ?? String(e.value)).toLowerCase().includes(l.toLowerCase());
 }
-function g(l2, e) {
+function g(l, e) {
   if (e)
-    return l2 ? e : e[0];
+    return l ? e : e[0];
 }
-var T$1 = class T extends y {
+var T$1 = class T extends C$1 {
   filteredOptions;
   multiple;
   isNavigating = false;
@@ -2857,11 +2845,11 @@ var T$1 = class T extends y {
     return e === "	" || this.multiple && this.isNavigating && t2.name === "space" && e !== void 0 && e !== "";
   }
   #u(e, t2) {
-    const i2 = t2.name === "up", s = t2.name === "down", n3 = t2.name === "return", r2 = this.userInput === "" || this.userInput === "	", u5 = this.#n, d = this.options, c3 = u5 !== void 0 && u5 !== "" && d.some(
-      (o2) => !o2.disabled && (this.#t ? this.#t(u5, o2) : true)
+    const i2 = t2.name === "up", s = t2.name === "down", n3 = t2.name === "return", r2 = this.userInput === "" || this.userInput === "	", u4 = this.#n, d = this.options, c3 = u4 !== void 0 && u4 !== "" && d.some(
+      (o2) => !o2.disabled && (this.#t ? this.#t(u4, o2) : true)
     );
     if (t2.name === "tab" && r2 && c3) {
-      this.userInput === "	" && this._clearUserInput(), this._setUserInput(u5, true), this.isNavigating = false;
+      this.userInput === "	" && this._clearUserInput(), this._setUserInput(u4, true), this.isNavigating = false;
       return;
     }
     if (t2.name === "tab" && this.#l && !this.multiple && this.focusedValue !== void 0) {
@@ -2889,7 +2877,7 @@ var T$1 = class T extends y {
     }
   }
 };
-var r = class extends y {
+var r = class extends C$1 {
   get cursor() {
     return this.value ? 0 : 1;
   }
@@ -2900,7 +2888,7 @@ var r = class extends y {
     super(t2, false), this.value = !!t2.initialValue, this.on("userInput", () => {
       this.value = this._value;
     }), this.on("confirm", (i2) => {
-      this.output.write(import_sisteransi.cursor.move(0, -1)), this.value = i2, this.state = "submit", this.close();
+      this.output.write(cursor.move(0, -1)), this.value = i2, this.state = "submit", this.close();
     }), this.on("cursor", () => {
       this.value = !this.value;
     });
@@ -2935,7 +2923,7 @@ function f(r2) {
     day: p(r2.day)
   };
 }
-function c(r2, t2) {
+function c$1(r2, t2) {
   return new Date(r2 || 2001, t2 || 1, 0).getDate();
 }
 function b(r2) {
@@ -2945,7 +2933,7 @@ function b(r2) {
   if (!(n3.getUTCFullYear() !== t2 || n3.getUTCMonth() !== i2 - 1 || n3.getUTCDate() !== s))
     return { year: t2, month: i2, day: s };
 }
-function C(r2) {
+function C2(r2) {
   const t2 = b(r2);
   return t2 ? new Date(Date.UTC(t2.year, t2.month - 1, t2.day)) : void 0;
 }
@@ -2964,10 +2952,10 @@ function T2(r2, t2, i2, s) {
     max: e && t2.year === e.year ? e.month : 12
   } : {
     min: n3 && t2.year === n3.year && t2.month === n3.month ? n3.day : 1,
-    max: e && t2.year === e.year && t2.month === e.month ? e.day : c(t2.year, t2.month)
+    max: e && t2.year === e.year && t2.month === e.month ? e.day : c$1(t2.year, t2.month)
   };
 }
-var U = class extends y {
+var U = class extends C$1 {
   #i;
   #o;
   #t;
@@ -2996,7 +2984,7 @@ var U = class extends y {
     return this.#i.map((i2) => t2[i2.type]).join(this.#o);
   }
   #r() {
-    this._setUserInput(this.#l(this.#t)), this._setValue(C(this.#t) ?? void 0);
+    this._setUserInput(this.#l(this.#t)), this._setValue(C2(this.#t) ?? void 0);
   }
   constructor(t2) {
     const i2 = t2.format ? { segments: M(t2.format), separator: t2.separator ?? "/" } : P(t2.locale), s = t2.separator ?? i2.separator, n3 = t2.format ? M(t2.format) : i2.segments, e = t2.initialValue ?? t2.defaultValue, m3 = e ? {
@@ -3004,7 +2992,7 @@ var U = class extends y {
       month: String(e.getUTCMonth() + 1).padStart(2, "0"),
       day: String(e.getUTCDate()).padStart(2, "0")
     } : { year: "____", month: "__", day: "__" }, o2 = n3.map((a2) => m3[a2.type]).join(s);
-    super({ ...t2, initialUserInput: o2 }, false), this.#i = n3, this.#o = s, this.#t = m3, this.#h = t2.minDate, this.#u = t2.maxDate, this.#r(), this.on("cursor", (a2) => this.#f(a2)), this.on("key", (a2, u5) => this.#y(a2, u5)), this.on("finalize", () => this.#p(t2));
+    super({ ...t2, initialUserInput: o2 }, false), this.#i = n3, this.#o = s, this.#t = m3, this.#h = t2.minDate, this.#u = t2.maxDate, this.#r(), this.on("cursor", (a2) => this.#f(a2)), this.on("key", (a2, u4) => this.#y(a2, u4)), this.on("finalize", () => this.#p(t2));
   }
   #a() {
     const t2 = Math.max(0, Math.min(this.#e.segmentIndex, this.#i.length - 1)), i2 = this.#i[t2];
@@ -3084,33 +3072,33 @@ var U = class extends y {
         return;
       }
       this.#n && !m3 && (this.#t[e.type] = "_".repeat(e.len), this.#e.positionInSegment = 0), this.#n = false, this.#s = null;
-      const o2 = this.#t[e.type], a2 = o2.indexOf("_"), u5 = a2 >= 0 ? a2 : Math.min(this.#e.positionInSegment, e.len - 1);
-      if (u5 < 0 || u5 >= e.len) return;
-      let l2 = o2.slice(0, u5) + t2 + o2.slice(u5 + 1), D = false;
-      if (u5 === 0 && o2 === "__" && (e.type === "month" || e.type === "day")) {
+      const o2 = this.#t[e.type], a2 = o2.indexOf("_"), u4 = a2 >= 0 ? a2 : Math.min(this.#e.positionInSegment, e.len - 1);
+      if (u4 < 0 || u4 >= e.len) return;
+      let l = o2.slice(0, u4) + t2 + o2.slice(u4 + 1), D = false;
+      if (u4 === 0 && o2 === "__" && (e.type === "month" || e.type === "day")) {
         const h2 = Number.parseInt(t2, 10);
-        l2 = `0${t2}`, D = h2 <= (e.type === "month" ? 1 : 2);
+        l = `0${t2}`, D = h2 <= (e.type === "month" ? 1 : 2);
       }
-      if (e.type === "year" && (l2 = (o2.replace(/_/g, "") + t2).padStart(e.len, "_")), !l2.includes("_")) {
-        const h2 = { ...this.#t, [e.type]: l2 }, d = this.#g(h2, e);
+      if (e.type === "year" && (l = (o2.replace(/_/g, "") + t2).padStart(e.len, "_")), !l.includes("_")) {
+        const h2 = { ...this.#t, [e.type]: l }, d = this.#g(h2, e);
         if (d) {
           this.inlineError = d;
           return;
         }
       }
-      this.inlineError = "", this.#t[e.type] = l2;
-      const y2 = l2.includes("_") ? void 0 : b(this.#t);
-      if (y2) {
-        const { year: h2, month: d } = y2, g2 = c(h2, d);
+      this.inlineError = "", this.#t[e.type] = l;
+      const y = l.includes("_") ? void 0 : b(this.#t);
+      if (y) {
+        const { year: h2, month: d } = y, g2 = c$1(h2, d);
         this.#t = {
           year: String(Math.max(0, Math.min(9999, h2))).padStart(4, "0"),
           month: String(Math.max(1, Math.min(12, d))).padStart(2, "0"),
-          day: String(Math.max(1, Math.min(g2, y2.day))).padStart(2, "0")
+          day: String(Math.max(1, Math.min(g2, y.day))).padStart(2, "0")
         };
       }
       this.#r();
-      const S = l2.indexOf("_");
-      D ? (this.#n = true, this.#s = t2) : S >= 0 ? this.#e.positionInSegment = S : a2 >= 0 && n3.index < this.#i.length - 1 ? (this.#e.segmentIndex = n3.index + 1, this.#e.positionInSegment = 0, this.#n = true) : this.#e.positionInSegment = Math.min(u5 + 1, e.len - 1);
+      const S = l.indexOf("_");
+      D ? (this.#n = true, this.#s = t2) : S >= 0 ? this.#e.positionInSegment = S : a2 >= 0 && n3.index < this.#i.length - 1 ? (this.#e.segmentIndex = n3.index + 1, this.#e.positionInSegment = 0, this.#n = true) : this.#e.positionInSegment = Math.min(u4 + 1, e.len - 1);
     }
   }
   #g(t2, i2) {
@@ -3123,62 +3111,64 @@ var U = class extends y {
   #p(t2) {
     const { year: i2, month: s, day: n3 } = f(this.#t);
     if (i2 && s && n3) {
-      const e = c(i2, s);
+      const e = c$1(i2, s);
       this.#t = {
         ...this.#t,
         day: String(Math.min(n3, e)).padStart(2, "0")
       };
     }
-    this.value = C(this.#t) ?? t2.defaultValue ?? void 0;
+    this.value = C2(this.#t) ?? t2.defaultValue ?? void 0;
   }
 };
-var u$2 = class u extends y {
+var u$1 = class u extends C$1 {
   options;
   cursor = 0;
-  #t;
+  #e;
   getGroupItems(t2) {
-    return this.options.filter((r2) => r2.group === t2);
+    return this.options.filter((i2) => i2.group === t2);
   }
   isGroupSelected(t2) {
-    const r2 = this.getGroupItems(t2), e = this.value;
-    return e === void 0 ? false : r2.every((s) => e.includes(s.value));
+    const i2 = this.getGroupItems(t2), e = this.value;
+    return e === void 0 ? false : i2.every((s) => e.includes(s.value));
   }
   toggleValue() {
     const t2 = this.options[this.cursor];
     if (t2 !== void 0)
       if (this.value === void 0 && (this.value = []), t2.group === true) {
-        const r2 = t2.value, e = this.getGroupItems(r2);
-        this.isGroupSelected(r2) ? this.value = this.value.filter(
-          (s) => e.findIndex((i2) => i2.value === s) === -1
+        const i2 = t2.value, e = this.getGroupItems(i2);
+        this.isGroupSelected(i2) ? this.value = this.value.filter(
+          (s) => e.findIndex((r2) => r2.value === s) === -1
         ) : this.value = [...this.value, ...e.map((s) => s.value)], this.value = Array.from(new Set(this.value));
       } else {
-        const r2 = this.value.includes(t2.value);
-        this.value = r2 ? this.value.filter((e) => e !== t2.value) : [...this.value, t2.value];
+        const i2 = this.value.includes(t2.value);
+        this.value = i2 ? this.value.filter((e) => e !== t2.value) : [...this.value, t2.value];
       }
   }
   constructor(t2) {
     super(t2, false);
-    const { options: r2 } = t2;
-    this.#t = t2.selectableGroups !== false, this.options = Object.entries(r2).flatMap(([e, s]) => [
+    const { options: i2 } = t2;
+    this.#e = t2.selectableGroups !== false, this.options = Object.entries(i2).flatMap(([e, s]) => [
       { value: e, group: true, label: e },
-      ...s.map((i2) => ({ ...i2, group: e }))
+      ...s.map((r2) => ({ ...r2, group: e }))
     ]), this.value = [...t2.initialValues ?? []], this.cursor = Math.max(
       this.options.findIndex(({ value: e }) => e === t2.cursorAt),
-      this.#t ? 0 : 1
-    ), this.on("cursor", (e) => {
+      this.#e ? 0 : 1
+    ), this.on("key", (e, s) => {
+      s.name === void 0 && e === "\u3000" && this.toggleValue();
+    }), this.on("cursor", (e) => {
       switch (e) {
         case "left":
         case "up": {
           this.cursor = this.cursor === 0 ? this.options.length - 1 : this.cursor - 1;
           const s = this.options[this.cursor]?.group === true;
-          !this.#t && s && (this.cursor = this.cursor === 0 ? this.options.length - 1 : this.cursor - 1);
+          !this.#e && s && (this.cursor = this.cursor === 0 ? this.options.length - 1 : this.cursor - 1);
           break;
         }
         case "down":
         case "right": {
           this.cursor = this.cursor === this.options.length - 1 ? 0 : this.cursor + 1;
           const s = this.options[this.cursor]?.group === true;
-          !this.#t && s && (this.cursor = this.cursor === this.options.length - 1 ? 0 : this.cursor + 1);
+          !this.#e && s && (this.cursor = this.cursor === this.options.length - 1 ? 0 : this.cursor + 1);
           break;
         }
         case "space":
@@ -3189,7 +3179,7 @@ var u$2 = class u extends y {
   }
 };
 var o = /* @__PURE__ */ new Set(["up", "down", "left", "right"]);
-var h = class extends y {
+var h = class extends C$1 {
   #t = false;
   #s;
   focused = "editor";
@@ -3283,7 +3273,7 @@ ${i2}` : `${s}${styleText("inverse", r2)}${i2}`;
     });
   }
 };
-var a = class extends y {
+var a = class extends C$1 {
   options;
   cursor = 0;
   get _value() {
@@ -3314,8 +3304,8 @@ var a = class extends y {
       this.options.findIndex(({ value: t2 }) => t2 === e.cursorAt),
       0
     );
-    this.cursor = this.options[i2]?.disabled ? findCursor(i2, 1, this.options) : i2, this.on("key", (t2, l2) => {
-      l2.name === "a" && this.toggleAll(), l2.name === "i" && this.toggleInvert();
+    this.cursor = this.options[i2]?.disabled ? findCursor(i2, 1, this.options) : i2, this.on("key", (t2, s) => {
+      s.name === "a" && this.toggleAll(), s.name === "i" && this.toggleInvert(), s.name === void 0 && t2 === "\u3000" && this.toggleValue();
     }), this.on("cursor", (t2) => {
       switch (t2) {
         case "left":
@@ -3333,7 +3323,7 @@ var a = class extends y {
     });
   }
 };
-var u$1 = class u2 extends y {
+var u2 = class extends C$1 {
   _mask = "\u2022";
   get cursor() {
     return this._cursor;
@@ -3361,7 +3351,7 @@ var u$1 = class u2 extends y {
     });
   }
 };
-var n$1 = class n extends y {
+var n$1 = class n extends C$1 {
   options;
   cursor = 0;
   get _selectedValue() {
@@ -3389,24 +3379,24 @@ var n$1 = class n extends y {
     });
   }
 };
-var u3 = class extends y {
+var c = class extends C$1 {
   options;
   cursor = 0;
   constructor(t2) {
     super(t2, false), this.options = t2.options;
-    const s = t2.caseSensitive === true, i2 = this.options.map(({ value: [e] }) => s ? e : e?.toLowerCase());
-    this.cursor = Math.max(i2.indexOf(t2.initialValue), 0), this.on("key", (e) => {
+    const s = t2.caseSensitive === true, i2 = this.options.map(({ value: [e] }) => s ? e : e?.toLowerCase()), n3 = Math.max(i2.indexOf(t2.initialValue), 0);
+    this.cursor = this.options[n3]?.disabled ? 0 : n3, this.on("key", (e) => {
       if (!e)
         return;
       const o2 = s ? e : e.toLowerCase();
       if (!i2.includes(o2))
         return;
-      const n3 = this.options.find(({ value: [r2] }) => s ? r2 === o2 : r2?.toLowerCase() === o2);
-      n3 && (this.value = n3.value, this.state = "submit", this.emit("submit"));
+      const r2 = this.options.find(({ value: [a2], disabled: u4 }) => u4 ? false : s ? a2 === o2 : a2?.toLowerCase() === o2);
+      r2 && (this.value = r2.value, this.state = "submit", this.emit("submit"));
     });
   }
 };
-var n2 = class extends y {
+var n2 = class extends C$1 {
   get userInputWithCursor() {
     if (this.state === "submit")
       return this.userInput;
@@ -3434,7 +3424,6 @@ var n2 = class extends y {
 // node_modules/@clack/prompts/dist/index.mjs
 import { styleText as styleText2, stripVTControlCharacters } from "node:util";
 import process$1 from "node:process";
-var import_sisteransi2 = __toESM(require_src(), 1);
 import { existsSync, lstatSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 function isUnicodeSupported() {
@@ -3445,8 +3434,8 @@ function isUnicodeSupported() {
 }
 var unicode = isUnicodeSupported();
 var isCI = () => process.env.CI === "true";
-var isTTY = (o2) => o2.isTTY === true;
-var unicodeOr = (o2, e) => unicode ? o2 : e;
+var isTTY = (e) => e.isTTY === true;
+var unicodeOr = (e, o2) => unicode ? e : o2;
 var S_STEP_ACTIVE = unicodeOr("\u25C6", "*");
 var S_STEP_CANCEL = unicodeOr("\u25A0", "x");
 var S_STEP_ERROR = unicodeOr("\u25B2", "x");
@@ -3472,8 +3461,8 @@ var S_INFO = unicodeOr("\u25CF", "\u2022");
 var S_SUCCESS = unicodeOr("\u25C6", "*");
 var S_WARN = unicodeOr("\u25B2", "!");
 var S_ERROR = unicodeOr("\u25A0", "x");
-var symbol = (o2) => {
-  switch (o2) {
+var symbol = (e) => {
+  switch (e) {
     case "initial":
     case "active":
       return styleText2("cyan", S_STEP_ACTIVE);
@@ -3487,8 +3476,8 @@ var symbol = (o2) => {
       return styleText2("dim", S_STEP_ACTIVE);
   }
 };
-var symbolBar = (o2) => {
-  switch (o2) {
+var symbolBar = (e) => {
+  switch (e) {
     case "initial":
     case "active":
       return styleText2("cyan", S_BAR);
@@ -3500,49 +3489,50 @@ var symbolBar = (o2) => {
       return styleText2("green", S_BAR);
   }
 };
-function formatInstructionFooter(o2, e) {
-  const r2 = [`${e ? `${styleText2("cyan", S_BAR)}  ` : ""}${o2.join(" \u2022 ")}`];
-  return e && r2.push(styleText2("cyan", S_BAR_END)), r2;
+function formatInstructionFooter(e, o2, r2) {
+  const s = r2 ? `${styleText2("cyan", S_BAR)}  ` : "", n3 = wrapTextWithPrefix(e, o2.join(" \u2022 "), s).split(`
+`);
+  return r2 && n3.push(styleText2("cyan", S_BAR_END)), n3;
 }
-var I = (l2, e, w, p3, b3, C3 = false) => {
+var E$1 = (l, e, w, p3, b3, C4 = false) => {
   let r2 = e, O = 0;
-  if (C3)
+  if (C4)
     for (let i2 = p3 - 1; i2 >= w; i2--) {
-      const m3 = l2[i2];
+      const m3 = l[i2];
       if (m3 && (r2 -= m3.length), O++, r2 <= b3) break;
     }
   else
     for (let i2 = w; i2 < p3; i2++) {
-      const m3 = l2[i2];
+      const m3 = l[i2];
       if (m3 && (r2 -= m3.length), O++, r2 <= b3) break;
     }
   return { lineCount: r2, removals: O };
 };
 var limitOptions = ({
-  cursor: l2,
+  cursor: l,
   options: e,
   style: w,
   output: p3 = process.stdout,
   maxItems: b3 = Number.POSITIVE_INFINITY,
-  columnPadding: C3 = 0,
+  columnPadding: C4 = 0,
   rowPadding: r2 = 4
 }) => {
-  const i2 = getColumns(p3) - C3, m3 = getRows(p3), M2 = styleText2("dim", "..."), v = Math.max(m3 - r2, 0), a2 = Math.max(Math.min(b3, v), 5);
+  const i2 = getColumns(p3) - C4, m3 = getRows(p3), M2 = styleText2("dim", "..."), v = Math.max(m3 - r2, 0), a2 = Math.max(Math.min(b3, v), 5);
   let f2 = 0;
-  l2 >= a2 - 3 && (f2 = Math.max(
-    Math.min(l2 - a2 + 3, e.length - a2),
+  l >= a2 - 3 && (f2 = Math.max(
+    Math.min(l - a2 + 3, e.length - a2),
     0
   ));
   let d = a2 < e.length && f2 > 0, c3 = a2 < e.length && f2 + a2 < e.length;
-  const W2 = Math.min(
+  const I = Math.min(
     f2 + a2,
     e.length
   ), s = [];
   let g2 = 0;
   d && g2++, c3 && g2++;
-  const T3 = f2 + (d ? 1 : 0), y2 = W2 - (c3 ? 1 : 0);
-  for (let t2 = T3; t2 < y2; t2++) {
-    const n3 = e[t2], o2 = n3 ? w(n3, t2 === l2) : "", h2 = wrapAnsi(o2, i2, {
+  const T3 = f2 + (d ? 1 : 0), W2 = I - (c3 ? 1 : 0);
+  for (let t2 = T3; t2 < W2; t2++) {
+    const n3 = e[t2], o2 = n3 !== void 0 ? w(n3, t2 === l) : "", h2 = wrapAnsi(o2, i2, {
       hard: true,
       trim: false
     }).split(`
@@ -3551,17 +3541,17 @@ var limitOptions = ({
   }
   if (g2 > v) {
     let t2 = 0, n3 = 0, o2 = g2;
-    const h2 = l2 - T3;
-    let u5 = v;
-    const L = () => I(s, o2, 0, h2, u5), E2 = () => I(
+    const h2 = l - T3;
+    let u4 = v;
+    const L = () => E$1(s, o2, 0, h2, u4), y = () => E$1(
       s,
       o2,
       h2 + 1,
       s.length,
-      u5,
+      u4,
       true
     );
-    d ? ({ lineCount: o2, removals: t2 } = L(), o2 > u5 && (c3 || (u5 -= 1), { lineCount: o2, removals: n3 } = E2())) : (c3 || (u5 -= 1), { lineCount: o2, removals: n3 } = E2(), o2 > u5 && (u5 -= 1, { lineCount: o2, removals: t2 } = L())), t2 > 0 && (d = true, s.splice(0, t2)), n3 > 0 && (c3 = true, s.splice(s.length - n3, n3));
+    d ? ({ lineCount: o2, removals: t2 } = L(), o2 > u4 && (c3 || (u4 -= 1), { lineCount: o2, removals: n3 } = y())) : (c3 || (u4 -= 1), { lineCount: o2, removals: n3 } = y(), o2 > u4 && (u4 -= 1, { lineCount: o2, removals: t2 } = L())), t2 > 0 && (d = true, s.splice(0, t2)), n3 > 0 && (c3 = true, s.splice(s.length - n3, n3));
   }
   const x2 = [];
   d && x2.push(M2);
@@ -3587,7 +3577,7 @@ function j(t2, c3) {
 }
 var autocomplete = (t2) => new T$1({
   options: t2.options,
-  initialValue: t2.initialValue ? [t2.initialValue] : void 0,
+  initialValue: t2.initialValue !== void 0 ? [t2.initialValue] : void 0,
   initialUserInput: t2.initialUserInput,
   placeholder: t2.placeholder,
   completeOnTab: t2.completeOnTab,
@@ -3597,11 +3587,11 @@ var autocomplete = (t2) => new T$1({
   output: t2.output,
   validate: t2.validate,
   render() {
-    const n3 = t2.withGuide ?? settings.withGuide, i2 = n3 ? [`${styleText2("gray", S_BAR)}`, `${symbol(this.state)}  ${t2.message}`] : [`${symbol(this.state)}  ${t2.message}`], r2 = this.userInput, o2 = this.options, m3 = t2.placeholder, p3 = r2 === "" && m3 !== void 0, $ = (l2, s) => {
-      const a2 = E(l2), u5 = l2.hint && l2.value === this.focusedValue ? styleText2("dim", ` (${l2.hint})`) : "";
+    const n3 = t2.withGuide ?? settings.withGuide, i2 = n3 ? [`${styleText2("gray", S_BAR)}`, `${symbol(this.state)}  ${t2.message}`] : [`${symbol(this.state)}  ${t2.message}`], r2 = this.userInput, o2 = this.options, m3 = t2.placeholder, p3 = r2 === "" && m3 !== void 0, $ = (l, s) => {
+      const a2 = E(l), u4 = l.hint && l.value === this.focusedValue ? styleText2("dim", ` (${l.hint})`) : "";
       switch (s) {
         case "active":
-          return `${styleText2("green", S_RADIO_ACTIVE)} ${a2}${u5}`;
+          return `${styleText2("green", S_RADIO_ACTIVE)} ${a2}${u4}`;
         case "inactive":
           return `${styleText2("dim", S_RADIO_INACTIVE)} ${styleText2("dim", a2)}`;
         case "disabled":
@@ -3610,33 +3600,33 @@ var autocomplete = (t2) => new T$1({
     };
     switch (this.state) {
       case "submit": {
-        const l2 = j(this.selectedValues, o2), s = l2.length > 0 ? `  ${styleText2("dim", l2.map(E).join(", "))}` : "", a2 = n3 ? styleText2("gray", S_BAR) : "";
+        const l = j(this.selectedValues, o2), s = l.length > 0 ? `  ${styleText2("dim", l.map(E).join(", "))}` : "", a2 = n3 ? styleText2("gray", S_BAR) : "";
         return `${i2.join(`
 `)}
 ${a2}${s}`;
       }
       case "cancel": {
-        const l2 = r2 ? `  ${styleText2(["strikethrough", "dim"], r2)}` : "", s = n3 ? styleText2("gray", S_BAR) : "";
+        const l = r2 ? `  ${styleText2(["strikethrough", "dim"], r2)}` : "", s = n3 ? styleText2("gray", S_BAR) : "";
         return `${i2.join(`
 `)}
-${s}${l2}`;
+${s}${l}`;
       }
       default: {
-        const l2 = this.state === "error" ? "yellow" : "cyan", s = n3 ? `${styleText2(l2, S_BAR)}  ` : "", a2 = n3 ? styleText2(l2, S_BAR_END) : "";
-        let u5 = "";
+        const l = this.state === "error" ? "yellow" : "cyan", s = n3 ? `${styleText2(l, S_BAR)}  ` : "", a2 = n3 ? styleText2(l, S_BAR_END) : "";
+        let u4 = "";
         if (this.isNavigating || p3) {
           const d = p3 ? m3 : r2;
-          u5 = d !== "" ? ` ${styleText2("dim", d)}` : "";
+          u4 = d !== "" ? ` ${styleText2("dim", d)}` : "";
         } else
-          u5 = ` ${this.userInputWithCursor}`;
+          u4 = ` ${this.userInputWithCursor}`;
         const V = this.filteredOptions.length !== o2.length ? styleText2(
           "dim",
           ` (${this.filteredOptions.length} match${this.filteredOptions.length === 1 ? "" : "es"})`
-        ) : "", b3 = this.filteredOptions.length === 0 && r2 ? [`${s}${styleText2("yellow", "No matches found")}`] : [], y2 = this.state === "error" ? [`${s}${styleText2("yellow", this.error)}`] : [];
+        ) : "", b3 = this.filteredOptions.length === 0 && r2 ? [`${s}${styleText2("yellow", "No matches found")}`] : [], y = this.state === "error" ? [`${s}${styleText2("yellow", this.error)}`] : [];
         n3 && i2.push(`${s.trimEnd()}`), i2.push(
-          `${s}${styleText2("dim", "Search:")}${u5}${V}`,
+          `${s}${styleText2("dim", "Search:")}${u4}${V}`,
           ...b3,
-          ...y2
+          ...y
         );
         const S = [
           `${styleText2("dim", "\u2191/\u2193")} to select`,
@@ -3668,8 +3658,8 @@ ${s}${l2}`;
 }).prompt();
 var autocompleteMultiselect = (t2) => {
   const c3 = (i2, r2, o2, m3) => {
-    const p3 = o2.includes(i2.value), $ = i2.label ?? String(i2.value ?? ""), l2 = i2.hint && m3 !== void 0 && i2.value === m3 ? styleText2("dim", ` (${i2.hint})`) : "", s = p3 ? styleText2("green", S_CHECKBOX_SELECTED) : styleText2("dim", S_CHECKBOX_INACTIVE);
-    return i2.disabled ? `${styleText2("gray", S_CHECKBOX_INACTIVE)} ${styleText2(["strikethrough", "gray"], $)}` : r2 ? `${s} ${$}${l2}` : `${s} ${styleText2("dim", $)}`;
+    const p3 = o2.includes(i2.value), $ = i2.label ?? String(i2.value ?? ""), l = i2.hint && m3 !== void 0 && i2.value === m3 ? styleText2("dim", ` (${i2.hint})`) : "", s = p3 ? styleText2("green", S_CHECKBOX_SELECTED) : styleText2("dim", S_CHECKBOX_INACTIVE);
+    return i2.disabled ? `${styleText2("gray", S_CHECKBOX_INACTIVE)} ${styleText2(["strikethrough", "gray"], $)}` : r2 ? `${s} ${$}${l}` : `${s} ${styleText2("dim", $)}`;
   }, n3 = new T$1({
     options: t2.options,
     multiple: true,
@@ -3686,7 +3676,7 @@ var autocompleteMultiselect = (t2) => {
     render() {
       const i2 = t2.withGuide ?? settings.withGuide, r2 = `${i2 ? `${styleText2("gray", S_BAR)}
 ` : ""}${symbol(this.state)}  ${t2.message}
-`, o2 = this.userInput, m3 = t2.placeholder, p3 = o2 === "" && m3 !== void 0, $ = this.isNavigating || p3 ? styleText2("dim", p3 ? m3 : o2) : this.userInputWithCursor, l2 = this.options, s = this.filteredOptions.length !== l2.length ? styleText2(
+`, o2 = this.userInput, m3 = t2.placeholder, p3 = o2 === "" && m3 !== void 0, $ = this.isNavigating || p3 ? styleText2("dim", p3 ? m3 : o2) : this.userInputWithCursor, l = this.options, s = this.filteredOptions.length !== l.length ? styleText2(
         "dim",
         ` (${this.filteredOptions.length} match${this.filteredOptions.length === 1 ? "" : "es"})`
       ) : "";
@@ -3702,18 +3692,18 @@ var autocompleteMultiselect = (t2) => {
             o2
           )}`;
         default: {
-          const a2 = this.state === "error" ? "yellow" : "cyan", u5 = i2 ? `${styleText2(a2, S_BAR)}  ` : "", V = i2 ? styleText2(a2, S_BAR_END) : "", b3 = [
+          const a2 = this.state === "error" ? "yellow" : "cyan", u4 = i2 ? `${styleText2(a2, S_BAR)}  ` : "", V = i2 ? styleText2(a2, S_BAR_END) : "", b3 = [
             `${styleText2("dim", "\u2191/\u2193")} to navigate`,
             `${styleText2("dim", this.isNavigating ? "Space/Tab:" : "Tab:")} select`,
             `${styleText2("dim", "Enter:")} confirm`,
             `${styleText2("dim", "Type:")} to search`
-          ], y2 = this.filteredOptions.length === 0 && o2 ? [`${u5}${styleText2("yellow", "No matches found")}`] : [], S = this.state === "error" ? [`${u5}${styleText2("yellow", this.error)}`] : [], g2 = [
+          ], y = this.filteredOptions.length === 0 && o2 ? [`${u4}${styleText2("yellow", "No matches found")}`] : [], S = this.state === "error" ? [`${u4}${styleText2("yellow", this.error)}`] : [], g2 = [
             ...`${r2}${i2 ? styleText2(a2, S_BAR) : ""}`.split(`
 `),
-            `${u5}${styleText2("dim", "Search:")} ${$}${s}`,
-            ...y2,
+            `${u4}${styleText2("dim", "Search:")} ${$}${s}`,
+            ...y,
             ...S
-          ], O = [`${u5}${b3.join(" \u2022 ")}`, V], d = limitOptions({
+          ], O = [`${u4}${b3.join(" \u2022 ")}`, V], d = limitOptions({
             cursor: this.cursor,
             options: this.filteredOptions,
             style: (f2, L) => c3(f2, L, this.selectedValues, this.focusedValue),
@@ -3723,7 +3713,7 @@ var autocompleteMultiselect = (t2) => {
           });
           return [
             ...g2,
-            ...d.map((f2) => `${u5}${f2}`),
+            ...d.map((f2) => `${u4}${f2}`),
             ...O
           ].join(`
 `);
@@ -3746,12 +3736,12 @@ function A$1(n3, e, t2, o2) {
 }
 var U2 = (n3) => n3;
 var box = (n3 = "", e = "", t2) => {
-  const o2 = t2?.output ?? process.stdout, i2 = getColumns(o2), R2 = 1 * 2, u5 = t2?.titlePadding ?? 1, h2 = t2?.contentPadding ?? 2, w = t2?.width === void 0 || t2.width === "auto" ? 1 : Math.min(1, t2.width), m3 = t2?.withGuide ?? settings.withGuide ? `${styleText2("gray", S_BAR)} ` : "", b3 = t2?.formatBorder ?? U2, a2 = (t2?.rounded ? K : Q).map(b3), _2 = b3(S_BAR_H), p3 = b3(S_BAR), x2 = dist_default2(m3), B = dist_default2(e), y2 = i2 - x2;
+  const o2 = t2?.output ?? process.stdout, i2 = getColumns(o2), R2 = 1 * 2, u4 = t2?.titlePadding ?? 1, h2 = t2?.contentPadding ?? 2, w = t2?.width === void 0 || t2.width === "auto" ? 1 : Math.min(1, t2.width), m3 = t2?.withGuide ?? settings.withGuide ? `${styleText2("gray", S_BAR)} ` : "", b3 = t2?.formatBorder ?? U2, a2 = (t2?.rounded ? K : Q).map(b3), _2 = b3(S_BAR_H), p3 = b3(S_BAR), x2 = dist_default2(m3), B = dist_default2(e), y = i2 - x2;
   let r2 = Math.floor(i2 * w) - x2;
   if (t2?.width === "auto") {
     const c3 = n3.split(`
 `);
-    let s = B + u5 * 2;
+    let s = B + u4 * 2;
     for (const G of c3) {
       const P3 = dist_default2(G) + h2 * 2;
       P3 > s && (s = P3);
@@ -3759,11 +3749,11 @@ var box = (n3 = "", e = "", t2) => {
     const g2 = s + R2;
     g2 < r2 && (r2 = g2);
   }
-  r2 % 2 !== 0 && (r2 < y2 ? r2++ : r2--);
-  const d = r2 - R2, T3 = d - u5 * 2, S = B > T3 ? `${e.slice(0, T3 - 3)}...` : e, [O, W2] = A$1(
+  r2 % 2 !== 0 && (r2 < y ? r2++ : r2--);
+  const d = r2 - R2, T3 = d - u4 * 2, S = B > T3 ? `${e.slice(0, T3 - 3)}...` : e, [O, W2] = A$1(
     dist_default2(S),
     d,
-    u5,
+    u4,
     t2?.titleAlign
   ), L = wrapAnsi(n3, d - h2 * 2, {
     hard: true,
@@ -3800,11 +3790,11 @@ var confirm = (e) => {
     output: e.output,
     initialValue: e.initialValue ?? true,
     render() {
-      const i2 = e.withGuide ?? settings.withGuide, u5 = `${symbol(this.state)}  `, l2 = i2 ? `${styleText2("gray", S_BAR)}  ` : "", f2 = wrapTextWithPrefix(
+      const i2 = e.withGuide ?? settings.withGuide, u4 = `${symbol(this.state)}  `, l = i2 ? `${styleText2("gray", S_BAR)}  ` : "", f2 = wrapTextWithPrefix(
         e.output,
         e.message,
-        l2,
-        u5
+        l,
+        u4
       ), s = `${i2 ? `${styleText2("gray", S_BAR)}
 ` : ""}${f2}
 `, c3 = this.value ? a2 : o2;
@@ -3847,7 +3837,7 @@ var date = (e) => {
     render() {
       const t2 = (e?.withGuide ?? settings.withGuide) !== false, i2 = `${`${t2 ? `${styleText2("gray", S_BAR)}
 ` : ""}${symbol(this.state)}  `}${e.message}
-`, l2 = this.state !== "initial" ? this.state : "active", d = b2(this, l2), c3 = this.value instanceof Date ? this.formattedValue : "";
+`, l = this.state !== "initial" ? this.state : "active", d = b2(this, l), c3 = this.value instanceof Date ? this.formattedValue : "";
       switch (this.state) {
         case "error": {
           const a2 = this.error ? `  ${styleText2("yellow", this.error)}` : "", s = t2 ? `${styleText2("yellow", S_BAR)}  ` : "", f2 = t2 ? styleText2("yellow", S_BAR_END) : "";
@@ -3881,9 +3871,9 @@ function b2(e, r2) {
   if (r2 === "submit" || r2 === "cancel")
     return e.formattedValue;
   const i2 = styleText2("gray", e.separator);
-  return e.segments.map((l2, d) => {
-    const c3 = d === o2.segmentIndex && !["submit", "cancel"].includes(r2), a2 = p2[l2.type];
-    return x(t2[l2.type], { isActive: c3, label: a2 });
+  return e.segments.map((l, d) => {
+    const c3 = d === o2.segmentIndex && !["submit", "cancel"].includes(r2), a2 = p2[l.type];
+    return x(t2[l.type], { isActive: c3, label: a2 });
   }).join(i2);
 }
 function x(e, r2) {
@@ -3914,22 +3904,22 @@ var MULTISELECT_INSTRUCTIONS = [
   `${styleText2("dim", "Space:")} select`,
   `${styleText2("dim", "Enter:")} confirm`
 ];
-var m2 = (i2, u5) => i2.split(`
-`).map((d) => u5(d)).join(`
+var m2 = (n3, u4) => n3.split(`
+`).map((d) => u4(d)).join(`
 `);
-var multiselect = (i2) => {
-  const u5 = (t2, a2) => {
+var multiselect = (n3) => {
+  const u4 = (t2, a2) => {
     const r2 = t2.label ?? String(t2.value);
     return a2 === "disabled" ? `${styleText2("gray", S_CHECKBOX_INACTIVE)} ${m2(r2, (o2) => styleText2(["strikethrough", "gray"], o2))}${t2.hint ? ` ${styleText2("dim", `(${t2.hint ?? "disabled"})`)}` : ""}` : a2 === "active" ? `${styleText2("cyan", S_CHECKBOX_ACTIVE)} ${r2}${t2.hint ? ` ${styleText2("dim", `(${t2.hint})`)}` : ""}` : a2 === "selected" ? `${styleText2("green", S_CHECKBOX_SELECTED)} ${m2(r2, (o2) => styleText2("dim", o2))}${t2.hint ? ` ${styleText2("dim", `(${t2.hint})`)}` : ""}` : a2 === "cancelled" ? `${m2(r2, (o2) => styleText2(["strikethrough", "dim"], o2))}` : a2 === "active-selected" ? `${styleText2("green", S_CHECKBOX_SELECTED)} ${r2}${t2.hint ? ` ${styleText2("dim", `(${t2.hint})`)}` : ""}` : a2 === "submitted" ? `${m2(r2, (o2) => styleText2("dim", o2))}` : `${styleText2("dim", S_CHECKBOX_INACTIVE)} ${m2(r2, (o2) => styleText2("dim", o2))}`;
-  }, d = i2.required ?? true, x2 = i2.showInstructions ?? true;
+  }, d = n3.required ?? true, x2 = n3.showInstructions ?? true;
   return new a({
-    options: i2.options,
-    signal: i2.signal,
-    input: i2.input,
-    output: i2.output,
-    initialValues: i2.initialValues,
+    options: n3.options,
+    signal: n3.signal,
+    input: n3.input,
+    output: n3.output,
+    initialValues: n3.initialValues,
     required: d,
-    cursorAt: i2.cursorAt,
+    cursorAt: n3.cursorAt,
     validate(t2) {
       if (d && (t2 === void 0 || t2.length === 0))
         return `Please select at least one option.
@@ -3945,75 +3935,75 @@ ${styleText2(
         )}`;
     },
     render() {
-      const t2 = i2.withGuide ?? settings.withGuide, a2 = wrapTextWithPrefix(
-        i2.output,
-        i2.message,
+      const t2 = n3.withGuide ?? settings.withGuide, a2 = wrapTextWithPrefix(
+        n3.output,
+        n3.message,
         t2 ? `${symbolBar(this.state)}  ` : "",
         `${symbol(this.state)}  `
       ), r2 = `${t2 ? `${styleText2("gray", S_BAR)}
 ` : ""}${a2}
-`, o2 = this.value ?? [], g2 = (n3, l2) => {
-        if (n3.disabled)
-          return u5(n3, "disabled");
-        const s = o2.includes(n3.value);
-        return l2 && s ? u5(n3, "active-selected") : s ? u5(n3, "selected") : u5(n3, l2 ? "active" : "inactive");
+`, o2 = this.value ?? [], g2 = (i2, l) => {
+        if (i2.disabled)
+          return u4(i2, "disabled");
+        const s = o2.includes(i2.value);
+        return l && s ? u4(i2, "active-selected") : s ? u4(i2, "selected") : u4(i2, l ? "active" : "inactive");
       };
       switch (this.state) {
         case "submit": {
-          const n3 = this.options.filter(({ value: s }) => o2.includes(s)).map((s) => u5(s, "submitted")).join(styleText2("dim", ", ")) || styleText2("dim", "none"), l2 = wrapTextWithPrefix(
-            i2.output,
-            n3,
+          const i2 = this.options.filter(({ value: s }) => o2.includes(s)).map((s) => u4(s, "submitted")).join(styleText2("dim", ", ")) || styleText2("dim", "none"), l = wrapTextWithPrefix(
+            n3.output,
+            i2,
             t2 ? `${styleText2("gray", S_BAR)}  ` : ""
           );
-          return `${r2}${l2}`;
+          return `${r2}${l}`;
         }
         case "cancel": {
-          const n3 = this.options.filter(({ value: s }) => o2.includes(s)).map((s) => u5(s, "cancelled")).join(styleText2("dim", ", "));
-          if (n3.trim() === "")
+          const i2 = this.options.filter(({ value: s }) => o2.includes(s)).map((s) => u4(s, "cancelled")).join(styleText2("dim", ", "));
+          if (i2.trim() === "")
             return `${r2}${styleText2("gray", S_BAR)}`;
-          const l2 = wrapTextWithPrefix(
-            i2.output,
-            n3,
+          const l = wrapTextWithPrefix(
+            n3.output,
+            i2,
             t2 ? `${styleText2("gray", S_BAR)}  ` : ""
           );
-          return `${r2}${l2}${t2 ? `
+          return `${r2}${l}${t2 ? `
 ${styleText2("gray", S_BAR)}` : ""}`;
         }
         case "error": {
-          const n3 = t2 ? `${styleText2("yellow", S_BAR)}  ` : "", l2 = this.error.split(`
+          const i2 = t2 ? `${styleText2("yellow", S_BAR)}  ` : "", l = this.error.split(`
 `).map(
             ($, v) => v === 0 ? `${t2 ? `${styleText2("yellow", S_BAR_END)}  ` : ""}${styleText2("yellow", $)}` : `   ${$}`
           ).join(`
 `), s = r2.split(`
-`).length, h2 = l2.split(`
+`).length, h2 = l.split(`
 `).length + 1;
-          return `${r2}${n3}${limitOptions({
-            output: i2.output,
+          return `${r2}${i2}${limitOptions({
+            output: n3.output,
             options: this.options,
             cursor: this.cursor,
-            maxItems: i2.maxItems,
-            columnPadding: n3.length,
+            maxItems: n3.maxItems,
+            columnPadding: i2.length,
             rowPadding: s + h2,
             style: g2
           }).join(`
-${n3}`)}
-${l2}
+${i2}`)}
+${l}
 `;
         }
         default: {
-          const n3 = t2 ? `${styleText2("cyan", S_BAR)}  ` : "", l2 = r2.split(`
-`).length, s = x2 ? formatInstructionFooter(MULTISELECT_INSTRUCTIONS, t2) : t2 ? [styleText2("cyan", S_BAR_END)] : [], h2 = s.join(`
+          const i2 = t2 ? `${styleText2("cyan", S_BAR)}  ` : "", l = r2.split(`
+`).length, s = x2 ? formatInstructionFooter(n3.output, MULTISELECT_INSTRUCTIONS, t2) : t2 ? [styleText2("cyan", S_BAR_END)] : [], h2 = s.join(`
 `), $ = s.length + 1;
-          return `${r2}${n3}${limitOptions({
-            output: i2.output,
+          return `${r2}${i2}${limitOptions({
+            output: n3.output,
             options: this.options,
             cursor: this.cursor,
-            maxItems: i2.maxItems,
-            columnPadding: n3.length,
-            rowPadding: l2 + $,
+            maxItems: n3.maxItems,
+            columnPadding: i2.length,
+            rowPadding: l + $,
             style: g2
           }).join(`
-${n3}`)}
+${i2}`)}
 ${h2}
 `;
         }
@@ -4021,83 +4011,83 @@ ${h2}
     }
   }).prompt();
 };
-var groupMultiselect = (o2) => {
-  const { selectableGroups: f2 = true, groupSpacing: x2 = 0 } = o2, d = (n3, l2, p3 = []) => {
-    const a2 = n3.label ?? String(n3.value), t2 = typeof n3.group == "string", s = t2 && (p3[p3.indexOf(n3) + 1] ?? { group: true }), u5 = t2 && s && s.group === true;
-    let r2 = "", c3 = "";
-    t2 && (f2 ? (r2 = u5 ? `${S_BAR_END} ` : `${S_BAR} `, c3 = u5 ? "  " : `${S_BAR} `) : r2 = "  ");
+var groupMultiselect = (r2) => {
+  const { selectableGroups: f2 = true, groupSpacing: x2 = 0 } = r2, d = (n3, l, p3 = []) => {
+    const a2 = n3.label ?? String(n3.value), t2 = typeof n3.group == "string", u4 = t2 && (p3[p3.indexOf(n3) + 1] ?? { group: true }), s = t2 && u4 && u4.group === true;
+    let o2 = "", c3 = "";
+    t2 && (f2 ? (o2 = s ? `${S_BAR_END} ` : `${S_BAR} `, c3 = s ? "  " : `${S_BAR} `) : o2 = "  ");
     let i2 = "";
     if (x2 > 0 && !t2 && (i2 = `
-`.repeat(x2)), l2 === "active")
+`.repeat(x2)), l === "active")
       return wrapTextWithPrefix(
-        o2.output,
+        r2.output,
         `${a2}${n3.hint ? ` ${styleText2("dim", `(${n3.hint})`)}` : ""}`,
-        `${i2}${styleText2("dim", r2)} `,
-        `${i2}${styleText2("dim", r2)}${styleText2("cyan", S_CHECKBOX_ACTIVE)} `,
+        `${i2}${styleText2("dim", o2)} `,
+        `${i2}${styleText2("dim", o2)}${styleText2("cyan", S_CHECKBOX_ACTIVE)} `,
         `${i2}${styleText2("dim", c3)} `
       );
-    if (l2 === "group-active")
+    if (l === "group-active")
       return wrapTextWithPrefix(
-        o2.output,
+        r2.output,
         a2,
-        `${i2}${r2} `,
-        `${i2}${r2}${styleText2("cyan", S_CHECKBOX_ACTIVE)} `,
+        `${i2}${o2} `,
+        `${i2}${o2}${styleText2("cyan", S_CHECKBOX_ACTIVE)} `,
         `${i2}${c3} `,
         (m3) => styleText2("dim", m3)
       );
-    if (l2 === "group-active-selected")
+    if (l === "group-active-selected")
       return wrapTextWithPrefix(
-        o2.output,
+        r2.output,
         a2,
-        `${i2}${r2} `,
-        `${i2}${r2}${styleText2("green", S_CHECKBOX_SELECTED)} `,
+        `${i2}${o2} `,
+        `${i2}${o2}${styleText2("green", S_CHECKBOX_SELECTED)} `,
         `${i2}${c3} `,
         (m3) => styleText2("dim", m3)
       );
-    if (l2 === "selected") {
+    if (l === "selected") {
       const m3 = t2 || f2 ? styleText2("green", S_CHECKBOX_SELECTED) : "";
       return wrapTextWithPrefix(
-        o2.output,
+        r2.output,
         `${a2}${n3.hint ? ` (${n3.hint})` : ""}`,
-        `${i2}${styleText2("dim", r2)} `,
-        `${i2}${styleText2("dim", r2)}${m3} `,
+        `${i2}${styleText2("dim", o2)} `,
+        `${i2}${styleText2("dim", o2)}${m3} `,
         `${i2}${styleText2("dim", c3)} `,
-        (I2) => styleText2("dim", I2)
+        (I) => styleText2("dim", I)
       );
     }
-    if (l2 === "cancelled")
+    if (l === "cancelled")
       return `${styleText2(["strikethrough", "dim"], a2)}`;
-    if (l2 === "active-selected")
+    if (l === "active-selected")
       return wrapTextWithPrefix(
-        o2.output,
+        r2.output,
         `${a2}${n3.hint ? ` ${styleText2("dim", `(${n3.hint})`)}` : ""}`,
-        `${i2}${styleText2("dim", r2)} `,
-        `${i2}${styleText2("dim", r2)}${styleText2("green", S_CHECKBOX_SELECTED)} `,
+        `${i2}${styleText2("dim", o2)} `,
+        `${i2}${styleText2("dim", o2)}${styleText2("green", S_CHECKBOX_SELECTED)} `,
         `${i2}${styleText2("dim", c3)} `
       );
-    if (l2 === "submitted")
+    if (l === "submitted")
       return `${styleText2("dim", a2)}`;
     const h2 = t2 || f2 ? styleText2("dim", S_CHECKBOX_INACTIVE) : "";
     return wrapTextWithPrefix(
-      o2.output,
+      r2.output,
       a2,
-      `${i2}${styleText2("dim", r2)} `,
-      `${i2}${styleText2("dim", r2)}${h2} `,
+      `${i2}${styleText2("dim", o2)} `,
+      `${i2}${styleText2("dim", o2)}${h2} `,
       `${i2}${styleText2("dim", c3)} `,
       (m3) => styleText2("dim", m3)
     );
-  }, y2 = o2.required ?? true, S = o2.showInstructions ?? true;
-  return new u$2({
-    options: o2.options,
-    signal: o2.signal,
-    input: o2.input,
-    output: o2.output,
-    initialValues: o2.initialValues,
-    required: y2,
-    cursorAt: o2.cursorAt,
+  }, y = r2.required ?? true, S = r2.showInstructions ?? true;
+  return new u$1({
+    options: r2.options,
+    signal: r2.signal,
+    input: r2.input,
+    output: r2.output,
+    initialValues: r2.initialValues,
+    required: y,
+    cursorAt: r2.cursorAt,
     selectableGroups: f2,
     validate(n3) {
-      if (y2 && (n3 === void 0 || n3.length === 0))
+      if (y && (n3 === void 0 || n3.length === 0))
         return `Please select at least one option.
 ${styleText2(
           "reset",
@@ -4111,58 +4101,58 @@ ${styleText2(
         )}`;
     },
     render() {
-      const n3 = o2.withGuide ?? settings.withGuide, l2 = `${n3 ? `${styleText2("gray", S_BAR)}
-` : ""}${symbol(this.state)}  ${o2.message}
-`, p3 = this.value ?? [], a2 = (t2, s) => {
-        const u5 = this.options, r2 = p3.includes(t2.value) || t2.group === true && this.isGroupSelected(`${t2.value}`);
-        return !s && typeof t2.group == "string" && this.options[this.cursor]?.value === t2.group ? d(t2, r2 ? "group-active-selected" : "group-active", u5) : s && r2 ? d(t2, "active-selected", u5) : r2 ? d(t2, "selected", u5) : d(t2, s ? "active" : "inactive", u5);
+      const n3 = r2.withGuide ?? settings.withGuide, l = `${n3 ? `${styleText2("gray", S_BAR)}
+` : ""}${symbol(this.state)}  ${r2.message}
+`, p3 = this.value ?? [], a2 = (t2, u4) => {
+        const s = this.options, o2 = p3.includes(t2.value) || t2.group === true && this.isGroupSelected(`${t2.value}`);
+        return !u4 && typeof t2.group == "string" && this.options[this.cursor]?.value === t2.group ? d(t2, o2 ? "group-active-selected" : "group-active", s) : u4 && o2 ? d(t2, "active-selected", s) : o2 ? d(t2, "selected", s) : d(t2, u4 ? "active" : "inactive", s);
       };
       switch (this.state) {
         case "submit": {
-          const t2 = this.options.filter(({ value: u5 }) => p3.includes(u5)).map((u5) => d(u5, "submitted")), s = t2.length === 0 ? "" : `  ${t2.join(styleText2("dim", ", "))}`;
-          return `${l2}${n3 ? styleText2("gray", S_BAR) : ""}${s}`;
+          const t2 = this.options.filter(({ value: s }) => p3.includes(s)).map((s) => d(s, "submitted")), u4 = t2.length === 0 ? "" : `  ${t2.join(styleText2("dim", ", "))}`;
+          return `${l}${n3 ? styleText2("gray", S_BAR) : ""}${u4}`;
         }
         case "cancel": {
-          const t2 = this.options.filter(({ value: s }) => p3.includes(s)).map((s) => d(s, "cancelled")).join(styleText2("dim", ", "));
-          return `${l2}${n3 ? `${styleText2("gray", S_BAR)}  ` : ""}${t2.trim() ? `${t2}${n3 ? `
+          const t2 = this.options.filter(({ value: u4 }) => p3.includes(u4)).map((u4) => d(u4, "cancelled")).join(styleText2("dim", ", "));
+          return `${l}${n3 ? `${styleText2("gray", S_BAR)}  ` : ""}${t2.trim() ? `${t2}${n3 ? `
 ${styleText2("gray", S_BAR)}` : ""}` : ""}`;
         }
         case "error": {
-          const t2 = n3 ? `${styleText2("yellow", S_BAR)}  ` : "", s = this.error.split(`
+          const t2 = n3 ? `${styleText2("yellow", S_BAR)}  ` : "", u4 = this.error.split(`
 `).map(
             (i2, h2) => h2 === 0 ? `${n3 ? `${styleText2("yellow", S_BAR_END)}  ` : ""}${styleText2("yellow", i2)}` : `   ${i2}`
           ).join(`
-`), u5 = l2.split(`
-`).length, r2 = s.split(`
+`), s = l.split(`
+`).length, o2 = u4.split(`
 `).length + 1, c3 = limitOptions({
-            output: o2.output,
+            output: r2.output,
             options: this.options,
             cursor: this.cursor,
-            maxItems: o2.maxItems,
+            maxItems: r2.maxItems,
             columnPadding: t2.length,
-            rowPadding: u5 + r2,
+            rowPadding: s + o2,
             style: a2
           }).join(`
 ${t2}`);
-          return `${l2}${t2}${c3}
-${s}
+          return `${l}${t2}${c3}
+${u4}
 `;
         }
         default: {
-          const t2 = n3 ? `${styleText2("cyan", S_BAR)}  ` : "", s = l2.split(`
-`).length, u5 = S ? formatInstructionFooter(MULTISELECT_INSTRUCTIONS, n3) : n3 ? [styleText2("cyan", S_BAR_END)] : [], r2 = u5.join(`
-`), c3 = u5.length + 1, i2 = limitOptions({
-            output: o2.output,
+          const t2 = n3 ? `${styleText2("cyan", S_BAR)}  ` : "", u4 = l.split(`
+`).length, s = S ? formatInstructionFooter(r2.output, MULTISELECT_INSTRUCTIONS, n3) : n3 ? [styleText2("cyan", S_BAR_END)] : [], o2 = s.join(`
+`), c3 = s.length + 1, i2 = limitOptions({
+            output: r2.output,
             options: this.options,
             cursor: this.cursor,
-            maxItems: o2.maxItems,
+            maxItems: r2.maxItems,
             columnPadding: t2.length,
-            rowPadding: s + c3,
+            rowPadding: u4 + c3,
             style: a2
           }).join(`
 ${t2}`);
-          return `${l2}${t2}${i2}
-${r2}
+          return `${l}${t2}${i2}
+${o2}
 `;
         }
       }
@@ -4174,19 +4164,19 @@ var log = {
     symbol: e = styleText2("gray", S_BAR),
     secondarySymbol: r2 = styleText2("gray", S_BAR),
     output: m3 = process.stdout,
-    spacing: l2 = 1,
+    spacing: l = 1,
     withGuide: c3
   } = {}) => {
-    const t2 = [], o2 = c3 ?? settings.withGuide, f2 = o2 ? r2 : "", O = o2 ? `${e}  ` : "", u5 = o2 ? `${r2}  ` : "";
-    for (let i2 = 0; i2 < l2; i2++)
+    const t2 = [], o2 = c3 ?? settings.withGuide, f2 = o2 ? r2 : "", O = o2 ? `${e}  ` : "", u4 = o2 ? `${r2}  ` : "";
+    for (let i2 = 0; i2 < l; i2++)
       t2.push(f2);
     const g2 = Array.isArray(s) ? s : s.split(`
 `);
     if (g2.length > 0) {
-      const [i2, ...y2] = g2;
+      const [i2, ...y] = g2;
       i2.length > 0 ? t2.push(`${O}${i2}`) : t2.push(o2 ? e : "");
-      for (const p3 of y2)
-        p3.length > 0 ? t2.push(`${u5}${p3}`) : t2.push(o2 ? r2 : "");
+      for (const p3 of y)
+        p3.length > 0 ? t2.push(`${u4}${p3}`) : t2.push(o2 ? r2 : "");
     }
     m3.write(`${t2.join(`
 `)}
@@ -4245,57 +4235,57 @@ var multiline = (e) => new h({
 `, h2 = e.placeholder && e.placeholder.length > 0 ? (
       // biome-ignore lint/style/noNonNullAssertion: guarded by placeholder.length > 0
       styleText2("inverse", e.placeholder[0]) + styleText2("dim", e.placeholder.slice(1))
-    ) : styleText2(["inverse", "hidden"], "_"), a2 = this.userInput ? this.userInputWithCursor : h2, l2 = this.value ?? "", d = e.showSubmit ? `
+    ) : styleText2(["inverse", "hidden"], "_"), a2 = this.userInput ? this.userInputWithCursor : h2, l = this.value ?? "", d = e.showSubmit ? `
   ${styleText2(this.focused === "submit" ? "cyan" : "dim", "[ submit ]")}` : "";
     switch (this.state) {
       case "error": {
-        const n3 = `${styleText2("yellow", S_BAR)}  `, r2 = i2 ? wrapTextWithPrefix(e.output, a2, n3, void 0) : a2, u5 = styleText2("yellow", S_BAR_END);
+        const n3 = `${styleText2("yellow", S_BAR)}  `, r2 = i2 ? wrapTextWithPrefix(e.output, a2, n3, void 0) : a2, u4 = styleText2("yellow", S_BAR_END);
         return `${o2}${r2}
-${u5}  ${styleText2("yellow", this.error)}${d}
+${u4}  ${styleText2("yellow", this.error)}${d}
 `;
       }
       case "submit": {
         const n3 = `${styleText2("gray", S_BAR)}  `, r2 = i2 ? wrapTextWithPrefix(
           e.output,
-          l2,
+          l,
           n3,
           void 0,
           void 0,
-          (u5) => styleText2("dim", u5)
-        ) : l2 ? styleText2("dim", l2) : "";
+          (u4) => styleText2("dim", u4)
+        ) : l ? styleText2("dim", l) : "";
         return `${o2}${r2}`;
       }
       case "cancel": {
         const n3 = `${styleText2("gray", S_BAR)}  `, r2 = i2 ? wrapTextWithPrefix(
           e.output,
-          l2,
+          l,
           n3,
           void 0,
           void 0,
-          (u5) => styleText2(["strikethrough", "dim"], u5)
-        ) : l2 ? styleText2(["strikethrough", "dim"], l2) : "";
+          (u4) => styleText2(["strikethrough", "dim"], u4)
+        ) : l ? styleText2(["strikethrough", "dim"], l) : "";
         return `${o2}${r2}`;
       }
       default: {
-        const n3 = i2 ? `${styleText2("cyan", S_BAR)}  ` : "", r2 = i2 ? styleText2("cyan", S_BAR_END) : "", u5 = i2 ? wrapTextWithPrefix(e.output, a2, n3) : a2;
-        return `${o2}${u5}
+        const n3 = i2 ? `${styleText2("cyan", S_BAR)}  ` : "", r2 = i2 ? styleText2("cyan", S_BAR_END) : "", u4 = i2 ? wrapTextWithPrefix(e.output, a2, n3) : a2;
+        return `${o2}${u4}
 ${r2}${d}
 `;
       }
     }
   }
 }).prompt();
-var W$1 = (o2) => o2;
-var C2 = (o2, e, s) => {
+var W = (o2) => o2;
+var C3 = (o2, e, s) => {
   const a2 = {
     hard: true,
     trim: false
   }, i2 = wrapAnsi(o2, e, a2).split(`
-`), c3 = i2.reduce((n3, t2) => Math.max(dist_default2(t2), n3), 0), u5 = i2.map(s).reduce((n3, t2) => Math.max(dist_default2(t2), n3), 0), g2 = e - (u5 - c3);
+`), c3 = i2.reduce((n3, t2) => Math.max(dist_default2(t2), n3), 0), u4 = i2.map(s).reduce((n3, t2) => Math.max(dist_default2(t2), n3), 0), g2 = e - (u4 - c3);
   return wrapAnsi(o2, g2, a2);
 };
 var note = (o2 = "", e = "", s) => {
-  const a2 = s?.output ?? process$1.stdout, i2 = s?.withGuide ?? settings.withGuide, c3 = s?.format ?? W$1, g2 = ["", ...C2(o2, getColumns(a2) - 6, c3).split(`
+  const a2 = s?.output ?? process$1.stdout, i2 = s?.withGuide ?? settings.withGuide, c3 = s?.format ?? W, g2 = ["", ...C3(o2, getColumns(a2) - 6, c3).split(`
 `).map(c3), ""], n3 = dist_default2(e), t2 = Math.max(
     g2.reduce((m3, F) => {
       const O = dist_default2(F);
@@ -4317,7 +4307,7 @@ ${styleText2("gray", l$1 + S_BAR_H.repeat(t2 + 2) + S_CORNER_BOTTOM_RIGHT)}
 `
   );
 };
-var password = (e) => new u$1({
+var password = (e) => new u2({
   validate: e.validate,
   mask: e.mask ?? S_PASSWORD_MASK,
   signal: e.signal,
@@ -4374,17 +4364,18 @@ var path = (e) => {
         return [];
       try {
         let i2;
-        existsSync(t2) ? lstatSync(t2).isDirectory() && (!e.directory || t2.endsWith("/")) ? i2 = t2 : i2 = dirname(t2) : i2 = dirname(t2);
-        const c3 = t2.length > 1 && t2.endsWith("/") ? t2.slice(0, -1) : t2;
+        const o2 = t2.endsWith("/") || t2.endsWith("\\");
+        existsSync(t2) ? lstatSync(t2).isDirectory() && (!e.directory || o2) ? i2 = t2 : i2 = dirname(t2) : i2 = dirname(t2);
+        const m3 = t2.length > 1 && o2 ? t2.slice(0, -1) : t2;
         return readdirSync(i2).map((r2) => {
-          const n3 = join(i2, r2), m3 = lstatSync(n3);
+          const n3 = join(i2, r2), l = lstatSync(n3);
           return {
             name: r2,
             path: n3,
-            isDirectory: m3.isDirectory()
+            isDirectory: l.isDirectory()
           };
         }).filter(
-          ({ path: r2, isDirectory: n3 }) => r2.startsWith(c3) && (n3 || !e.directory)
+          ({ path: r2, isDirectory: n3 }) => r2.startsWith(m3) && (n3 || !e.directory)
         ).map((r2) => ({
           value: r2.path
         }));
@@ -4394,87 +4385,106 @@ var path = (e) => {
     }
   });
 };
-var W = (l2) => styleText2("magenta", l2);
+var Y = 3e4;
+var Z = (c3) => styleText2("magenta", c3);
 var spinner = ({
-  indicator: l2 = "dots",
-  onCancel: h2,
+  indicator: c3 = "dots",
+  onCancel: b3,
   output: n3 = process.stdout,
-  cancelMessage: G,
-  errorMessage: O,
-  frames: E2 = unicode ? ["\u25D2", "\u25D0", "\u25D3", "\u25D1"] : ["\u2022", "o", "O", "0"],
-  delay: F = unicode ? 80 : 120,
-  signal: m3,
-  ...I2
+  cancelMessage: _2,
+  errorMessage: C4,
+  frames: M2 = unicode ? ["\u25D2", "\u25D0", "\u25D3", "\u25D1"] : ["\u2022", "o", "O", "0"],
+  delay: O = unicode ? 80 : 120,
+  signal: g2,
+  ...E2
 } = {}) => {
-  const u5 = isCI();
-  let M2, T3, d = false, S = false, s = "", p3, w = performance.now();
-  const x2 = getColumns(n3), k = I2?.styleFrame ?? W, g2 = (e) => {
-    const r2 = e > 1 ? O ?? settings.messages.error : G ?? settings.messages.cancel;
-    S = e === 1, d && (a2(r2, e), S && typeof h2 == "function" && h2());
-  }, f2 = () => g2(2), i2 = () => g2(1), A2 = () => {
-    process.on("uncaughtExceptionMonitor", f2), process.on("unhandledRejection", f2), process.on("SIGINT", i2), process.on("SIGTERM", i2), process.on("exit", g2), m3 && m3.addEventListener("abort", i2);
-  }, H = () => {
-    process.removeListener("uncaughtExceptionMonitor", f2), process.removeListener("unhandledRejection", f2), process.removeListener("SIGINT", i2), process.removeListener("SIGTERM", i2), process.removeListener("exit", g2), m3 && m3.removeEventListener("abort", i2);
-  }, y2 = () => {
-    if (p3 === void 0) return;
-    u5 && n3.write(`
+  const u4 = isCI(), h2 = isAccessible(E2.accessible);
+  let x2, I, p3 = false, l = false, r2 = "", v, w = performance.now();
+  const y = getColumns(n3), F = E2?.styleFrame ?? Z, S = (e) => {
+    const s = e > 1 ? C4 ?? settings.messages.error : _2 ?? settings.messages.cancel;
+    l = e === 1, p3 && (m3(s, e), l && typeof b3 == "function" && b3());
+  }, $ = () => S(2), a2 = () => S(1), H = () => {
+    process.on("uncaughtExceptionMonitor", $), process.on("unhandledRejection", $), process.on("SIGINT", a2), process.on("SIGTERM", a2), process.on("exit", S), g2 && g2.addEventListener("abort", a2);
+  }, B = () => {
+    process.removeListener("uncaughtExceptionMonitor", $), process.removeListener("unhandledRejection", $), process.removeListener("SIGINT", a2), process.removeListener("SIGTERM", a2), process.removeListener("exit", S), g2 && g2.removeEventListener("abort", a2);
+  }, R2 = () => {
+    if (v === void 0) return;
+    u4 && n3.write(`
 `);
-    const r2 = wrapAnsi(p3, x2, {
+    const s = wrapAnsi(v, y, {
       hard: true,
       trim: false
     }).split(`
 `);
-    r2.length > 1 && n3.write(import_sisteransi2.cursor.up(r2.length - 1)), n3.write(import_sisteransi2.cursor.to(0)), n3.write(import_sisteransi2.erase.down());
-  }, C3 = (e) => e.replace(/\.+$/, ""), _2 = (e) => {
-    const r2 = (performance.now() - e) / 1e3, t2 = Math.floor(r2 / 60), o2 = Math.floor(r2 % 60);
-    return t2 > 0 ? `[${t2}m ${o2}s]` : `[${o2}s]`;
-  }, N = I2.withGuide ?? settings.withGuide, P3 = (e = "") => {
-    d = true, M2 = block({ output: n3 }), s = C3(e), w = performance.now(), N && n3.write(`${styleText2("gray", S_BAR)}
+    s.length > 1 && n3.write(cursor.up(s.length - 1)), n3.write(cursor.to(0)), n3.write(erase.down());
+  }, L = (e) => e.replace(/\.+$/, ""), T3 = (e) => {
+    const s = (performance.now() - e) / 1e3, i2 = Math.floor(s / 60), t2 = Math.floor(s % 60);
+    return i2 > 0 ? `[${i2}m ${t2}s]` : `[${t2}s]`;
+  }, N = E2.withGuide ?? settings.withGuide, P3 = (e = "") => {
+    if (p3 = true, l = false, r2 = L(e), w = performance.now(), H(), h2) {
+      r2 !== "" && n3.write(`${r2}
+`), I = setInterval(() => {
+        n3.write(r2 === "" ? `still working
+` : `still working: ${r2}
 `);
-    let r2 = 0, t2 = 0;
-    A2(), T3 = setInterval(() => {
-      if (u5 && s === p3)
+      }, Y);
+      return;
+    }
+    x2 = block({ output: n3 }), N && n3.write(`${styleText2("gray", S_BAR)}
+`);
+    let s = 0, i2 = 0;
+    I = setInterval(() => {
+      if (u4 && r2 === v)
         return;
-      y2(), p3 = s;
-      const o2 = k(E2[r2]);
-      let v;
-      if (u5)
-        v = `${o2}  ${s}...`;
-      else if (l2 === "timer")
-        v = `${o2}  ${s} ${_2(w)}`;
+      R2(), v = r2;
+      const t2 = F(M2[s]);
+      let o2;
+      if (u4)
+        o2 = `${t2}  ${r2}...`;
+      else if (c3 === "timer")
+        o2 = `${t2}  ${r2} ${T3(w)}`;
       else {
-        const B = ".".repeat(Math.floor(t2)).slice(0, 3);
-        v = `${o2}  ${s}${B}`;
+        const j2 = ".".repeat(Math.floor(i2)).slice(0, 3);
+        o2 = `${t2}  ${r2}${j2}`;
       }
-      const j2 = wrapAnsi(v, x2, {
+      const D = wrapAnsi(o2, y, {
         hard: true,
         trim: false
       });
-      n3.write(j2), r2 = r2 + 1 < E2.length ? r2 + 1 : 0, t2 = t2 < 4 ? t2 + 0.125 : 0;
-    }, F);
-  }, a2 = (e = "", r2 = 0, t2 = false) => {
-    if (!d) return;
-    d = false, clearInterval(T3), y2();
-    const o2 = r2 === 0 ? styleText2("green", S_STEP_SUBMIT) : r2 === 1 ? styleText2("red", S_STEP_CANCEL) : styleText2("red", S_STEP_ERROR);
-    s = e ?? s, t2 || (l2 === "timer" ? n3.write(`${o2}  ${s} ${_2(w)}
-`) : n3.write(`${o2}  ${s}
-`)), H(), M2();
+      n3.write(D), s = s + 1 < M2.length ? s + 1 : 0, i2 = i2 < 4 ? i2 + 0.125 : 0;
+    }, O);
+  }, m3 = (e = "", s = 0, i2 = false) => {
+    if (p3) {
+      if (p3 = false, l = s === 1, clearInterval(I), h2 || R2(), r2 = e ?? r2, !i2)
+        if (h2) {
+          const t2 = s === 1 ? _2 ?? settings.messages.cancel : s === 2 ? C4 ?? settings.messages.error : "Done", o2 = r2 || t2;
+          c3 === "timer" ? n3.write(`${o2} ${T3(w)}
+`) : n3.write(`${o2}
+`);
+        } else {
+          const t2 = s === 0 ? styleText2("green", S_STEP_SUBMIT) : s === 1 ? styleText2("red", S_STEP_CANCEL) : styleText2("red", S_STEP_ERROR);
+          c3 === "timer" ? n3.write(`${t2}  ${r2} ${T3(w)}
+`) : n3.write(`${t2}  ${r2}
+`);
+        }
+      B(), x2?.();
+    }
   };
   return {
     start: P3,
-    stop: (e = "") => a2(e, 0),
+    stop: (e = "") => m3(e, 0),
     message: (e = "") => {
-      s = C3(e ?? s);
+      r2 = L(e ?? r2);
     },
-    cancel: (e = "") => a2(e, 1),
-    error: (e = "") => a2(e, 2),
-    clear: () => a2("", 0, true),
+    cancel: (e = "") => m3(e, 1),
+    error: (e = "") => m3(e, 2),
+    clear: () => m3("", 0, true),
     get isCancelled() {
-      return S;
+      return l;
     }
   };
 };
-var u4 = {
+var u3 = {
   light: unicodeOr("\u2500", "-"),
   heavy: unicodeOr("\u2501", "="),
   block: unicodeOr("\u2588", "#")
@@ -4487,7 +4497,7 @@ function progress({
 } = {}) {
   const r2 = spinner(x2);
   let a2 = 0, n3 = "";
-  const c3 = Math.max(1, d), l2 = Math.max(1, v), S = (t2) => {
+  const c3 = Math.max(1, d), l = Math.max(1, v), S = (t2) => {
     switch (t2) {
       case "initial":
       case "active":
@@ -4501,8 +4511,8 @@ function progress({
         return (e) => styleText2("magenta", e);
     }
   }, p3 = (t2, e) => {
-    const m3 = Math.floor(a2 / c3 * l2);
-    return `${S(t2)(u4[o2].repeat(m3))}${styleText2("dim", u4[o2].repeat(l2 - m3))} ${e}`;
+    const m3 = Math.floor(a2 / c3 * l);
+    return `${S(t2)(u3[o2].repeat(m3))}${styleText2("dim", u3[o2].repeat(l - m3))} ${e}`;
   }, h2 = (t2 = "") => {
     n3 = t2, r2.start(p3("initial", t2));
   }, g2 = (t2 = 1, e) => {
@@ -4515,7 +4525,9 @@ function progress({
     error: r2.error,
     clear: r2.clear,
     advance: g2,
-    isCancelled: r2.isCancelled,
+    get isCancelled() {
+      return r2.isCancelled;
+    },
     message: (t2) => g2(0, t2)
   };
 }
@@ -4557,7 +4569,7 @@ var select = (t2) => {
         t2.message,
         s,
         m3
-      ), u5 = `${n3 ? `${styleText2("gray", S_BAR)}
+      ), u4 = `${n3 ? `${styleText2("gray", S_BAR)}
 ` : ""}${i2}
 `;
       switch (this.state) {
@@ -4567,7 +4579,7 @@ var select = (t2) => {
             o2(this.options[this.cursor], "selected"),
             r2
           );
-          return `${u5}${a2}`;
+          return `${u4}${a2}`;
         }
         case "cancel": {
           const r2 = n3 ? `${styleText2("gray", S_BAR)}  ` : "", a2 = wrapTextWithPrefix(
@@ -4575,14 +4587,14 @@ var select = (t2) => {
             o2(this.options[this.cursor], "cancelled"),
             r2
           );
-          return `${u5}${a2}${n3 ? `
+          return `${u4}${a2}${n3 ? `
 ${styleText2("gray", S_BAR)}` : ""}`;
         }
         default: {
-          const r2 = n3 ? `${styleText2("cyan", S_BAR)}  ` : "", a2 = u5.split(`
-`).length, p3 = d ? formatInstructionFooter(SELECT_INSTRUCTIONS, n3) : n3 ? [styleText2("cyan", S_BAR_END)] : [], f2 = p3.join(`
+          const r2 = n3 ? `${styleText2("cyan", S_BAR)}  ` : "", a2 = u4.split(`
+`).length, p3 = d ? formatInstructionFooter(t2.output, SELECT_INSTRUCTIONS, n3) : n3 ? [styleText2("cyan", S_BAR_END)] : [], f2 = p3.join(`
 `), b3 = p3.length + 1;
-          return `${u5}${r2}${limitOptions({
+          return `${u4}${r2}${limitOptions({
             output: t2.output,
             cursor: this.cursor,
             options: this.options,
@@ -4599,36 +4611,36 @@ ${f2}
     }
   }).prompt();
 };
-var selectKey = (t2) => {
+var selectKey = (i2) => {
   const c3 = (e, a2 = "inactive") => {
     if (e === void 0)
       return "";
     const n3 = e.label ?? String(e.value);
-    return a2 === "selected" ? `${styleText2("dim", n3)}` : a2 === "cancelled" ? `${styleText2(["strikethrough", "dim"], n3)}` : a2 === "active" ? `${styleText2(["bgCyan", "gray"], ` ${e.value} `)} ${n3}${e.hint ? ` ${styleText2("dim", `(${e.hint})`)}` : ""}` : `${styleText2(["gray", "bgWhite", "inverse"], ` ${e.value} `)} ${n3}${e.hint ? ` ${styleText2("dim", `(${e.hint})`)}` : ""}`;
+    return a2 === "disabled" ? `${styleText2("dim", ` ${e.value} `)} ${styleText2("gray", n3)}${e.hint ? ` ${styleText2("dim", `(${e.hint})`)}` : ""}` : a2 === "selected" ? `${styleText2("dim", n3)}` : a2 === "cancelled" ? `${styleText2(["strikethrough", "dim"], n3)}` : a2 === "active" ? `${styleText2(["bgCyan", "gray"], ` ${e.value} `)} ${n3}${e.hint ? ` ${styleText2("dim", `(${e.hint})`)}` : ""}` : `${styleText2(["gray", "bgWhite", "inverse"], ` ${e.value} `)} ${n3}${e.hint ? ` ${styleText2("dim", `(${e.hint})`)}` : ""}`;
   };
-  return new u3({
-    options: t2.options,
-    signal: t2.signal,
-    input: t2.input,
-    output: t2.output,
-    initialValue: t2.initialValue,
-    caseSensitive: t2.caseSensitive,
+  return new c({
+    options: i2.options,
+    signal: i2.signal,
+    input: i2.input,
+    output: i2.output,
+    initialValue: i2.initialValue,
+    caseSensitive: i2.caseSensitive,
     render() {
-      const e = t2.withGuide ?? settings.withGuide, a2 = `${e ? `${styleText2("gray", S_BAR)}
-` : ""}${symbol(this.state)}  ${t2.message}
+      const e = i2.withGuide ?? settings.withGuide, a2 = `${e ? `${styleText2("gray", S_BAR)}
+` : ""}${symbol(this.state)}  ${i2.message}
 `;
       switch (this.state) {
         case "submit": {
-          const n3 = e ? `${styleText2("gray", S_BAR)}  ` : "", r2 = this.options.find((u5) => u5.value === this.value) ?? t2.options[0], l2 = wrapTextWithPrefix(
-            t2.output,
+          const n3 = e ? `${styleText2("gray", S_BAR)}  ` : "", r2 = this.options.find((l) => l.value === this.value) ?? i2.options[0], u4 = wrapTextWithPrefix(
+            i2.output,
             c3(r2, "selected"),
             n3
           );
-          return `${a2}${l2}`;
+          return `${a2}${u4}`;
         }
         case "cancel": {
           const n3 = e ? `${styleText2("gray", S_BAR)}  ` : "", r2 = wrapTextWithPrefix(
-            t2.output,
+            i2.output,
             c3(this.options[0], "cancelled"),
             n3
           );
@@ -4636,15 +4648,18 @@ var selectKey = (t2) => {
 ${styleText2("gray", S_BAR)}` : ""}`;
         }
         default: {
-          const n3 = e ? `${styleText2("cyan", S_BAR)}  ` : "", r2 = e ? styleText2("cyan", S_BAR_END) : "", l2 = this.options.map(
-            (u5, d) => wrapTextWithPrefix(
-              t2.output,
-              c3(u5, d === this.cursor ? "active" : "inactive"),
+          const n3 = e ? `${styleText2("cyan", S_BAR)}  ` : "", r2 = e ? styleText2("cyan", S_BAR_END) : "", u4 = this.options.map(
+            (l, $) => wrapTextWithPrefix(
+              i2.output,
+              c3(
+                l,
+                l.disabled ? "disabled" : $ === this.cursor ? "active" : "inactive"
+              ),
               n3
             )
           ).join(`
 `);
-          return `${a2}${l2}
+          return `${a2}${u4}
 ${r2}
 `;
         }
@@ -4654,9 +4669,9 @@ ${r2}
 };
 var i = `${styleText2("gray", S_BAR)}  `;
 var stream = {
-  message: async (e, { symbol: l2 = styleText2("gray", S_BAR) } = {}) => {
+  message: async (e, { symbol: l = styleText2("gray", S_BAR) } = {}) => {
     process.stdout.write(`${styleText2("gray", S_BAR)}
-${l2}  `);
+${l}  `);
     let s = 3;
     for await (let r2 of e) {
       r2 = r2.replace(/\n/g, `
@@ -4687,11 +4702,11 @@ var tasks = async (o2, e) => {
     s.stop(n3 || t2.title);
   }
 };
-var A = (l2) => l2.replace(/\x1b\[(?:\d+;)*\d*[ABCDEFGHfJKSTsu]|\x1b\[(s|u)/g, "");
-var taskLog = (l2) => {
-  const r2 = l2.output ?? process.stdout, O = getColumns(r2), i2 = styleText2("gray", S_BAR), p3 = l2.spacing ?? 1, k = 3, m3 = l2.retainLog === true, d = !isCI() && isTTY(r2);
+var A = (l) => l.replace(/\x1b\[(?:\d+;)*\d*[ABCDEFGHfJKSTsu]|\x1b\[(s|u)/g, "");
+var taskLog = (l) => {
+  const r2 = l.output ?? process.stdout, O = getColumns(r2), i2 = styleText2("gray", S_BAR), p3 = l.spacing ?? 1, k = 3, m3 = l.retainLog === true, d = !isCI() && isTTY(r2);
   r2.write(`${i2}
-`), r2.write(`${styleText2("green", S_STEP_SUBMIT)}  ${l2.title}
+`), r2.write(`${styleText2("green", S_STEP_SUBMIT)}  ${l.title}
 `);
   for (let e = 0; e < p3; e++)
     r2.write(`${i2}
@@ -4719,7 +4734,7 @@ ${t2.header}`);
 `).reduce((b3, w) => w === "" ? b3 + 1 : b3 + Math.ceil((w.length + k) / O), 0);
       s += E2;
     }
-    s > 0 && (s += 1, r2.write(import_sisteransi2.erase.lines(s)));
+    s > 0 && (s += 1, r2.write(erase.lines(s)));
   }, h2 = (e, s, t2) => {
     const o2 = t2 ? `${e.full}
 ${e.value}` : e.value;
@@ -4749,9 +4764,9 @@ ${e.value}` : e.value;
     }
   }, L = (e, s, t2) => {
     if (f2(false), (t2?.raw !== true || !v) && e.value !== "" && (e.value += `
-`), e.value += A(s), v = t2?.raw === true, l2.limit !== void 0) {
+`), e.value += A(s), v = t2?.raw === true, l.limit !== void 0) {
       const o2 = e.value.split(`
-`), a2 = o2.length - l2.limit;
+`), a2 = o2.length - l.limit;
       if (a2 > 0) {
         const g2 = o2.splice(0, a2);
         m3 && (e.full += (e.full === "" ? "" : `
@@ -4761,12 +4776,12 @@ ${e.value}` : e.value;
       e.value = o2.join(`
 `);
     }
-    d && y2();
-  }, y2 = () => {
+    d && y();
+  }, y = () => {
     for (const e of n3)
       e.result ? e.result.status === "error" ? log.error(e.result.message, { output: r2, secondarySymbol: i2, spacing: 0 }) : log.success(e.result.message, { output: r2, secondarySymbol: i2, spacing: 0 }) : e.value !== "" && h2(e, 0);
   }, B = (e, s) => {
-    f2(false), e.result = s, d && y2();
+    f2(false), e.result = s, d && y();
   };
   return {
     message(e, s) {
@@ -4813,7 +4828,7 @@ var text = (t2) => new n2({
   signal: t2.signal,
   input: t2.input,
   render() {
-    const r2 = t2?.withGuide ?? settings.withGuide, l2 = `${`${r2 ? `${styleText2("gray", S_BAR)}
+    const r2 = t2?.withGuide ?? settings.withGuide, l = `${`${r2 ? `${styleText2("gray", S_BAR)}
 ` : ""}${symbol(this.state)}  `}${t2.message}
 `, d = t2.placeholder && t2.placeholder.length > 0 ? (
       // biome-ignore lint/style/noNonNullAssertion: guarded by placeholder.length > 0
@@ -4822,29 +4837,29 @@ var text = (t2) => new n2({
     switch (this.state) {
       case "validating": {
         const n3 = r2 ? `${styleText2("cyan", S_BAR)}  ` : "", i2 = r2 ? styleText2("cyan", S_BAR_END) : "", c3 = styleText2("dim", o2), $ = styleText2("dim", "Validating...");
-        return `${l2}${n3}${c3}
+        return `${l}${n3}${c3}
 ${i2}  ${$}
 `;
       }
       case "error": {
         const n3 = this.error ? `  ${styleText2("yellow", this.error)}` : "", i2 = r2 ? `${styleText2("yellow", S_BAR)}  ` : "", c3 = r2 ? styleText2("yellow", S_BAR_END) : "";
-        return `${l2.trim()}
+        return `${l.trim()}
 ${i2}${o2}
 ${c3}${n3}
 `;
       }
       case "submit": {
         const n3 = s ? `${r2 ? "  " : ""}${styleText2("dim", s)}` : "", i2 = r2 ? styleText2("gray", S_BAR) : "";
-        return `${l2}${i2}${n3}`;
+        return `${l}${i2}${n3}`;
       }
       case "cancel": {
         const n3 = s ? `  ${styleText2(["strikethrough", "dim"], s)}` : "", i2 = r2 ? styleText2("gray", S_BAR) : "";
-        return `${l2}${i2}${n3}${s.trim() ? `
+        return `${l}${i2}${n3}${s.trim() ? `
 ${i2}` : ""}`;
       }
       default: {
         const n3 = r2 ? `${styleText2("cyan", S_BAR)}  ` : "", i2 = r2 ? styleText2("cyan", S_BAR_END) : "";
-        return `${l2}${n3}${o2}
+        return `${l}${n3}${o2}
 ${i2}
 `;
       }
@@ -5020,17 +5035,17 @@ import { closeSync as closeSync2, existsSync as existsSync10, fstatSync, mkdirSy
 import { delimiter, join as join11 } from "node:path";
 
 // src/core/hooks/fallback.ts
-import { join as join5, resolve as resolve2 } from "node:path";
+import { join as join5, resolve as resolve4 } from "node:path";
 
 // src/core/policy/read-media.ts
 import { extname } from "node:path";
 var { closeSync, openSync, readSync } = process.getBuiltinModule("node:fs");
 
 // src/core/policy/own-file.ts
-import { extname as extname2, join as join4 } from "node:path";
+import { extname as extname2, join as join4, resolve as resolve3 } from "node:path";
 
 // src/core/project/contain.ts
-import { dirname as dirname3, join as join3, relative, sep } from "node:path";
+import { dirname as dirname3, isAbsolute, join as join3, relative, resolve as resolve2, sep } from "node:path";
 var { lstatSync: lstatSync2, realpathSync: realpathSync2 } = process.getBuiltinModule("node:fs");
 function components(p3) {
   return p3.split(sep).filter((c3) => c3 !== "");
@@ -5058,8 +5073,8 @@ function nodeTooOld(version) {
   const b3 = NODE_MIN.split(".");
   for (let i2 = 0; i2 < b3.length; i2++) {
     const x2 = Number(a2[i2] ?? 0) || 0;
-    const y2 = Number(b3[i2]);
-    if (x2 !== y2) return x2 < y2;
+    const y = Number(b3[i2]);
+    if (x2 !== y) return x2 < y;
   }
   return false;
 }
@@ -5155,7 +5170,7 @@ var { existsSync: existsSync3, linkSync, mkdirSync: mkdirSync2, rmSync } = proce
 
 // src/core/ops/doctor-config.ts
 import { existsSync as existsSync9, readdirSync as readdirSync5, readFileSync as readFileSync6 } from "node:fs";
-import { dirname as dirname7, join as join10 } from "node:path";
+import { dirname as dirname7, isAbsolute as isAbsolute3, join as join10, resolve as resolve5 } from "node:path";
 
 // src/core/ops/host-text.ts
 var BOM_CODE = 65279;
@@ -6381,8 +6396,8 @@ function isNonEOL(cp) {
 function isNonAscii(cp) {
   return CodePoint.PAD <= cp && cp <= CodePoint.CP_D7FF || CodePoint.CP_E000 <= cp && cp <= CodePoint.CP_10FFFF;
 }
-function isValidDate(y2, m3, d) {
-  if (y2 >= 0 && m3 <= 12 && m3 >= 1 && d >= 1) return d <= (m3 === 2 ? y2 & 3 || !(y2 % 25) && y2 & 15 ? 28 : 29 : 30 + (m3 + (m3 >> 3) & 1));
+function isValidDate(y, m3, d) {
+  if (y >= 0 && m3 <= 12 && m3 >= 1 && d >= 1) return d <= (m3 === 2 ? y & 3 || !(y % 25) && y & 15 ? 28 : 29 : 30 + (m3 + (m3 >> 3) & 1));
   return false;
 }
 function isValidTime(h2, m3, s) {
@@ -7299,6 +7314,23 @@ function atomicWriteFile(file, text2, opts = {}) {
 import { existsSync as existsSync4 } from "node:fs";
 import { dirname as dirname4, join as join6 } from "node:path";
 import { fileURLToPath } from "node:url";
+function bundleDirOf(argv1, moduleFile) {
+  const own2 = dirname4(argv1);
+  if (existsSync4(join6(own2, SERVER_ENTRY_FILE))) return own2;
+  let dir = dirname4(moduleFile);
+  for (; ; ) {
+    if (existsSync4(join6(dir, SERVER_ENTRY_FILE))) return dir;
+    const up = dirname4(dir);
+    if (up === dir) return own2;
+    dir = up;
+  }
+}
+var memo;
+function ownBundleDir() {
+  const argv1 = process.argv[1] ?? "";
+  if (memo?.argv1 !== argv1) memo = { argv1, dir: bundleDirOf(argv1, fileURLToPath(import.meta.url)) };
+  return memo.dir;
+}
 
 // src/core/ops/host-config.ts
 function stripJsonComments(text2) {
@@ -7654,6 +7686,9 @@ function ownMcpValue(agent, node, server) {
   if (mcp === void 0) return void 0;
   return { ...mcp.fields, [MCP_COMMAND_FIELD]: node, [MCP_ARGS_FIELD]: [server, AGENT_ARG, agent] };
 }
+function opencodePluginFile() {
+  return ownBundleDir();
+}
 function applyEdits(agent, path15, text2, format, wanted) {
   const parsed = parseHostConfig(agent, path15, text2, format);
   let out2 = text2;
@@ -7775,7 +7810,7 @@ function flatCommands(events2, prefix) {
   return out2;
 }
 var isV1Hook = (cmd) => cmd.includes(SERVER_KEY) && (V1_SCRIPT_NAMES.some((name) => cmd.includes(name)) || cmd.includes(V1_HOOK_COMMAND));
-var isCodexScript = (cmd) => cmd.includes(V1_SCRIPT_EXT) && V1_PATH_SEPS.some((sep3) => cmd.includes(V1_CODEX_HOOKS_DIR.join(sep3) + sep3));
+var isCodexScript = (cmd) => V1_PATH_SEPS.some((sep3) => V1_CODEX_SCRIPT_NAMES.some((name) => cmd.includes(V1_CODEX_HOOKS_DIR.join(sep3) + sep3 + name)));
 function dataDir(dir, reason, out2) {
   if (existsSync6(dir)) out2.push(finding(dir, "", reason));
 }
@@ -7823,8 +7858,7 @@ function scanCodex(agentHome, out2) {
   const config = readTomlValue(tomlFile);
   for (const span of readTomlTables(tomlFile)) {
     if (span.path[0] !== V1_TOML_SECTION_ROOT || span.path[1] !== SERVER_KEY) continue;
-    if (span.path.length === 2 && isV2McpTable(hostConfigValueAt(config, span.path))) continue;
-    if (span.path.length === 3 && span.path[2] === MCP_ENV_FIELD && isV2McpTable(hostConfigValueAt(config, span.path.slice(0, 2)))) continue;
+    if (isV2McpTable(hostConfigValueAt(config, span.path.slice(0, 2)))) continue;
     out2.push(finding(tomlFile, span.header.trim(), V1_REASON.codexToml));
   }
   dataDir(join8(agentHome, V1_DATA_DIR_NAME), V1_REASON.dataDir, out2);
@@ -7987,7 +8021,7 @@ function detectV1(agent, home, scope = {}) {
 
 // src/core/ops/plugin-root.ts
 import { existsSync as existsSync7, readdirSync as readdirSync4, readFileSync as readFileSync4, realpathSync as realpathSync3 } from "node:fs";
-import { dirname as dirname6, isAbsolute, join as join9, sep as sep2 } from "node:path";
+import { dirname as dirname6, isAbsolute as isAbsolute2, join as join9, sep as sep2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // src/setup/pi-gate.ts
@@ -8092,6 +8126,7 @@ function piSettingsGate(env, home, pkgDir, cwd) {
 
 // src/core/ops/doctor-config.ts
 var [PART_MCP, PART_HOOKS, PART_TIMEOUT] = D3_PARTS;
+var isObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 function composeMatcher(row, event) {
   let prefix = "";
   for (const ch of row.toolNamePrefix) prefix += REGEX_SPECIAL_CHARS.includes(ch) ? REGEX_ESCAPE + ch : ch;
@@ -8101,6 +8136,118 @@ function composeMatcher(row, event) {
   return MATCHER_OPEN + alts.join(MATCHER_ALT) + MATCHER_CLOSE;
 }
 var CODEX_PLUGIN_KEY = `${SERVER_KEY}@${SERVER_KEY}`;
+function opencodeEntrySpec(entry2) {
+  return isObject(entry2) ? entry2[OPENCODE_PACKAGE_FIELD] : Array.isArray(entry2) ? entry2[0] : entry2;
+}
+function isNativeOpencodeEntry(entry2, key) {
+  const spec = opencodeEntrySpec(entry2);
+  if (typeof spec !== "string") return false;
+  return spec.startsWith(OPENCODE_NPM_SPEC_PREFIX) || key === OPENCODE_PLUGINS_KEY && spec === SERVER_KEY;
+}
+function stringLiterals(src) {
+  const out2 = [];
+  let i2 = 0;
+  while (i2 < src.length) {
+    const c3 = src[i2];
+    if (c3 === "/" && src[i2 + 1] === "/") {
+      const n3 = src.indexOf("\n", i2);
+      i2 = n3 < 0 ? src.length : n3;
+      continue;
+    }
+    if (c3 === "/" && src[i2 + 1] === "*") {
+      const n3 = src.indexOf("*/", i2 + 2);
+      i2 = n3 < 0 ? src.length : n3 + 2;
+      continue;
+    }
+    if (c3 === '"' || c3 === "'" || c3 === "`") {
+      let j2 = i2 + 1;
+      let s = "";
+      while (j2 < src.length && src[j2] !== c3) {
+        if (src[j2] === "\\") {
+          s += src[j2 + 1] ?? "";
+          j2 += 2;
+          continue;
+        }
+        s += src[j2];
+        j2++;
+      }
+      out2.push(s);
+      i2 = j2 + 1;
+      continue;
+    }
+    i2++;
+  }
+  return out2;
+}
+var OPENCODE_PLUGINS_DIR = "plugins";
+var OPENCODE_PROJECT_DIR = ".opencode";
+var OPENCODE_PLUGIN_EXTS = [".js", ".mjs", ".ts"];
+var OPENCODE_PLUGIN_INDEX = "index";
+var OPENCODE_DIR_FILE_MAX = 64 * 1024;
+var OWN_PLUGIN_MODULES = [SERVER_KEY, `${SERVER_KEY}/server`];
+var FILE_URL_PREFIX = "file://";
+var NODE_MODULES_DIR = "node_modules";
+var PACKAGE_JSON_FILE = "package.json";
+var OPENCODE_PACKAGE_DIR_HINT = `${NODE_MODULES_DIR}/${SERVER_KEY}`;
+function opencodePluginDirs(configDir, worktree) {
+  return [configDir, opencodeProjectDir(worktree)];
+}
+function opencodeProjectDir(worktree) {
+  return join10(worktree, OPENCODE_PROJECT_DIR);
+}
+function packageResolves(fromDir) {
+  for (let d = fromDir; ; d = dirname7(d)) {
+    if (existsSync9(join10(d, NODE_MODULES_DIR, SERVER_KEY, PACKAGE_JSON_FILE))) return true;
+    if (dirname7(d) === d) return false;
+  }
+}
+function opencodeDirPlugins(dirs) {
+  const bundle = opencodePluginFile();
+  const ownFile = join10(bundle, ...OPENCODE_PLUGIN_PATH).split("\\").join("/");
+  const isModule = (p3) => OWN_PLUGIN_MODULES.includes(p3);
+  const isPath = (p3) => {
+    if (p3 === ownFile || p3 === `${FILE_URL_PREFIX}${ownFile}`) return true;
+    const seg = p3.split("/");
+    const n3 = seg.length;
+    return n3 >= 3 && seg[n3 - 1] === "plugin.js" && seg[n3 - 2] === "opencode" && seg[n3 - 3] === SERVER_KEY;
+  };
+  const out2 = [];
+  for (const dir of dirs) {
+    const pdir = join10(dir, OPENCODE_PLUGINS_DIR);
+    let names;
+    try {
+      names = readdirSync5(pdir);
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      const loose = OPENCODE_PLUGIN_EXTS.some((x2) => name.endsWith(x2)) ? [join10(pdir, name)] : [];
+      const files = [...loose, ...OPENCODE_PLUGIN_EXTS.map((x2) => join10(pdir, name, `${OPENCODE_PLUGIN_INDEX}${x2}`))];
+      for (const f2 of files) {
+        let text2;
+        try {
+          const b3 = readFileSync6(f2);
+          if (b3.length > OPENCODE_DIR_FILE_MAX) continue;
+          text2 = b3.toString("utf8");
+        } catch {
+          continue;
+        }
+        const lits = stringLiterals(text2).map((s) => s.split("\\").join("/")).filter((p3) => isModule(p3) || isPath(p3));
+        if (!lits.length) continue;
+        const loads2 = lits.some((p3) => {
+          if (isModule(p3)) return packageResolves(dirname7(f2));
+          const bare = p3.startsWith(FILE_URL_PREFIX) ? p3.slice(FILE_URL_PREFIX.length) : p3;
+          return existsSync9(isAbsolute3(bare) ? bare : resolve5(dirname7(f2), bare));
+        });
+        out2.push({ file: f2, loads: loads2 });
+      }
+    }
+  }
+  return out2;
+}
+function opencodeDirPlugin(dirs) {
+  return opencodeDirPlugins(dirs).find((p3) => p3.loads)?.file;
+}
 
 // src/core/ops/doctor-issue.ts
 function formUrl(title, summary) {
@@ -8377,6 +8524,8 @@ function hookInstallFor(ctx, row, command) {
       kind: "plugin-list",
       file: path4.join(opencodeDirOf(ctx.env, ctx.home), OPENCODE_BASE_CONFIG_FILE),
       key: ["plugin"],
+      worktree: ctx.cwd ?? process.cwd(),
+      // D-R54-OC-PLUGINS-DIR-1: <project>/.opencode/plugins
       entry: ctx.pkgDir
     };
   }
@@ -8890,14 +9039,14 @@ async function listPluginHooks(env, pluginId, cwd) {
 function askPluginHooks(env, pluginId, cwd) {
   const bin = whichBin("codex", env);
   if (!bin) return Promise.resolve({ kind: "absent" });
-  return new Promise((resolve3) => {
+  return new Promise((resolve6) => {
     let asked;
     const done_ = (hooks) => hooks === void 0 ? { kind: "silent" } : { kind: "list", hooks, codexHome: asked };
     let f2;
     try {
       f2 = spawnForm(bin, ["app-server"], env);
     } catch {
-      resolve3({ kind: "silent" });
+      resolve6({ kind: "silent" });
       return;
     }
     const child = spawn(f2.command, f2.args, { env, cwd, stdio: ["pipe", "pipe", "ignore"], windowsVerbatimArguments: f2.windowsVerbatimArguments, windowsHide: true });
@@ -8907,7 +9056,7 @@ function askPluginHooks(env, pluginId, cwd) {
     let result;
     const settle = () => {
       clearTimeout(grace);
-      resolve3(done_(result));
+      resolve6(done_(result));
     };
     let grace;
     const finish2 = (v) => {
@@ -9046,12 +9195,12 @@ function frame(buf) {
 function listCopilotHooks(env, file, cwd) {
   const bin = whichBin("copilot", env);
   if (!bin) return Promise.resolve(void 0);
-  return new Promise((resolve3) => {
+  return new Promise((resolve6) => {
     let f2;
     try {
       f2 = spawnForm(bin, ["--server", "--stdio", "--no-auto-update"], env);
     } catch {
-      resolve3(void 0);
+      resolve6(void 0);
       return;
     }
     const child = spawn2(f2.command, f2.args, { env, cwd, stdio: ["pipe", "pipe", "ignore"], windowsVerbatimArguments: f2.windowsVerbatimArguments, windowsHide: true });
@@ -9063,7 +9212,7 @@ function listCopilotHooks(env, file, cwd) {
       clearTimeout(timer);
       child.stdin.destroy();
       child.kill();
-      resolve3(v);
+      resolve6(v);
     };
     const timer = setTimeout(() => finish2(void 0), ASK_TIMEOUT_MS2);
     child.on("error", () => finish2(void 0));
@@ -9117,9 +9266,9 @@ function sampleText() {
   const lines = [];
   let bytes = 0;
   for (let i2 = 0; bytes < SAMPLE_BYTES; i2++) {
-    const l2 = "context-mode doctor sample line " + i2;
-    lines.push(l2);
-    bytes += l2.length + 1;
+    const l = "context-mode doctor sample line " + i2;
+    lines.push(l);
+    bytes += l.length + 1;
   }
   return lines.join("\n") + "\n";
 }
@@ -9139,7 +9288,7 @@ function hookSample(id, cwd, text2) {
     case "pi":
       return { effect, payload: { type: event, sessionId: SAMPLE_SESSION, cwd, toolName: tool, input: command, content: text2, isError: false } };
     case "opencode":
-      return { effect, payload: { type: event, sessionID: SAMPLE_SESSION, directory: cwd, tool, args: command } };
+      return { effect, payload: { type: event, sessionID: SAMPLE_SESSION, directory: cwd, tool, args: command, ...effect === "replace" ? { output: text2 } : {} } };
     case "codex":
     case "qwen":
     case "vscode":
@@ -9149,7 +9298,7 @@ function hookSample(id, cwd, text2) {
   }
 }
 function sampleVerdict(id, effect, text2, a2) {
-  const noProject = a2.stderr.split("\n").find((l2) => l2.startsWith(NO_PROJECT_LINE));
+  const noProject = a2.stderr.split("\n").find((l) => l.startsWith(NO_PROJECT_LINE));
   if (noProject !== void 0) return "NO_PROJECT: the hook did not resolve the project (" + noProject.trim() + ")";
   if (a2.status === null) return "hook did not finish";
   if (a2.status !== 0 && a2.status !== DENY_EXIT) return `hook exited ${a2.status}: ${a2.stderr.trim()}`;
@@ -9372,9 +9521,8 @@ function planCodexTrust(row, edits, hooksFile, file, command, env) {
     prior.changes.push(...changes);
   } else edits.push({ file, before: text2, after: res.text, changes });
 }
-var NATIVE_PLUGIN_PREFIX = "context-mode@";
 function isNativeSpec(e) {
-  return typeof e === "string" && e.startsWith(NATIVE_PLUGIN_PREFIX);
+  return isNativeOpencodeEntry(e, OPENCODE_PLUGIN_KEY);
 }
 function isStaleOwnPlugin(e, entry2) {
   if (typeof e !== "string" || e === entry2 || !path12.isAbsolute(e)) return false;
@@ -9390,10 +9538,31 @@ function wantedPluginList(list2, entry2, nativeElsewhere = false) {
   const kept = list2.filter((e) => !(native && e === entry2) && !isStaleOwnPlugin(e, entry2));
   return native || kept.includes(entry2) ? kept : [...kept, entry2];
 }
-var OC2_NATIVE_KEY = "plugins";
-function nativePluginsKey(doc) {
-  const v = isObj5(doc) ? doc[OC2_NATIVE_KEY] : void 0;
-  return Array.isArray(v) && v.some(isNativeSpec);
+function nativePluginsKey(doc, file) {
+  const native = (d) => isObj5(d) && [OPENCODE_PLUGINS_KEY, OPENCODE_PLUGIN_KEY].some((k) => {
+    const v = d[k];
+    return Array.isArray(v) && v.some((e) => isNativeOpencodeEntry(e, k));
+  });
+  if (native(doc)) return true;
+  if (opencodeDirPlugin([path12.dirname(file)]) !== void 0) return true;
+  return OPENCODE_CONFIG_FILES.map((n3) => path12.join(path12.dirname(file), n3)).filter((f2) => f2 !== file).some((f2) => {
+    const text2 = readOr(f2);
+    if (text2 === void 0 || text2.trim() === "") return false;
+    try {
+      return native(parseHostConfig("opencode", f2, text2, "jsonc"));
+    } catch {
+      return false;
+    }
+  });
+}
+function projectPluginFile(h2) {
+  return opencodeDirPlugin([opencodeProjectDir(h2.worktree)]);
+}
+function fixLineOf(row) {
+  const h2 = row.hookInstall;
+  if (h2.kind !== "plugin-list") return void 0;
+  const proj = projectPluginFile(h2);
+  return proj !== void 0 && pluginListIssue(h2)?.startsWith(proj) ? `remove ${proj}` : void 0;
 }
 function pluginListIssue(h2) {
   const text2 = readOr(h2.file);
@@ -9406,7 +9575,10 @@ function pluginListIssue(h2) {
   }
   const cur = isObj5(doc) ? doc[h2.key[0]] : void 0;
   const list2 = Array.isArray(cur) ? cur : [];
-  if ((list2.some(isNativeSpec) || nativePluginsKey(doc)) && list2.includes(h2.entry)) return `${h2.file}: context-mode loads twice (native entry and ${h2.entry}), every hook fires twice; run: context-mode setup`;
+  const listed = list2.includes(h2.entry);
+  if (listed && nativePluginsKey(doc, h2.file)) return `${h2.file}: context-mode loads twice (native entry and ${h2.entry}), every hook fires twice; run: context-mode setup`;
+  const proj = listed ? projectPluginFile(h2) : void 0;
+  if (proj !== void 0) return `${proj}: context-mode loads twice in this project (this file and ${h2.entry} in ${h2.file}), every hook fires twice; remove ${proj}, the ${h2.file} entry loads the hooks in every project`;
   const stale = list2.find((e) => isStaleOwnPlugin(e, h2.entry));
   if (stale !== void 0) return `${h2.file}: plugin file missing, so OpenCode never loads the hooks (${String(stale)}); run: context-mode setup`;
   return void 0;
@@ -9433,7 +9605,7 @@ function planHookInstall(row, edits, env) {
     planJsonKeys(row, edits, h2.file, fileFormat(row, h2.file), (doc) => {
       const cur = doc[h2.key[0]];
       const list2 = Array.isArray(cur) ? cur : [];
-      const want = wantedPluginList(list2, h2.entry, nativePluginsKey(doc));
+      const want = wantedPluginList(list2, h2.entry, nativePluginsKey(doc, h2.file));
       if (cur === void 0 && want.length === 0) return [];
       return [[h2.key, want.length === list2.length && want.every((e, i2) => e === list2[i2]) ? list2 : want]];
     });
@@ -9497,54 +9669,66 @@ function statusOf(row, text2) {
   }
   return void 0;
 }
-function opencodeMajor(bin, env) {
+function opencodeVersion(bin, env) {
   const r2 = runBin(bin, ["--version"], env);
   const text2 = `${r2.stdout}${r2.stderr}`;
   const digits = text2.split("").filter((c3) => c3 >= "0" && c3 <= "9" || c3 === ".").join("");
-  return Number(digits.split(".")[0]);
+  if (!digits.split(".")[0]) return { error: `${bin} --version printed no version: ${text2.trim().split("\n")[0] ?? ""}` };
+  return { major: Number(digits.split(".")[0]) };
 }
-function opencodeListArgs(major) {
-  return major >= 2 ? ["mcp", "list", "--standalone"] : ["mcp", "list", "--pure"];
+function opencodeMajor(bin, env) {
+  const v = opencodeVersion(bin, env);
+  return "major" in v ? v.major : Number.NaN;
 }
-var OC2_CONFIG_ARGS = ["debug", "config", "--standalone"];
-function opencode2ListCheck(bin, env) {
-  const r2 = runBin(bin, OC2_CONFIG_ARGS, env);
-  const what = `${bin} ${OC2_CONFIG_ARGS.join(" ")}`;
-  let docs;
+var OC_CONFIG_ARGS = { 1: ["debug", "config", "--pure"], 2: ["debug", "config", "--standalone"] };
+function opencodeListCheck(bin, major, env) {
+  const args = major >= 2 ? OC_CONFIG_ARGS[2] : OC_CONFIG_ARGS[1];
+  const r2 = runBin(bin, [...args], env);
+  const what = `${bin} ${args.join(" ")}`;
+  const first = (s) => `${s}`.trim().split("\n")[0] ?? "";
+  let out2;
   try {
-    docs = JSON.parse(`${r2.stdout}`);
+    out2 = JSON.parse(`${r2.stdout}`);
   } catch {
-    docs = void 0;
+    out2 = void 0;
   }
-  if (r2.status !== 0) return { name: "list", ok: false, detail: `${what} exited ${r2.status}: ${`${r2.stderr}`.trim().split("\n")[0] ?? ""}` };
-  if (!Array.isArray(docs)) return { name: "list", ok: false, detail: `${what} printed no config list: ${`${r2.stdout}`.trim().split("\n")[0] ?? ""}` };
-  const listed = docs.some((d) => isObj5(d) && isObj5(d.info) && isObj5(d.info.mcp) && isObj5(d.info.mcp.servers) && isObj5(d.info.mcp.servers[SERVER_KEY]));
-  const read = docs.filter(isObj5).map((d) => d.path).filter((p3) => typeof p3 === "string");
-  return { name: "list", ok: listed, detail: listed ? void 0 : `${what} does not load mcp.servers.${SERVER_KEY}; it read: ${read.join(", ") || "no config"}` };
+  if (r2.status !== 0) return { name: "list", ok: false, detail: `${what} exited ${r2.status}: ${first(r2.stderr)}` };
+  if (major >= 2) {
+    if (!Array.isArray(out2)) return { name: "list", ok: false, detail: `${what} printed no config list: ${first(r2.stdout)}` };
+    const listed2 = out2.some((d) => isObj5(d) && isObj5(d.info) && isObj5(d.info.mcp) && isObj5(d.info.mcp.servers) && isObj5(d.info.mcp.servers[SERVER_KEY]));
+    const read = out2.filter(isObj5).map((d) => d.path).filter((p3) => typeof p3 === "string");
+    return { name: "list", ok: listed2, detail: listed2 ? void 0 : `${what} does not load mcp.servers.${SERVER_KEY}; it read: ${read.join(", ") || "no config"}` };
+  }
+  if (!isObj5(out2)) return { name: "list", ok: false, detail: `${what} printed no config: ${first(r2.stdout)}` };
+  const mcp = isObj5(out2.mcp) ? out2.mcp : {};
+  const listed = isObj5(mcp[SERVER_KEY]);
+  return { name: "list", ok: listed, detail: listed ? void 0 : `${what} does not load mcp.${SERVER_KEY}; it loads mcp: ${Object.keys(mcp).join(", ") || "none"}` };
 }
-var HOST_BROKEN = {
-  copilot: { text: "no platform package found", fix: "npm install -g @github/copilot" }
-};
 var HOST_BROKEN_PREFIX = "host broken: run ";
+var HOST_BROKEN = {
+  copilot: [
+    { text: "no platform package found", prefix: HOST_BROKEN_PREFIX, fix: "npm install -g @github/copilot" },
+    { text: "GitHub Copilot CLI was not found", prefix: "copilot not installed: run ", fix: "npm install -g @github/copilot" }
+  ]
+};
 function hostBroken(bin, out2) {
-  const b3 = HOST_BROKEN[bin];
-  if (!b3 || !out2.includes(b3.text)) return void 0;
-  return `${HOST_BROKEN_PREFIX}${b3.fix} (${out2.trim().split("\n")[0]})`;
+  const b3 = HOST_BROKEN[bin]?.find((e) => out2.includes(e.text));
+  if (!b3) return void 0;
+  const lines = out2.trim().split("\n");
+  return `${b3.prefix}${b3.fix} (${(lines.find((l) => l.includes(b3.text)) ?? lines[0]).trim()})`;
 }
 function listState(row, env) {
-  let l0 = row.listCommand;
-  if (!l0 || !hostBin(l0.bin, env).file) return { status: void 0 };
+  const l = row.listCommand;
+  if (!l || !hostBin(l.bin, env).file) return { status: void 0 };
   if (row.id === "opencode") {
-    const major = opencodeMajor(l0.bin, env);
-    if (major >= 2) return { check: opencode2ListCheck(l0.bin, env), status: void 0 };
-    l0 = { bin: l0.bin, args: opencodeListArgs(major) };
+    const v = opencodeVersion(l.bin, env);
+    return { check: "major" in v ? opencodeListCheck(l.bin, v.major, env) : { name: "list", ok: false, detail: v.error }, status: void 0 };
   }
-  const l2 = l0;
-  const r2 = runBin(l2.bin, l2.args, env);
+  const r2 = runBin(l.bin, l.args, env);
   const out2 = `${r2.stdout}${r2.stderr}`;
   const ok = r2.status === 0 && out2.includes("context-mode");
-  const check = { name: "list", ok, detail: ok ? void 0 : `${l2.bin} ${l2.args.join(" ")} does not list context-mode` };
-  return { check, status: r2.status === 0 ? statusOf(row, `${r2.stdout}`) : void 0, broken: r2.status === 0 ? void 0 : hostBroken(l2.bin, out2) };
+  const check = { name: "list", ok, detail: ok ? void 0 : `${l.bin} ${l.args.join(" ")} does not list context-mode` };
+  return { check, status: r2.status === 0 ? statusOf(row, `${r2.stdout}`) : void 0, broken: r2.status === 0 ? void 0 : hostBroken(l.bin, out2) };
 }
 var DISABLE_ALL_HOOKS = "disableAllHooks";
 var SETTINGS_FILES = ["settings.json", "settings.local.json"];
@@ -9625,7 +9809,7 @@ function degradedDetail(node, env) {
   return `only ctx_doctor is served: ${D2_SQLITE_DETAIL} under ${node}${v ? ` ${v}` : ""}. Fix: ${D2_SQLITE_FIX}`;
 }
 function mcpCheck(cmd, env) {
-  return new Promise((resolve3) => {
+  return new Promise((resolve6) => {
     const child = spawn3(cmd[0], cmd.slice(1), { env, stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32", windowsHide: true });
     const reap = () => {
       child.kill();
@@ -9637,7 +9821,7 @@ function mcpCheck(cmd, env) {
       clearTimeout(timer);
       process.off("exit", reap);
       child.kill();
-      resolve3({ name: "mcp", ok, detail });
+      resolve6({ name: "mcp", ok, detail });
     };
     const timer = setTimeout(() => done(false, "no MCP answer before timeout"), VERIFY_TIMEOUT_MS);
     child.on("error", (e) => done(false, e.message));
@@ -9730,6 +9914,7 @@ function ownConfigEdits(row, c3, text2) {
   const ownEnv = value[MCP_ENV_FIELD];
   if (isObj5(userEnv) || isObj5(ownEnv)) value[MCP_ENV_FIELD] = { ...isObj5(userEnv) ? userEnv : {}, ...isObj5(ownEnv) ? ownEnv : {} };
   if (Array.isArray(cur[MCP_ENV_VARS_FIELD])) value[MCP_ENV_VARS_FIELD] = cur[MCP_ENV_VARS_FIELD];
+  if (isObj5(cur[MCP_TOOLS_FIELD])) value[MCP_TOOLS_FIELD] = cur[MCP_TOOLS_FIELD];
   return [[c3.key, value], ...edits.slice(1)];
 }
 function parseCheck(row) {
@@ -9746,10 +9931,10 @@ function parseCheck(row) {
 function hookRegisteredCheck(row, env, list2) {
   const h2 = row.hookInstall;
   if (h2.kind === "package") {
-    const l2 = row.listCommand;
-    if (!l2) return { name: "hook-registered", ok: false, detail: `no list command for ${row.id}` };
-    if (!list2) return { name: "hook-registered", ok: false, detail: `${l2.bin} is not on PATH, so the hooks cannot be checked` };
-    return { name: "hook-registered", ok: list2.ok, detail: list2.ok ? void 0 : `${l2.bin} ${l2.args.join(" ")} does not list context-mode (hooks ship in ${h2.via})` };
+    const l = row.listCommand;
+    if (!l) return { name: "hook-registered", ok: false, detail: `no list command for ${row.id}` };
+    if (!list2) return { name: "hook-registered", ok: false, detail: `${l.bin} is not on PATH, so the hooks cannot be checked` };
+    return { name: "hook-registered", ok: list2.ok, detail: list2.ok ? void 0 : `${l.bin} ${l.args.join(" ")} does not list context-mode (hooks ship in ${h2.via})` };
   }
   const edits = [];
   try {
@@ -9757,7 +9942,8 @@ function hookRegisteredCheck(row, env, list2) {
   } catch (e) {
     return { name: "hook-registered", ok: false, detail: e.message };
   }
-  if (!edits.length) return { name: "hook-registered", ok: true };
+  const kept = !edits.length && h2.kind === "plugin-list" ? pluginListIssue(h2) : void 0;
+  if (!edits.length) return kept === void 0 ? { name: "hook-registered", ok: true } : { name: "hook-registered", ok: false, detail: kept };
   const trust = h2.kind === "file" ? h2.trust : void 0;
   if (trust && edits.every((e) => e.file === trust && e.changes.every((c3) => isTrust(row, c3)))) return { name: "hook-registered", ok: false, detail: `${h2.file}: the context-mode hooks are not trusted in ${trust}; re-run setup` };
   const issue = h2.kind === "plugin-list" ? pluginListIssue(h2) : h2.kind === "file" && row.id === "kiro" ? kiroDisabledIssue(h2) : void 0;
@@ -10051,13 +10237,13 @@ async function verifyRow(row, ctx) {
   const env = ctx.env;
   const checks = [parseCheck(row)];
   const ls = listState(row, env);
-  const l2 = ls.check;
-  if (l2) checks.push(l2);
+  const l = ls.check;
+  if (l) checks.push(l);
   const cp = copyCheck(row, ctx.pkgDir);
   if (cp) checks.push(cp);
   checks.push(await mcpCheck(row.serverCommand, env));
   if (row.hookCommand) checks.push(hookCheck(row, env));
-  checks.push(hookRegisteredCheck(row, env, l2));
+  checks.push(hookRegisteredCheck(row, env, l));
   const en = hookEnabledCheck(row, ls.status);
   if (en) checks.push(en);
   if (row.copilotSettings) checks.push(await copilotEnabledCheck(row, ctx));
@@ -10140,7 +10326,7 @@ function detectAgents(reg, ctx) {
   return reg.filter((r2) => existsSync17(agentHomeDir(r2.id, ctx)) || r2.listCommand && which(r2.listCommand.bin, ctx.env)).map((r2) => r2.id);
 }
 async function runSetup(opts) {
-  const ctx = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
+  const ctx = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env, cwd: opts.cwd };
   const runId = opts.runId ?? (/* @__PURE__ */ new Date()).toISOString().split(":").join("-").split(".").join("-");
   const reg = buildRegistry(ctx);
   const nodeVersion = opts.nodeVersion ?? process.version;
@@ -10235,19 +10421,22 @@ async function setupRow(row, ctx, run, dryRun) {
       if (w) res.checks = res.checks.map((c3) => c3.name === "copy" ? w : c3);
     }
     const bad = res.checks.filter((c3) => !c3.ok);
+    const keep = bad.length === 1 && bad[0].name === "hook-registered" ? fixLineOf(row) : void 0;
+    if (keep) return { ...res, status: "FAIL", reason: `${bad[0].name}: ${bad[0].detail}`, fix: keep };
     if (bad.length) throw new Error(bad.map((c3) => `${c3.name}: ${c3.detail}`).join("; "));
   } catch (e) {
+    const fix = fixLineOf(row);
     run.rollback(row.id, ctx.env);
     const broken = row.cli ? hostBroken(row.cli.bin, e.message) : void 0;
     if (broken) return { ...res, status: "SKIPPED", reason: broken };
-    return { ...res, status: "FAIL", reason: e.message, rolledBack: true };
+    return { ...res, status: "FAIL", reason: e.message, rolledBack: true, ...fix ? { fix } : {} };
   }
   return res;
 }
 var V1_FORM_REASON = "old context-mode entry, run: context-mode setup";
 var NOT_SET_UP_REASON = "not set up, run context-mode setup";
 async function runDoctor(opts) {
-  const ctx = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
+  const ctx = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env, cwd: opts.cwd };
   const reg = buildRegistry(ctx);
   for (const f2 of ["server.mjs", "hook.mjs"]) {
     if (!existsSync17(path12.join(ctx.pkgDir, f2))) return { exitCode: 1, agents: [], error: `preflight: ${path12.join(ctx.pkgDir, f2)} is missing` };
@@ -10282,6 +10471,8 @@ async function runDoctor(opts) {
         if (bad.length) {
           res.status = "FAIL";
           res.reason = bad.map((c3) => `${c3.name}: ${c3.detail}`).join("; ");
+          const fix = fixLineOf(row);
+          if (fix) res.fix = fix;
         }
       }
     }
@@ -10294,7 +10485,10 @@ function notSetUpReason(row, res, env) {
   const h2 = row.hookInstall;
   const missing = row.id === "opencode" && h2.kind === "plugin-list" && res.changes.some((c3) => c3.path === h2.key[0]);
   const oc2 = missing && hostBin("opencode", env).file !== void 0 && opencodeMajor("opencode", env) >= 2;
-  if (oc2) return `${NOT_SET_UP_REASON}, or run: opencode plugin add context-mode`;
+  const dead = missing ? opencodeDirPlugins(opencodePluginDirs(path12.dirname(h2.file), h2.worktree)).find((p3) => !p3.loads) : void 0;
+  const hint = dead ? `; ${dead.file} loads context-mode once ${OPENCODE_PACKAGE_DIR_HINT} is next to it or above it` : "";
+  if (oc2) return `${NOT_SET_UP_REASON}, or run: opencode plugin add context-mode${hint}`;
+  if (hint) return NOT_SET_UP_REASON + hint;
   if (row.id === "gemini" && hostBin("gemini", env).file !== void 0) return `${NOT_SET_UP_REASON}, or run: ${NATIVE_INSTALL.gemini[0]}`;
   return NOT_SET_UP_REASON;
 }
@@ -10445,7 +10639,7 @@ function table(agents) {
   return [`${"AGENT".padEnd(13)} STATUS  DETAIL`, ...rows].join("\n");
 }
 function failLines(agents) {
-  return agents.filter((a2) => a2.status === "FAIL").map((a2) => `FAIL ${a2.id}: ${a2.reason ?? "failed"}. Fix: ${fixFor(a2.id)}`);
+  return agents.filter((a2) => a2.status === "FAIL").map((a2) => `FAIL ${a2.id}: ${a2.reason ?? "failed"}. Fix: ${a2.fix ?? fixFor(a2.id)}`);
 }
 function verboseLines(agents) {
   return agents.flatMap((a2) => a2.checks.map((c3) => `  ${a2.id} ${c3.warn ? "WARN" : c3.ok ? "ok  " : "FAIL"} ${c3.name}${c3.detail ? `: ${c3.detail}` : ""}`));
@@ -10613,9 +10807,9 @@ async function finish(ui, command, res, writeReport) {
   if (ui.f.json) out(JSON.stringify({ command, ...res }));
   else if (ui.clack) ui.clack.note(table(res.agents), "Summary");
   else out(table(res.agents));
-  if (ui.f.verbose && !ui.f.json) for (const l2 of verboseLines(res.agents)) err(l2);
+  if (ui.f.verbose && !ui.f.json) for (const l of verboseLines(res.agents)) err(l);
   if (res.error) err(`FAIL ${command}: ${res.error}. Fix: context-mode ${command}${command === "setup" ? " --repair" : ""}`);
-  for (const l2 of failLines(res.agents)) err(l2);
+  for (const l of failLines(res.agents)) err(l);
   if (res.exitCode !== EXIT_OK) await report(ui, command, res, writeReport);
   return res.exitCode;
 }
@@ -10753,7 +10947,7 @@ async function doctor(ui) {
   const p3 = ui.clack;
   if (!p3 || code === EXIT_OK) return code;
   let worst = code;
-  for (const a2 of res.agents.filter((x2) => x2.status === "FAIL")) {
+  for (const a2 of res.agents.filter((x2) => x2.status === "FAIL" && x2.fix === void 0)) {
     const ok = await p3.confirm({ message: `Fix ${a2.id} now? (runs ${fixFor(a2.id)})`, initialValue: true });
     if (p3.isCancel(ok)) return EXIT_SIGINT;
     if (!ok) continue;
