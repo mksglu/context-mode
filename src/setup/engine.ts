@@ -1189,13 +1189,18 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
       if (w) res.checks = res.checks.map((c) => (c.name === "copy" ? w : c));
     }
     const bad = res.checks.filter((c) => !c.ok);
+    // D-R54-OC-PLUGINS-DIR-1 (review round 3): the one bad check is a project plugins file next to our global entry.
+    // What setup wrote is right (it loads the hooks in every other project); the fix is to remove that file, which
+    // setup never edits. A rollback would leave no MCP entry and a Fix: line that says setup again (a loop).
+    const keep = bad.length === 1 && bad[0].name === "hook-registered" ? fixLineOf(row) : undefined;
+    if (keep) return { ...res, status: "FAIL", reason: `${bad[0].name}: ${bad[0].detail}`, fix: keep };
     if (bad.length) throw new Error(bad.map((c) => `${c.name}: ${c.detail}`).join("; "));
   } catch (e) {
+    const fix = fixLineOf(row); // before the rollback: it reads the files as setup left them
     run.rollback(row.id, ctx.env);
     // D-SETUP-HOST-BROKEN-1: the host broke on the install step itself (the list passed): the same SKIPPED line.
     const broken = row.cli ? hostBroken(row.cli.bin, (e as Error).message) : undefined;
     if (broken) return { ...res, status: "SKIPPED", reason: broken };
-    const fix = fixLineOf(row);
     return { ...res, status: "FAIL", reason: (e as Error).message, rolledBack: true, ...(fix ? { fix } : {}) };
   }
   return res;
