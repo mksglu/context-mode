@@ -111,6 +111,29 @@ describe("ADR-0011: detect v1", { concurrency: CONC }, () => {
     assert.equal(detectV1("gemini", home, { tmp: tmp(t) }).length, 2);
   });
 
+  // #1364 (Korayem, Codex CLI 0.167.0, 2.1.7) and #1359 (HengYangDS): ctx_upgrade removed the user's own security hooks
+  // `node "$HOME/.agents/hooks/codex/secret-guard-*.mjs"` from ~/.codex/hooks.json, because any .mjs under a hooks/codex/
+  // folder read as v1. v1.0.169 wrote only hooks/codex/<event>.mjs for its six Codex events (LEGACY_HOOK_PATH_SUFFIXES)
+  // and `context-mode hook codex <event>` (D-1364-CODEX-V1-SCRIPT-1).
+  test("[#1364] detect-v1/codex keeps user .mjs hooks under a hooks/codex/ folder; v1 event scripts are still flagged", (t) => {
+    const home = tmp(t);
+    const file = path.join(home, ".codex", "hooks.json");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify({ hooks: {
+      PreToolUse: [{ hooks: [{ type: "command", command: 'node "$HOME/.agents/hooks/codex/secret-guard-pre-tool.mjs"' }] }],
+      PostToolUse: [{ hooks: [
+        { type: "command", command: "node C:\\Users\\u\\.agents\\hooks\\codex\\guard.mjs" },
+        { type: "command", command: "node /x/dotfiles/hooks/codex/notify.mjs" },
+        { type: "command", command: "node /x/dotfiles/hooks/codex/my-pretooluse.mjs" },
+      ] }],
+      SessionStart: [{ hooks: [{ type: "command", command: "node C:\\cm\\hooks\\codex\\sessionstart.mjs" }] }],
+      Stop: [{ hooks: [{ type: "command", command: "node /a/hooks/codex/stop.mjs" }, { type: "command", command: "context-mode hook codex stop" }] }],
+      UserPromptSubmit: [{ hooks: [{ type: "command", command: 'node "${PLUGIN_ROOT}/hooks/codex/userpromptsubmit.mjs"' }] }],
+    } }), "utf8");
+    assert.deepEqual(detectV1("codex", home, { tmp: tmp(t) }).map((f) => f.path),
+      ["hooks.SessionStart.0.hooks.0", "hooks.Stop.0.hooks.0", "hooks.Stop.0.hooks.1", "hooks.UserPromptSubmit.0.hooks.0"]);
+  });
+
   test("[M5] detect-v1/pi-npm-entry-found-via-PI_CODING_AGENT_DIR and after the git entry (#1035, #901, #1309)", (t) => {
     const home = tmp(t);
     const piDir = tmp(t);
@@ -297,6 +320,20 @@ describe("ADR-0011: remove v1", { concurrency: CONC }, () => {
     assert.ok(!after.includes("context-mode"));
     assert.ok(after.includes("[features]") && after.includes("[mcp_servers.other]") && after.includes("command = \"o\""));
     r.commit();
+  });
+
+  // #1364 (D-1364-CODEX-V1-SCRIPT-1): the reporter's hooks.json lost its user entry and no copy was left.
+  test("[#1364] v1-remove/codex removes only the v1 hook entry; the user hook under ~/.agents/hooks/codex/ stays as it was", (t) => {
+    const home = tmp(t);
+    const mine = { type: "command", command: 'node "$HOME/.agents/hooks/codex/secret-guard-pre-tool.mjs"', timeout: 7 };
+    const file = put(path.join(home, ".codex", "hooks.json"), { hooks: {
+      PreToolUse: [{ hooks: [mine] }],
+      Stop: [{ hooks: [{ type: "command", command: "node /x/hooks/codex/stop.mjs" }] }],
+    } });
+    const r = removeV1("codex", detectV1("codex", home, { tmp: tmp(t) }));
+    assert.deepEqual(r.rows, [{ area: `${file}: hooks.Stop.0.hooks.0`, before: V1_REASON.codexHook, after: UPGRADE_REMOVED }]);
+    r.commit();
+    assert.deepEqual(json(file).hooks.PreToolUse, [{ hooks: [mine] }]);
   });
 
   test("[M5] v1-remove/pi-npm-entries-dropped-git-entry-kept-jsonc-comments-kept", (t) => {

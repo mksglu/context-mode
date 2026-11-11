@@ -327,6 +327,48 @@ describe("GP11 doctor and upgrade", () => {
     assert.ok(!flat.includes("v1/server.js"));
   });
 
+  // #1359 (HengYangDS) and #1364 (Korayem), Codex 0.167.0 on 2.1.7: the reporter's exact replay. Codex documents
+  // [mcp_servers.<id>.tools.<tool>] approval_mode as user config; doctor said FAIL on it, then setup and ctx_upgrade deleted
+  // it, and ctx_upgrade also removed the user's own hook under ~/.agents/hooks/codex/ (D-1359-CODEX-TOOLS-1, D-1364-CODEX-V1-SCRIPT-1).
+  test("[M5] GP11/codex-user-approvals-and-hooks-kept (#1359 #1364): doctor exits 0, setup and ctx_upgrade keep them", async (t) => {
+    const { home, repo } = fixture(t);
+    const CLI = path.join(path.dirname(SERVER_BUNDLE), "cli.mjs");
+    const codexDir = path.join(home, ".codex");
+    const env = { PATH: [path.dirname(process.execPath), "/usr/bin", "/bin"].join(path.delimiter), HOME: home, USERPROFILE: home,
+      TMPDIR: home, XDG_CONFIG_HOME: path.join(home, ".config"), CODEX_HOME: codexDir };
+    const cli = (...args) => {
+      try { execFileSync(process.execPath, [CLI, ...args, "--agents", "codex", "--no-input", "--json"], { env, cwd: repo, stdio: "ignore" }); return 0; }
+      catch (e) { return e.status; }
+    };
+    assert.equal(cli("setup", "--yes"), 0);
+    const toml = path.join(codexDir, "config.toml");
+    const approvals = '\n[mcp_servers.context-mode.tools.ctx_execute]\napproval_mode = "auto"\n\n[mcp_servers.context-mode.tools.ctx_batch]\napproval_mode = "prompt"\n';
+    writeFileSync(toml, readFileSync(toml, "utf8") + approvals);
+    const tomlBefore = readFileSync(toml, "utf8");
+    assert.equal(cli("doctor"), 0, "the user's tool approval tables are no v1 leftover");
+    assert.equal(cli("setup", "--yes"), 0);
+    assert.equal(readFileSync(toml, "utf8"), tomlBefore, "setup again keeps the approval tables");
+
+    const hooks = path.join(codexDir, "hooks.json");
+    const doc = JSON.parse(readFileSync(hooks, "utf8"));
+    const mine = { type: "command", command: 'node "$HOME/.agents/hooks/codex/secret-guard-pre-tool.mjs"' };
+    (doc.hooks.PreToolUse ??= []).push({ hooks: [mine] });
+    (doc.hooks.Stop ??= []).push({ hooks: [{ type: "command", command: "node /x/hooks/codex/stop.mjs" }] }); // a real v1 entry
+    writeFileSync(hooks, JSON.stringify(doc, null, 2));
+    const c = spawnBundle(SERVER_BUNDLE, env, ["--agent", "codex"], { cwd: repo });
+    t.after(() => c.kill());
+    await c.request("initialize", INIT);
+    const reply = text(await call(c, "ctx_upgrade", {}));
+    await c.close();
+    const removed = reply.split("\n").filter((l) => l.endsWith("| removed |"));
+    assert.equal(removed.length, 1, reply);
+    assert.ok(removed[0].includes("hooks.Stop."), reply);
+    const after = JSON.parse(readFileSync(hooks, "utf8"));
+    assert.ok(after.hooks.PreToolUse.some((g) => g.hooks.some((h) => h.command === mine.command)), JSON.stringify(after));
+    assert.ok(!JSON.stringify(after).includes("/x/hooks/codex/stop.mjs"));
+    assert.ok(readFileSync(toml, "utf8").includes(approvals.trim()), readFileSync(toml, "utf8"));
+  });
+
   test("[M5] GP11/no-baked-paths: ctx_upgrade never writes the build host's own path into config", async (t) => {
     const { home, repo, spawn } = fixture(t);
     mkdirSync(path.join(home, ".claude"), { recursive: true });

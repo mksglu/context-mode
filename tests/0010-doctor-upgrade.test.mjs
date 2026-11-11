@@ -35,6 +35,7 @@ import { buildReport } from "../src/core/ops/report.ts";
 import { verifySums } from "../src/core/ops/verify-sums.ts";
 import { ctxDoctor, d1UpdateCommand, runDoctorChecks } from "../src/core/tools/doctor.ts";
 import { ctxUpgrade, runUpgrade } from "../src/core/tools/upgrade.ts";
+import { detectV1 } from "../src/core/ops/detect-v1.ts";
 import { buildRegistry, hookRunsCheck, runSetup } from "../src/setup/index.ts";
 import { codexRunDirOf, codexSetupHomeOf } from "../src/core/project/config-dir.ts";
 import { generateManifests } from "../build/manifests.ts";
@@ -2684,6 +2685,45 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, '[mcp_servers.context-mode]\ncommand = "/usr/bin/node"\nargs = ["/p/server.mjs", "--agent", "codex"]\n\n[mcp_servers.context-mode-other]\ncommand = "x"\n');
     assert.equal(checkV1Leftovers("codex", s.home, { tmp: s.tmp }).status, "PASS");
+  });
+
+  // #1359 (HengYangDS, Codex 0.167.0, 2.1.7): Codex documents [mcp_servers.<id>.tools.<tool>] approval_mode as user config.
+  // D4 called the reporter's two approval tables "old context-mode config.toml section", doctor exited 1, and setup and
+  // ctx_upgrade then deleted them. v1.0.169 never wrote a tools table; its parent table ran the `context-mode` bin
+  // (D-1359-CODEX-TOOLS-1).
+  const V2_ENTRY = '[mcp_servers.context-mode]\ncommand = "/usr/bin/node"\nargs = ["/p/server.mjs", "--agent", "codex"]\n';
+  const APPROVALS = '\n[mcp_servers.context-mode.tools.ctx_execute]\napproval_mode = "auto"\n\n[mcp_servers.context-mode.tools.ctx_batch]\napproval_mode = "prompt"\n';
+
+  test("[#1359] D4 PASS for a v2 entry with the user's tool approval tables; a tools table under a v1 parent is still flagged", (t) => {
+    const s = sandbox(t);
+    mkdirSync(s.tmp, { recursive: true });
+    const file = path.join(s.home, ".codex", "config.toml");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, V2_ENTRY + APPROVALS);
+    assert.deepEqual(detectV1("codex", s.home, { tmp: s.tmp }), []);
+    assert.equal(checkV1Leftovers("codex", s.home, { tmp: s.tmp }).status, "PASS");
+    writeFileSync(file, '[mcp_servers.context-mode]\ncommand = "context-mode"\n' + APPROVALS);
+    assert.deepEqual(detectV1("codex", s.home, { tmp: s.tmp }).map((f) => f.path),
+      ["[mcp_servers.context-mode]", "[mcp_servers.context-mode.tools.ctx_execute]", "[mcp_servers.context-mode.tools.ctx_batch]"]);
+  });
+
+  test("[#1359] ctx_upgrade keeps the user's approval tables and a user hook under hooks/codex/ byte for byte", async (t) => {
+    const s = sandbox(t);
+    const dir = path.join(s.home, ".codex");
+    mkdirSync(dir, { recursive: true });
+    const toml = path.join(dir, "config.toml");
+    const hooks = path.join(dir, "hooks.json");
+    writeFileSync(toml, V2_ENTRY.replace("/p/server.mjs", path.join(s.pkgDir, "server.mjs")) + APPROVALS);
+    writeFileSync(hooks, JSON.stringify({ hooks: { PostToolUse: [{ hooks: [{ type: "command", command: "node /Users/me/dotfiles/hooks/codex/notify.mjs" }] }] } }, null, 2));
+    const tomlBefore = readFileSync(toml, "utf8");
+    const hooksBefore = readFileSync(hooks, "utf8");
+    const deps = { project: { projectKey: "0123456789abcdef", worktree: path.join(s.home, "repo"), agent: "codex" },
+      env: { HOME: s.home, USERPROFILE: s.home, PATH: process.env.PATH }, signal: new AbortController().signal };
+    const reply = await asServer(s.pkgDir, () => runUpgrade({ mode: "upgrade" }, deps));
+    assert.ok(!reply.text.includes("| removed |"), reply.text);
+    assert.equal(readFileSync(hooks, "utf8"), hooksBefore);
+    assert.ok(readFileSync(toml, "utf8").includes(APPROVALS.trim()), readFileSync(toml, "utf8"));
+    assert.equal(readFileSync(toml, "utf8").includes(tomlBefore.slice(tomlBefore.indexOf("[mcp_servers.context-mode.tools"))), true);
   });
 
   test("[D-DOC-RT-1] all 10 hosts: after setup, D4 is clean and D3 names no MCP entry for a host whose entry setup wrote", async (t) => {

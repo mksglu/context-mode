@@ -239,6 +239,23 @@ rl.on("line", (l) => {
     assert.equal(readFileSync(toml, "utf8"), text);
   });
 
+  // #1359 (HengYangDS, D-1359-CODEX-TOOLS-1): re-running `setup --yes --agents codex` deleted the user's
+  // [mcp_servers.context-mode.tools.<tool>] approval_mode tables (Codex-native user config) from config.toml.
+  test("[#1359] setup again keeps the user's [mcp_servers.context-mode.tools.*] approval tables and their values", async (t) => {
+    const s = sandbox(t);
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "r1" });
+    assert.equal(res.exitCode, 0, JSON.stringify(res.agents));
+    const toml = path.join(s.home, ".codex", "config.toml");
+    const approvals = '\n[mcp_servers.context-mode.tools.ctx_execute]\napproval_mode = "auto"\n\n[mcp_servers.context-mode.tools.ctx_batch]\napproval_mode = "prompt"\n';
+    writeFileSync(toml, readFileSync(toml, "utf8") + approvals);
+    const before = readFileSync(toml, "utf8");
+    const again = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "r2" });
+    assert.equal(again.exitCode, 0, JSON.stringify(again.agents));
+    assert.deepEqual(again.agents[0].v1.filter((f) => f.file === toml), []);
+    assert.deepEqual(again.agents[0].changes, []);
+    assert.equal(readFileSync(toml, "utf8"), before);
+  });
+
   // #1328 / #1329 (lisandroprada, fingerprint 2e26442450f2): on Node v23.9.0 setup failed with "mcp: tools/list returned
   // ctx_doctor, expected ..." and rolled back. Node is checked first: one line with the fix, no write, no rollback.
   test("[#1328] setup on Node v23.9.0 stops first with one NODE_TOO_OLD line and writes nothing", async (t) => {
