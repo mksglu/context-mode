@@ -4,12 +4,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { runHookFixture } from "../harness/hook-runner.mjs";
 import { normalize } from "../harness/normalize.mjs";
 import { checkGolden } from "../harness/golden.mjs";
 import { execFileSync, spawnSync } from "node:child_process";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
 
 // GP3: hook files, fixture replay and Pi/OpenCode parity
@@ -271,6 +271,52 @@ import { DatabaseSync } from "node:sqlite";
     const bundlePath = path.join(path.resolve(__dirname, "..", ".."), "release-out", "pi", "index.js");
     const mod = await import(`file://${bundlePath}`);
     assert.equal(typeof (mod.default ?? mod), "function");
+  });
+
+  // #1352: Pi's own ExtensionRunner.emitToolResult with the built Pi bundle as the extension (ADR-0016:48 Pi row:
+  // content AND structuredContent together). The Pi host package comes from PI_HOST_DIR, the managed Pi install
+  // (~/.pi/agent/install/releases/<current-version>) or the global npm root; no Pi on the machine skips the case.
+  function piHostPackage() {
+    const roots = [];
+    if (process.env.PI_HOST_DIR) roots.push(path.join(process.env.PI_HOST_DIR, "node_modules"));
+    try {
+      const agentDir = path.join(homedir(), ".pi", "agent");
+      const ver = readFileSync(path.join(agentDir, "install", "current-version"), "utf8").trim();
+      roots.push(path.join(agentDir, "install", "releases", ver, "node_modules"));
+    } catch { /* no managed Pi install */ }
+    const npmRoot = spawnSync("npm", ["root", "-g"], { encoding: "utf8", shell: process.platform === "win32" });
+    if (npmRoot.status === 0) roots.push(npmRoot.stdout.trim());
+    return roots.map((r) => path.join(r, "@earendil-works", "pi-coding-agent")).find((d) => existsSync(path.join(d, "dist", "index.js")));
+  }
+  const PI_HOST = piHostPackage();
+
+  test("[M5] GP3/pi-tool-result-keeps-metadata: Pi's runner keeps details and structuredContent on a replace; excludeTools keeps the result whole (#1352)", { skip: PI_HOST === undefined ? "Pi not installed" : false }, async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "gp3-pi-1352-"));
+    const oldEnv = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE, PI_CODING_AGENT_DIR: process.env.PI_CODING_AGENT_DIR };
+    try {
+      const repo = path.join(root, "repo");
+      execFileSync("git", ["init", "-q", repo]);
+      process.env.HOME = root; process.env.USERPROFILE = root; process.env.PI_CODING_AGENT_DIR = path.join(root, ".pi", "agent");
+      const host = await import(pathToFileURL(path.join(PI_HOST, "dist", "index.js")).href);
+      const loader = await import(pathToFileURL(path.join(PI_HOST, "dist", "core", "extensions", "loader.js")).href);
+      const bundle = await import(pathToFileURL(path.join(REPO_ROOT, "release-out", "pi", "index.js")).href);
+      const runtime = host.createExtensionRuntime();
+      const settings = host.SettingsManager.inMemory({ contextMode: { excludeTools: ["kept_tool"] } });
+      runtime.getSettings = () => settings.getSettings();
+      const ext = await loader.loadExtensionFromFactory(bundle.default, repo, host.createEventBus(), runtime, "context-mode");
+      const runner = new host.ExtensionRunner([ext], runtime, repo, host.SessionManager.inMemory(repo), undefined);
+      const page = "# Requested page\n" + Array.from({ length: 300 }, (_, i) => "Section " + i + ": a distinct paragraph about the requested page and its source " + i + ".\n").join("");
+      const meta = { responseId: "r-1352", successful: 1 };
+      const ev = (toolName) => ({ type: "tool_result", toolName, toolCallId: "c-" + toolName, input: { url: "https://example.invalid/p" }, content: [{ type: "text", text: page }], details: { ...meta }, structuredContent: { ...meta }, isError: false });
+      const replaced = await runner.emitToolResult(ev("fetch_content"));
+      assert.ok(replaced && Buffer.byteLength(replaced.content[0].text) < Buffer.byteLength(page) / 2, "the large result is replaced");
+      assert.deepEqual(replaced.details, meta, "details survive the replace");
+      assert.deepEqual(replaced.structuredContent, meta, "structuredContent survives the replace");
+      assert.equal(await runner.emitToolResult(ev("kept_tool")), undefined, "an excludeTools entry leaves the result whole");
+    } finally {
+      for (const [k, v] of Object.entries(oldEnv)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test("[M5] GP3/tool-name-map-opencode-webfetch: OpenCode's webfetch call gets the WebFetch hint (#1052)", async () => {

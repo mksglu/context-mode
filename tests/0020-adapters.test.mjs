@@ -1543,6 +1543,15 @@ describe("ADR-0020 adapters", () => {
       assert.equal(hintPi, hintCc);
     });
 
+    test("[#1352] pi decode: a tool_result with keep: true marks the result keep; any other value leaves it unset", () => {
+      const row = getRow("pi");
+      const base = { type: "tool_result", sessionId: "s", cwd: "/p", toolName: "fetch_content", input: {}, content: "abc", isError: false };
+      assert.deepEqual(row.decode({ ...base, keep: true }).result, { isError: false, bytes: 3, text: "abc", keep: true });
+      for (const keep of [undefined, false, "true", 1]) {
+        assert.equal(Object.hasOwn(row.decode({ ...base, keep }).result, "keep"), false, String(keep));
+      }
+    });
+
     test("[M5] adapters/pi-project-permissions-honored: a deny rule in the project permissions file denies with reason (#1019)", () => {
       const row = getRow("pi");
       assert.ok(typeof row.checkPermission === "function" || typeof row.decide === "function");

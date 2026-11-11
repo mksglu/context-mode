@@ -10,6 +10,8 @@ import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import piExtension from "../src/entries/pi.ts";
 import { resolveProject } from "../src/core/project/resolve.ts";
+import { openDb } from "../src/core/store/db.ts";
+import { readSessionEvents } from "../src/core/journal/read.ts";
 import { INSTRUCTIONS } from "../src/entries/server.ts";
 import { setTimeout as sleep } from "node:timers/promises";
 
@@ -503,6 +505,7 @@ describe("ADR-0020 plugins", () => {
           tools.set(t.name, t);
         },
       };
+      if (opts.getSettings !== undefined) pi.getSettings = opts.getSettings;
       return { pi, handlers, tools };
     }
     const ctxFor = (sid, cwd = repo) => ({ cwd, sessionManager: { getSessionId: () => sid } });
@@ -630,6 +633,106 @@ describe("ADR-0020 plugins", () => {
       const text = (await tools.get("ctx_resume").execute("r1", {})).content[0].text;
       assert.ok(text.includes("pi-edited.txt"), text);
       assert.ok(text.includes("pi-written.txt"), text);
+    });
+  });
+
+  describe("ADR-0020 pi plugin tool_result metadata and excludeTools (#1352)", () => {
+    // #1352 (xz-dev, hoho51): a large extension result (fetch_content, session_search) came back with `details`
+    // overwritten by {text} and with `structuredContent` dropped, so the tool lost its continuation id (responseId).
+    // ADR-0016:48 Pi row: "set `content` AND `structuredContent` together post-call (`tool_result`)". Pi >= 1.4
+    // drops structuredContent on a content-only patch (types.d.ts "Return it along with `content` to keep it") and
+    // keeps `details` when the patch omits it. contextMode.excludeTools in Pi settings leaves a named tool whole.
+    let root;
+    let repo;
+    let oldHome;
+
+    before(() => {
+      root = realpathSync(mkdtempSync(join(tmpdir(), "cm-pi-1352-")));
+      repo = join(root, "repo");
+      mkdirSync(repo);
+      execFileSync("git", ["init", "-q", repo]);
+      oldHome = process.env.HOME;
+      process.env.HOME = root; process.env.USERPROFILE = root;
+    });
+
+    after(() => {
+      process.env.HOME = oldHome;
+      try { rmSync(root, { recursive: true, force: true, maxRetries: 3 }); } catch (err) { if (process.platform !== "win32") throw err; }
+    });
+
+    const PAGE = "# Requested page\n" + Array.from({ length: 300 }, (_, i) => "Section " + i + ": a distinct paragraph about the requested page and its source " + i + ".\n").join("");
+    const META = { responseId: "stored-response-for-continuation", successful: 1 };
+
+    function resultEvent(toolName, id, extra = {}) {
+      return {
+        toolName, toolCallId: id, input: { url: "https://example.invalid/" + id },
+        content: [{ type: "text", text: PAGE }], details: { ...META }, structuredContent: { ...META }, isError: false, ...extra,
+      };
+    }
+
+    async function start(sid, getSettings) {
+      const handlers = new Map();
+      const pi = { on: (n, f) => handlers.set(n, f), registerTool() {} };
+      if (getSettings !== undefined) pi.getSettings = getSettings;
+      piExtension(pi);
+      const ctx = { cwd: repo, sessionManager: { getSessionId: () => sid } };
+      await handlers.get("before_agent_start")({ systemPrompt: "" }, ctx);
+      return (ev) => handlers.get("tool_result")(ev, ctx);
+    }
+
+    // The journal write is detached: wait until the row lands.
+    async function rowsOf(sid, kind) {
+      const db = await openDb(resolveProject("pi", { env: process.env, argv: [], cwd: repo, piCwd: repo }));
+      let rows = [];
+      for (let i = 0; i < 100; i++) {
+        rows = readSessionEvents(db, sid, kind);
+        if (rows.length > 0) break;
+        await sleep(20);
+      }
+      return rows;
+    }
+
+    test("[#1352] a large replace keeps the tool's details (no details key) and returns its structuredContent", async () => {
+      const toolResult = await start("pi-1352-a");
+      const out = await toolResult(resultEvent("fetch_content", "a1"));
+      assert.ok(out && Buffer.byteLength(out.content[0].text) < Buffer.byteLength(PAGE) / 2, "the content is replaced");
+      assert.equal(Object.hasOwn(out, "details"), false, "details stays as the tool made it: " + JSON.stringify(out.details));
+      assert.deepEqual(out.structuredContent, META, "structuredContent goes back with the new content, so Pi keeps it");
+      const plain = await toolResult(resultEvent("fetch_content", "a2", { structuredContent: undefined }));
+      assert.equal(Object.hasOwn(plain, "structuredContent"), false, "no structuredContent in, none out");
+    });
+
+    test("[#1352] excludeTools: a listed tool's 23 KB result stays whole, a cmd row is still journaled, another tool is still replaced", async () => {
+      const toolResult = await start("pi-1352-b", () => ({ contextMode: { excludeTools: ["fetch_content", "bash"] } }));
+      assert.equal(await toolResult(resultEvent("fetch_content", "b1")), undefined, "fetch_content is left as the host made it");
+      const bash = { toolName: "bash", toolCallId: "b2", input: { command: "cat page.md" }, content: [{ type: "text", text: PAGE }], isError: false };
+      assert.equal(await toolResult(bash), undefined, "bash is listed, so it is left whole too");
+      assert.equal((await rowsOf("pi-1352-b", "cmd")).length, 1, "the kept bash call still has its journal row");
+      const other = await toolResult(resultEvent("web_search", "b3"));
+      assert.ok(other && Buffer.byteLength(other.content[0].text) < Buffer.byteLength(PAGE) / 2, "a tool not on the list is still replaced");
+    });
+
+    test("[#1352] missing, empty or malformed excludeTools settings, and a Pi with no getSettings, give the default replace", async () => {
+      const variants = [
+        undefined,
+        () => ({}),
+        () => ({ contextMode: null }),
+        () => ({ contextMode: { excludeTools: [] } }),
+        () => ({ contextMode: { excludeTools: "fetch_content" } }),
+        () => ({ contextMode: { excludeTools: [1, null, { name: "fetch_content" }] } }),
+        () => { throw new Error("Extension runtime not initialized"); },
+      ];
+      for (const [i, getSettings] of variants.entries()) {
+        const toolResult = await start("pi-1352-c" + i, getSettings);
+        const out = await toolResult(resultEvent("fetch_content", "c" + i));
+        assert.ok(out && Buffer.byteLength(out.content[0].text) < Buffer.byteLength(PAGE) / 2, "variant " + i + " replaces");
+      }
+    });
+
+    test("[#1352] an excluded tool's large error result stays unchanged and is journaled as toolerr", async () => {
+      const toolResult = await start("pi-1352-d", () => ({ contextMode: { excludeTools: ["fetch_content"] } }));
+      assert.equal(await toolResult(resultEvent("fetch_content", "d1", { isError: true })), undefined);
+      assert.equal((await rowsOf("pi-1352-d", "toolerr")).length, 1, "the error row is written");
     });
   });
 
