@@ -4,7 +4,7 @@
 // row), and the hook timeout. D4 folds detectV1's findings into one row. D5b flags Claude Code hooks that VS
 // Code's chat.useClaudeHooks re-runs in the same repo.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import {
   AGENT_ARG, AGENT_HOME_DIR, D3_NO_SETUP_FIX, NATIVE_INSTALL, V1_REASON, D3_ROOT_DETAIL, D3_ROOT_FIX, MCP_ARGS_FIELD, MCP_COMMAND_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
   D5B_DETAIL, D5B_FIX, DOCTOR_FIX_UPGRADE, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_COMMAND_FIELD, HOOK_COMMAND_SEP,
@@ -229,18 +229,41 @@ const OPENCODE_PLUGIN_INDEX = "index";
 const OPENCODE_DIR_FILE_MAX = 64 * 1024; // a re-export is one line; a large file is not a stub of ours
 const OWN_PLUGIN_MODULES = [SERVER_KEY, `${SERVER_KEY}/server`];
 
-/** D-R54-OC-PLUGINS-DIR-1 (#1349): a plugin file in an OpenCode plugins dir loads context-mode when one of its module
- *  names is the package ("context-mode", "context-mode/server") or a path to our bundle's opencode/plugin.js. */
-export function opencodeDirPlugin(dirs: readonly string[]): string | undefined {
+const FILE_URL_PREFIX = "file://";
+const NODE_MODULES_DIR = "node_modules";
+const PACKAGE_JSON_FILE = "package.json";
+export const OPENCODE_PACKAGE_DIR_HINT = `${NODE_MODULES_DIR}/${SERVER_KEY}`; // named in the fix line when a dir file cannot resolve it
+
+/** The plugins dir roots OpenCode reads: the config dir and <project>/.opencode (D-R54-OC-PLUGINS-DIR-1). D3 and setup share it. */
+export function opencodePluginDirs(configDir: string, worktree: string): string[] {
+  return [configDir, join(worktree, OPENCODE_PROJECT_DIR)];
+}
+
+/** Node (and Bun) resolve a bare module name from node_modules next to the importing file or in a dir above it. */
+function packageResolves(fromDir: string): boolean {
+  for (let d = fromDir; ; d = dirname(d)) {
+    if (existsSync(join(d, NODE_MODULES_DIR, SERVER_KEY, PACKAGE_JSON_FILE))) return true;
+    if (dirname(d) === d) return false;
+  }
+}
+
+export interface OpencodeDirPlugin { file: string; loads: boolean; }
+
+/** D-R54-OC-PLUGINS-DIR-1 (#1349): each plugin file in an OpenCode plugins dir whose module names include the package
+ *  ("context-mode", "context-mode/server") or a path to our bundle's opencode/plugin.js. loads = OpenCode can resolve
+ *  that module: the package is in node_modules next to the file or above it, or the path names a file that exists.
+ *  A file with no resolvable module makes OpenCode log "failed to load plugin ... Cannot find package" (review round 1). */
+export function opencodeDirPlugins(dirs: readonly string[]): OpencodeDirPlugin[] {
   const bundle = opencodePluginFile();
   const ownFile = join(bundle, ...OPENCODE_PLUGIN_PATH).split("\\").join("/");
-  const own = (s: string) => {
-    const p = s.split("\\").join("/");
-    if (OWN_PLUGIN_MODULES.includes(p) || p === ownFile || p === `file://${ownFile}`) return true;
+  const isModule = (p: string) => OWN_PLUGIN_MODULES.includes(p);
+  const isPath = (p: string) => {
+    if (p === ownFile || p === `${FILE_URL_PREFIX}${ownFile}`) return true;
     const seg = p.split("/");
     const n = seg.length;
     return n >= 3 && seg[n - 1] === "plugin.js" && seg[n - 2] === "opencode" && seg[n - 3] === SERVER_KEY;
   };
+  const out: OpencodeDirPlugin[] = [];
   for (const dir of dirs) {
     const pdir = join(dir, OPENCODE_PLUGINS_DIR);
     let names: string[];
@@ -251,11 +274,23 @@ export function opencodeDirPlugin(dirs: readonly string[]): string | undefined {
       for (const f of files) {
         let text: string;
         try { const b = readFileSync(f); if (b.length > OPENCODE_DIR_FILE_MAX) continue; text = b.toString("utf8"); } catch { continue; }
-        if (stringLiterals(text).some(own)) return f;
+        const lits = stringLiterals(text).map((s) => s.split("\\").join("/")).filter((p) => isModule(p) || isPath(p));
+        if (!lits.length) continue;
+        const loads = lits.some((p) => {
+          if (isModule(p)) return packageResolves(dirname(f));
+          const bare = p.startsWith(FILE_URL_PREFIX) ? p.slice(FILE_URL_PREFIX.length) : p;
+          return existsSync(isAbsolute(bare) ? bare : resolve(dirname(f), bare));
+        });
+        out.push({ file: f, loads });
       }
     }
   }
-  return undefined;
+  return out;
+}
+
+/** The first plugins dir file of ours that OpenCode loads, or undefined. */
+export function opencodeDirPlugin(dirs: readonly string[]): string | undefined {
+  return opencodeDirPlugins(dirs).find((p) => p.loads)?.file;
 }
 
 /** D-R44-OC-D3-1 (#1310): a local MCP entry runs our server: command is a node (or a command array that starts with one),
@@ -287,7 +322,7 @@ function opencodeListed(file: string, worktree: string): boolean {
   const dirs = [dirname(file), worktree];
   if (dirs.some((dir) => OPENCODE_CONFIG_FILES.some((name) => opencodeValueListed(opencodeFileValue(join(dir, name)))))) return true;
   // D-R54-OC-PLUGINS-DIR-1 (#1349): OpenCode also loads a plugin file from the plugins dir, no config entry needed.
-  return opencodeDirPlugin([dirname(file), join(worktree, OPENCODE_PROJECT_DIR)]) !== undefined;
+  return opencodeDirPlugin(opencodePluginDirs(dirname(file), worktree)) !== undefined;
 }
 
 function mcpWrong(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktree: string): boolean {

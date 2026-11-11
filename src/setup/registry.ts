@@ -25,7 +25,9 @@ export const INSTRUCTION_FILES: readonly string[] = Object.freeze([
   "CLAUDE.md", "AGENTS.md", "AGENTS.override.md", "GEMINI.md", "QWEN.md", "copilot-instructions.md", "KIRO.md",
 ]);
 
-export interface SetupContext { home: string; pkgDir: string; env: Record<string, string | undefined>; platform?: NodeJS.Platform; }
+export interface SetupContext { home: string; pkgDir: string; env: Record<string, string | undefined>; platform?: NodeJS.Platform;
+  /** D-R54-OC-PLUGINS-DIR-1: the project OpenCode runs in (its .opencode/plugins dir loads plugins too); default process.cwd(). */
+  cwd?: string; }
 
 /** A config file setup edits itself: the exact diff is known before apply. */
 export interface ConfigTarget {
@@ -45,7 +47,7 @@ export interface HookFile { file: string; mode: "rewrite" | "drop"; }
  *  ships the hooks (claude-code, gemini, qwen, pi through its CLI install). */
 export type HookInstall =
   | { kind: "file"; file: string; shape: JsonObject; command: string; trust?: string }
-  | { kind: "plugin-list"; file: string; key: readonly string[]; entry: string }
+  | { kind: "plugin-list"; file: string; key: readonly string[]; entry: string; worktree: string }
   | { kind: "package"; via: string };
 
 /** ADR-0020: the one skill channel. dir = setup writes <dir>/<name>/SKILL.md rendered with the agent's tool name
@@ -287,6 +289,7 @@ function hookInstallFor(ctx: SetupContext, row: AdapterRow, command: string): Ho
   }
   if (row.id === "opencode") {
     return { kind: "plugin-list", file: path.join(opencodeDirOf(ctx.env, ctx.home), OPENCODE_BASE_CONFIG_FILE), key: ["plugin"],
+      worktree: ctx.cwd ?? process.cwd(), // D-R54-OC-PLUGINS-DIR-1: <project>/.opencode/plugins
       entry: ctx.pkgDir }; // D-OC2-ENTRY-1: the package dir loads on OpenCode 1.19.5 and 2.2.x (2.x rejects a file path: "configured plugin path must be a directory"); the host turns an absolute or drive-letter path into a file URL itself (D-WIN-OCENTRY-1)
   }
   return { kind: "package", via: ch.path };

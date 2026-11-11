@@ -21,7 +21,7 @@ import { nodeTooOld } from "../core/hooks/fallback.ts";
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
 import type { AgentId, HostConfigFormat, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
-import { isNativeOpencodeEntry, opencodeDirPlugin } from "../core/ops/doctor-config.ts";
+import { isNativeOpencodeEntry, OPENCODE_PACKAGE_DIR_HINT, opencodeDirPlugin, opencodeDirPlugins, opencodePluginDirs } from "../core/ops/doctor-config.ts";
 import { atomicWriteFile, renameWithRetry, unlinkWithRetry } from "../core/ops/atomic-file.ts";
 import { editHostConfigText, hostConfigValueAt, parseHostConfig } from "../core/ops/host-config.ts";
 import { hostLayout, hostText, withLayout } from "../core/ops/host-text.ts";
@@ -293,14 +293,15 @@ function wantedPluginList(list: unknown[], entry: string, nativeElsewhere = fals
 /** D-OC2-NATIVE-CMD-1: `opencode plugin add context-mode` on OpenCode 2 writes the spec to a "plugins" key (1.19 writes "plugin").
  *  D-R54-OC2-BARE-NATIVE-1 (#1344): 2.2.6 writes the bare name there, and OpenCode merges every config file of its
  *  config dir (D-R49-DOCTOR-1339-2), so a native entry in opencode.jsonc counts for the opencode.json list too. */
-function nativePluginsKey(doc: unknown, file: string): boolean {
+function nativePluginsKey(doc: unknown, file: string, worktree: string): boolean {
   const native = (d: unknown) => isObj(d) && [OPENCODE_PLUGINS_KEY, OPENCODE_PLUGIN_KEY].some((k) => {
     const v = d[k];
     return Array.isArray(v) && v.some((e) => isNativeOpencodeEntry(e, k));
   });
   if (native(doc)) return true;
-  // D-R54-OC-PLUGINS-DIR-1 (#1349): a plugin file of ours in <config dir>/plugins loads the hooks with no list entry.
-  if (opencodeDirPlugin([path.dirname(file)]) !== undefined) return true;
+  // D-R54-OC-PLUGINS-DIR-1 (#1349): a plugin file of ours in <config dir>/plugins or <project>/.opencode/plugins loads
+  // the hooks with no list entry (the same dirs D3 reads). A file whose package OpenCode cannot find loads nothing.
+  if (opencodeDirPlugin(opencodePluginDirs(path.dirname(file), worktree)) !== undefined) return true;
   return OPENCODE_CONFIG_FILES.map((n) => path.join(path.dirname(file), n)).filter((f) => f !== file).some((f) => {
     const text = readOr(f);
     if (text === undefined || text.trim() === "") return false;
@@ -315,7 +316,7 @@ function pluginListIssue(h: Extract<HookInstall, { kind: "plugin-list" }>): stri
   try { doc = parseHostConfig("opencode", h.file, text, fileFormat({ id: "opencode" } as CheckRow, h.file)); } catch { return undefined; }
   const cur = isObj(doc) ? doc[h.key[0]] : undefined;
   const list = Array.isArray(cur) ? cur : [];
-  if (nativePluginsKey(doc, h.file) && list.includes(h.entry)) return `${h.file}: context-mode loads twice (native entry and ${h.entry}), every hook fires twice; run: context-mode setup`;
+  if (nativePluginsKey(doc, h.file, h.worktree) && list.includes(h.entry)) return `${h.file}: context-mode loads twice (native entry and ${h.entry}), every hook fires twice; run: context-mode setup`;
   const stale = list.find((e) => isStaleOwnPlugin(e, h.entry));
   if (stale !== undefined) return `${h.file}: plugin file missing, so OpenCode never loads the hooks (${String(stale)}); run: context-mode setup`;
   return undefined;
@@ -342,7 +343,7 @@ function planHookInstall(row: CheckRow, edits: FileEdit[], env: SetupContext["en
     planJsonKeys(row, edits, h.file, fileFormat(row, h.file), (doc) => {
       const cur = doc[h.key[0]];
       const list = Array.isArray(cur) ? cur : [];
-      const want = wantedPluginList(list, h.entry, nativePluginsKey(doc, h.file));
+      const want = wantedPluginList(list, h.entry, nativePluginsKey(doc, h.file, h.worktree));
       if (cur === undefined && want.length === 0) return [];
       return [[h.key, want.length === list.length && want.every((e, i) => e === list[i]) ? list : want]];
     });
@@ -1072,7 +1073,7 @@ export function detectAgents(reg: CheckRow[], ctx: SetupContext): AgentId[] {
 // ---------- entry points ----------
 
 export async function runSetup(opts: SetupOptions): Promise<SetupResult> {
-  const ctx: SetupContext = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
+  const ctx: SetupContext = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env, cwd: opts.cwd };
   const runId = opts.runId ?? new Date().toISOString().split(":").join("-").split(".").join("-");
   const reg = buildRegistry(ctx);
   // preflight. #1328 D-NODE-OLD-1: Node first. Below NODE_MIN the server serves only ctx_doctor, so every agent
@@ -1180,7 +1181,7 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
 export const V1_FORM_REASON = "old context-mode entry, run: context-mode setup";
 export const NOT_SET_UP_REASON = "not set up, run context-mode setup";
 export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
-  const ctx: SetupContext = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
+  const ctx: SetupContext = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env, cwd: opts.cwd };
   const reg = buildRegistry(ctx);
   for (const f of ["server.mjs", "hook.mjs"]) {
     if (!existsSync(path.join(ctx.pkgDir, f))) return { exitCode: 1, agents: [], error: `preflight: ${path.join(ctx.pkgDir, f)} is missing` };
@@ -1216,7 +1217,11 @@ function notSetUpReason(row: CheckRow, res: AgentResult, env: SetupContext["env"
   const h = row.hookInstall;
   const missing = row.id === "opencode" && h.kind === "plugin-list" && res.changes.some((c) => c.path === h.key[0]);
   const oc2 = missing && hostBin("opencode", env).file !== undefined && opencodeMajor("opencode", env) >= 2;
-  if (oc2) return `${NOT_SET_UP_REASON}, or run: opencode plugin add context-mode`;
+  // D-R54-OC-PLUGINS-DIR-1 (review round 1): a plugins dir file of ours that OpenCode cannot load is named with what it needs.
+  const dead = missing ? opencodeDirPlugins(opencodePluginDirs(path.dirname(h.file), h.worktree)).find((p) => !p.loads) : undefined;
+  const hint = dead ? `; ${dead.file} loads context-mode once ${OPENCODE_PACKAGE_DIR_HINT} is next to it or above it` : "";
+  if (oc2) return `${NOT_SET_UP_REASON}, or run: opencode plugin add context-mode${hint}`;
+  if (hint) return NOT_SET_UP_REASON + hint;
   // D-R44-GEMINI-NATIVE-CMD-1 (host audit gemini-1): gemini is on PATH and lists no context-mode extension, so the fix
   // line names the host's own install command too.
   if (row.id === "gemini" && hostBin("gemini", env).file !== undefined) return `${NOT_SET_UP_REASON}, or run: ${NATIVE_INSTALL.gemini[0]}`;
