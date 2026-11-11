@@ -21,7 +21,7 @@ import { nodeTooOld } from "../core/hooks/fallback.ts";
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
 import type { AgentId, HostConfigFormat, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
-import { isNativeOpencodeEntry, OPENCODE_PACKAGE_DIR_HINT, opencodeDirPlugin, opencodeDirPlugins, opencodePluginDirs } from "../core/ops/doctor-config.ts";
+import { isNativeOpencodeEntry, OPENCODE_PACKAGE_DIR_HINT, opencodeDirPlugin, opencodeDirPlugins, opencodePluginDirs, opencodeProjectDir } from "../core/ops/doctor-config.ts";
 import { atomicWriteFile, renameWithRetry, unlinkWithRetry } from "../core/ops/atomic-file.ts";
 import { editHostConfigText, hostConfigValueAt, parseHostConfig } from "../core/ops/host-config.ts";
 import { hostLayout, hostText, withLayout } from "../core/ops/host-text.ts";
@@ -293,15 +293,16 @@ function wantedPluginList(list: unknown[], entry: string, nativeElsewhere = fals
 /** D-OC2-NATIVE-CMD-1: `opencode plugin add context-mode` on OpenCode 2 writes the spec to a "plugins" key (1.19 writes "plugin").
  *  D-R54-OC2-BARE-NATIVE-1 (#1344): 2.2.6 writes the bare name there, and OpenCode merges every config file of its
  *  config dir (D-R49-DOCTOR-1339-2), so a native entry in opencode.jsonc counts for the opencode.json list too. */
-function nativePluginsKey(doc: unknown, file: string, worktree: string): boolean {
+function nativePluginsKey(doc: unknown, file: string): boolean {
   const native = (d: unknown) => isObj(d) && [OPENCODE_PLUGINS_KEY, OPENCODE_PLUGIN_KEY].some((k) => {
     const v = d[k];
     return Array.isArray(v) && v.some((e) => isNativeOpencodeEntry(e, k));
   });
   if (native(doc)) return true;
-  // D-R54-OC-PLUGINS-DIR-1 (#1349): a plugin file of ours in <config dir>/plugins or <project>/.opencode/plugins loads
-  // the hooks with no list entry (the same dirs D3 reads). A file whose package OpenCode cannot find loads nothing.
-  if (opencodeDirPlugin(opencodePluginDirs(path.dirname(file), worktree)) !== undefined) return true;
+  // D-R54-OC-PLUGINS-DIR-1 (#1349): a plugin file of ours in <config dir>/plugins loads the hooks with no list entry.
+  // A file whose package OpenCode cannot find loads nothing. Review round 2: only the config dir counts here, because
+  // setup edits only the global file; a <project>/.opencode/plugins file loads in that one project (pluginListIssue).
+  if (opencodeDirPlugin([path.dirname(file)]) !== undefined) return true;
   return OPENCODE_CONFIG_FILES.map((n) => path.join(path.dirname(file), n)).filter((f) => f !== file).some((f) => {
     const text = readOr(f);
     if (text === undefined || text.trim() === "") return false;
@@ -316,7 +317,12 @@ function pluginListIssue(h: Extract<HookInstall, { kind: "plugin-list" }>): stri
   try { doc = parseHostConfig("opencode", h.file, text, fileFormat({ id: "opencode" } as CheckRow, h.file)); } catch { return undefined; }
   const cur = isObj(doc) ? doc[h.key[0]] : undefined;
   const list = Array.isArray(cur) ? cur : [];
-  if (nativePluginsKey(doc, h.file, h.worktree) && list.includes(h.entry)) return `${h.file}: context-mode loads twice (native entry and ${h.entry}), every hook fires twice; run: context-mode setup`;
+  const listed = list.includes(h.entry);
+  if (listed && nativePluginsKey(doc, h.file)) return `${h.file}: context-mode loads twice (native entry and ${h.entry}), every hook fires twice; run: context-mode setup`;
+  // D-R54-OC-PLUGINS-DIR-1 (review round 2): the global entry loads the hooks in every project, a project plugins file
+  // only in its own project, so the fix is to remove the project file (setup never edits a project file).
+  const proj = listed ? opencodeDirPlugin([opencodeProjectDir(h.worktree)]) : undefined;
+  if (proj !== undefined) return `${proj}: context-mode loads twice in this project (this file and ${h.entry} in ${h.file}), every hook fires twice; remove ${proj}, the ${h.file} entry loads the hooks in every project`;
   const stale = list.find((e) => isStaleOwnPlugin(e, h.entry));
   if (stale !== undefined) return `${h.file}: plugin file missing, so OpenCode never loads the hooks (${String(stale)}); run: context-mode setup`;
   return undefined;
@@ -343,7 +349,7 @@ function planHookInstall(row: CheckRow, edits: FileEdit[], env: SetupContext["en
     planJsonKeys(row, edits, h.file, fileFormat(row, h.file), (doc) => {
       const cur = doc[h.key[0]];
       const list = Array.isArray(cur) ? cur : [];
-      const want = wantedPluginList(list, h.entry, nativePluginsKey(doc, h.file, h.worktree));
+      const want = wantedPluginList(list, h.entry, nativePluginsKey(doc, h.file));
       if (cur === undefined && want.length === 0) return [];
       return [[h.key, want.length === list.length && want.every((e, i) => e === list[i]) ? list : want]];
     });
@@ -691,7 +697,9 @@ function hookRegisteredCheck(row: CheckRow, env: SetupContext["env"], list: Chec
   }
   const edits: FileEdit[] = [];
   try { planHookInstall(row, edits, env); } catch (e) { return { name: "hook-registered", ok: false, detail: (e as Error).message }; }
-  if (!edits.length) return { name: "hook-registered", ok: true };
+  // D-R54-OC-PLUGINS-DIR-1 (review round 2): a project plugins file next to the global entry needs no edit of ours and still loads twice.
+  const kept = !edits.length && h.kind === "plugin-list" ? pluginListIssue(h) : undefined;
+  if (!edits.length) return kept === undefined ? { name: "hook-registered", ok: true } : { name: "hook-registered", ok: false, detail: kept };
   const trust = h.kind === "file" ? h.trust : undefined;
   if (trust && edits.every((e) => e.file === trust && e.changes.every((c) => isTrust(row, c)))) return { name: "hook-registered", ok: false, detail: `${h.file}: the context-mode hooks are not trusted in ${trust}; re-run setup` };
   const issue = h.kind === "plugin-list" ? pluginListIssue(h) : h.kind === "file" && row.id === "kiro" ? kiroDisabledIssue(h) : undefined;

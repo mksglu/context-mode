@@ -236,7 +236,12 @@ export const OPENCODE_PACKAGE_DIR_HINT = `${NODE_MODULES_DIR}/${SERVER_KEY}`; //
 
 /** The plugins dir roots OpenCode reads: the config dir and <project>/.opencode (D-R54-OC-PLUGINS-DIR-1). D3 and setup share it. */
 export function opencodePluginDirs(configDir: string, worktree: string): string[] {
-  return [configDir, join(worktree, OPENCODE_PROJECT_DIR)];
+  return [configDir, opencodeProjectDir(worktree)];
+}
+
+/** <project>/.opencode: OpenCode loads its plugins dir only in that project (review round 2). */
+export function opencodeProjectDir(worktree: string): string {
+  return join(worktree, OPENCODE_PROJECT_DIR);
 }
 
 /** Node (and Bun) resolve a bare module name from node_modules next to the importing file or in a dir above it. */
