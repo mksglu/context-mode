@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { claudeDirOf, codexDirOf, copilotDirOf, dataRootOf, geminiDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
-import { AGENT_HOME_DIR, D2_NODE_DETAIL, D2_NODE_FIX, D2_SQLITE_DETAIL, D2_SQLITE_FIX, DB_FILE_NAME, MCP_ENV_FIELD, MCP_ENV_VARS_FIELD, SETUP_MANIFEST_FILE, NATIVE_INSTALL, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, D2_NODE_DETAIL, D2_NODE_FIX, D2_SQLITE_DETAIL, D2_SQLITE_FIX, DB_FILE_NAME, MCP_ENV_FIELD, MCP_ENV_VARS_FIELD, MCP_TOOLS_FIELD, SETUP_MANIFEST_FILE, NATIVE_INSTALL, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError, formatError } from "../core/contracts/errors.ts";
 import { nodeTooOld } from "../core/hooks/fallback.ts";
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
@@ -627,7 +627,8 @@ function hookCheck(row: CheckRow, env: SetupContext["env"]): Check {
 }
 
 /** #1327 D-1327-CODEX-ENV-1: the config edits for a row, with the env table and env_vars list the user keeps on the codex
- *  MCP entry (other vars, Codex forwards these to the server) merged in; setup sets only its own CODEX_HOME key. */
+ *  MCP entry (other vars, Codex forwards these to the server) merged in; setup sets only its own CODEX_HOME key.
+ *  #1359 D-1359-CODEX-TOOLS-1: the user's tools table (per-tool approval_mode) is kept as it is. */
 function ownConfigEdits(row: CheckRow, c: NonNullable<CheckRow["config"]>, text: string): [readonly string[], unknown][] {
   const edits = configEdits(c);
   if (row.id !== "codex" || !isObj(c.value)) return edits;
@@ -639,6 +640,7 @@ function ownConfigEdits(row: CheckRow, c: NonNullable<CheckRow["config"]>, text:
   const ownEnv = value[MCP_ENV_FIELD];
   if (isObj(userEnv) || isObj(ownEnv)) value[MCP_ENV_FIELD] = { ...(isObj(userEnv) ? userEnv : {}), ...(isObj(ownEnv) ? ownEnv : {}) };
   if (Array.isArray(cur[MCP_ENV_VARS_FIELD])) value[MCP_ENV_VARS_FIELD] = cur[MCP_ENV_VARS_FIELD];
+  if (isObj(cur[MCP_TOOLS_FIELD])) value[MCP_TOOLS_FIELD] = cur[MCP_TOOLS_FIELD];
   return [[c.key, value], ...edits.slice(1)];
 }
 

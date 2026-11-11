@@ -824,7 +824,12 @@ export const V1_SCRIPT_NAMES = Object.freeze([
 ] as const);
 export const V1_HOOK_COMMAND = "context-mode hook";
 export const V1_CODEX_HOOK_COMMAND = "context-mode hook codex";
-export const V1_CODEX_HOOKS_DIR = Object.freeze(["hooks", "codex"] as const); // path segments of hooks/codex/*.mjs
+export const V1_CODEX_HOOKS_DIR = Object.freeze(["hooks", "codex"] as const); // path segments of hooks/codex/<event>.mjs
+// #1364 D-1364-CODEX-V1-SCRIPT-1: the only scripts v1.0.169 shipped under hooks/codex/ and wrote into hooks.json
+// (v1 src/adapters/codex/index.ts LEGACY_HOOK_PATH_SUFFIXES). Any other .mjs there is the user's own hook.
+export const V1_CODEX_SCRIPT_NAMES = Object.freeze([
+  "pretooluse.mjs", "posttooluse.mjs", "sessionstart.mjs", "precompact.mjs", "userpromptsubmit.mjs", "stop.mjs",
+] as const);
 export const V1_CACHE_HEAL_NAME = "context-mode-cache-heal"; // hooks/context-mode-cache-heal.{mjs,sh}
 export const V1_CACHE_HEAL_EXTS = Object.freeze([".mjs", ".sh"] as const);
 export const V1_STATUSLINE_COMMAND = "context-mode statusline"; // report only, never removed
@@ -889,7 +894,6 @@ export const V1_DATA_DIR_NAME = "context-mode"; // <agent home>/context-mode/
 // "content" dir, "platform.json"); v2 shares the dir (DATA_ROOT), so only these names are v1 content.
 export const V1_DATA_ROOT_ENTRIES = Object.freeze(["content", "platform.json"] as const);
 export const V1_SESSIONS_DIR_NAME = "sessions"; // VS Code: <.github|.vscode>/context-mode/sessions/
-export const V1_SCRIPT_EXT = ".mjs"; // hooks/codex/*.mjs
 export const V1_BIN_COMMAND = SERVER_KEY; // v1 global npm bin; v2 never runs it ("no npm for users")
 export const VSCODE_MCP_SERVERS_KEY = "servers"; // .vscode/mcp.json {servers:{<name>:{command,args}}}
 export const ZCODE_EVENTS_KEY = "events"; // ~/.zcode/cli/config.json hooks.events.<Event>[]
@@ -907,7 +911,7 @@ export const V1_REASON = Object.freeze({
   cacheHealFile: "old context-mode cache-heal script file",
   statusLine: "old context-mode statusLine (context-mode statusline): report only, never removed",
   mcpEntry: "old context-mode MCP entry mcpServers.context-mode",
-  codexHook: "old context-mode Codex hook entry: context-mode hook codex or hooks/codex/*.mjs",
+  codexHook: "old context-mode Codex hook entry: context-mode hook codex or hooks/codex/<event>.mjs",
   codexToml: "old context-mode config.toml [mcp_servers.context-mode*] section",
   hookFile: "old context-mode hook file context-mode.json (runs context-mode hook)",
   vscodeMcp: "old context-mode MCP entry servers.context-mode in .vscode/mcp.json: report only, never removed",
@@ -958,6 +962,7 @@ export const MCP_COMMAND_FIELD = "command";
 export const MCP_ARGS_FIELD = "args";
 export const MCP_ENV_FIELD = "env"; // #1327 D-1327-CODEX-ENV-1: Codex passes this table to the MCP server process (mcp_types.rs env)
 export const MCP_ENV_VARS_FIELD = "env_vars"; // #1327: Codex forwards these named vars from its own env
+export const MCP_TOOLS_FIELD = "tools"; // #1359 D-1359-CODEX-TOOLS-1: [mcp_servers.<id>.tools.<tool>] approval_mode, user config
 // The one host config file (segments under $HOME; VS Code: the name inside its user dir, ownMcpFileOf) and key path of context-mode's own MCP entry, for the
 // agents whose MCP entry lives in a host config file (installMode config-mcp, mcp-entry, hooks+mcp).
 // fields = host-required members of the entry next to command/args; also = sibling key paths the host needs set

@@ -16,8 +16,8 @@ import {
   OWN_HOOK_FILE, PI_AGENT_DIR, PI_CURRENT_MAJOR, PI_NODE_MODULES_DIR, PI_NPM_DIR, PI_PACKAGE_JSON_FILE, PI_PACKAGE_SOURCE_KEY, PI_PACKAGES_KEY, SERVER_KEY, SETTINGS_FILE, STATUS_LINE_KEY,
   V1_BIN_COMMAND, V1_CACHE_HEAL_EXTS, V1_CACHE_HEAL_NAME, V1_CODEX_HOOK_COMMAND, V1_CODEX_HOOKS_DIR,
   V1_DATA_DIR_NAME, V1_DATA_ROOT_ENTRIES, V1_HOOK_COMMAND, V1_HOOKS_DIR_NAME, V1_OPENCODE_PLUGIN_SPEC,
-  V1_PATH_SEPS, V1_PI_PACKAGE, V1_REASON, V1_SCRIPT_EXT, V1_SCRIPT_NAMES, V1_SESSIONS_DIR_NAME,
-  V1_STATUSLINE_COMMAND, V1_TMP_PREFIX, V1_TOML_SECTION_ROOT, SERVER_ENTRY_FILE, MCP_ARGS_FIELD, MCP_COMMAND_FIELD, MCP_ENV_FIELD, VSCODE_DIR_NAME, VSCODE_MCP_FILE,
+  V1_PATH_SEPS, V1_PI_PACKAGE, V1_REASON, V1_CODEX_SCRIPT_NAMES, V1_SCRIPT_NAMES, V1_SESSIONS_DIR_NAME,
+  V1_STATUSLINE_COMMAND, V1_TMP_PREFIX, V1_TOML_SECTION_ROOT, SERVER_ENTRY_FILE, MCP_ARGS_FIELD, MCP_COMMAND_FIELD, VSCODE_DIR_NAME, VSCODE_MCP_FILE,
   VSCODE_MCP_SERVERS_KEY, ZCODE_CLI_DIR, ZCODE_EVENTS_KEY,
 } from "../contracts/constants.ts";
 
@@ -143,8 +143,10 @@ function flatCommands(events: unknown, prefix: string[]): Cmd[] {
 const isV1Hook = (cmd: string): boolean =>
   cmd.includes(SERVER_KEY) && (V1_SCRIPT_NAMES.some((name) => cmd.includes(name)) || cmd.includes(V1_HOOK_COMMAND));
 
+/** #1364 D-1364-CODEX-V1-SCRIPT-1: a v1 Codex hook runs hooks/codex/<event>.mjs, one of the six v1.0.169 event scripts
+ *  (POSIX or Windows separators). A user's own script under a hooks/codex/ folder (~/.agents/hooks/codex/guard.mjs) is not v1. */
 const isCodexScript = (cmd: string): boolean =>
-  cmd.includes(V1_SCRIPT_EXT) && V1_PATH_SEPS.some((sep) => cmd.includes(V1_CODEX_HOOKS_DIR.join(sep) + sep));
+  V1_PATH_SEPS.some((sep) => V1_CODEX_SCRIPT_NAMES.some((name) => cmd.includes(V1_CODEX_HOOKS_DIR.join(sep) + sep + name)));
 
 function dataDir(dir: string, reason: string, out: V1Finding[]): void {
   if (existsSync(dir)) out.push(finding(dir, "", reason));
@@ -201,10 +203,10 @@ function scanCodex(agentHome: string, out: V1Finding[]): void {
   for (const span of readTomlTables(tomlFile)) { // real tables only: a header-looking line inside a multiline string is not one
     if (span.path[0] !== V1_TOML_SECTION_ROOT || span.path[1] !== SERVER_KEY) continue; // sibling servers (context-mode-x) are not ours
     // D-DOC-RT-1: v2 setup writes [mcp_servers.context-mode] too. It is v2 when it runs node on our server bundle; any
-    // sub-table (v1 [..tools.ctx_*]) or any other command (v1 `context-mode` bin) is the old section.
-    if (span.path.length === 2 && isV2McpTable(hostConfigValueAt(config, span.path))) continue;
-    // #1327 D-1327-CODEX-ENV-1: the env table of a v2 entry is the server env Codex passes (setup writes CODEX_HOME there).
-    if (span.path.length === 3 && span.path[2] === MCP_ENV_FIELD && isV2McpTable(hostConfigValueAt(config, span.path.slice(0, 2)))) continue;
+    // other command (v1 `context-mode` bin) is the old section, with every sub-table under it.
+    // #1327 D-1327-CODEX-ENV-1, #1359 D-1359-CODEX-TOOLS-1: a sub-table of a v2 entry is Codex config for that entry
+    // (env, tools.<tool> approval_mode), set by setup or by the user; v1.0.169 never wrote one.
+    if (isV2McpTable(hostConfigValueAt(config, span.path.slice(0, 2)))) continue;
     out.push(finding(tomlFile, span.header.trim(), V1_REASON.codexToml));
   }
   dataDir(join(agentHome, V1_DATA_DIR_NAME), V1_REASON.dataDir, out);

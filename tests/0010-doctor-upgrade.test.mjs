@@ -2658,9 +2658,14 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     assert.equal(res.exitCode, 0, JSON.stringify(res.agents));
     const d3 = await asServer(s.pkgDir, () => checkHostConfig(getAdapter("codex"), env, s.home));
     assert.deepEqual([d3.status, d3.detail], ["PASS", "ok"]);
-    // v1 left a section in the Codex dir that CODEX_HOME names: D4 must look there, not only in ~/.codex.
+    // v1 left its data dir in the Codex dir that CODEX_HOME names: D4 must look there, not only in ~/.codex.
+    // #1359 D-1359-CODEX-TOOLS-1: a tools.<tool> table under this v2 entry is user config, so it is no leftover here.
     writeFileSync(path.join(env.CODEX_HOME, "config.toml"), readFileSync(path.join(env.CODEX_HOME, "config.toml"), "utf8") + '\n[mcp_servers.context-mode.tools.ctx_execute]\napproval_mode = "approve"\n');
-    assert.match(checkV1Leftovers("codex", s.home, { tmp: s.tmp, codexDir: env.CODEX_HOME }).detail, /config\.toml/);
+    assert.equal(checkV1Leftovers("codex", s.home, { tmp: s.tmp, codexDir: env.CODEX_HOME }).status, "PASS");
+    mkdirSync(path.join(env.CODEX_HOME, "context-mode"));
+    const d4 = checkV1Leftovers("codex", s.home, { tmp: s.tmp, codexDir: env.CODEX_HOME });
+    assert.equal(d4.status, "WARN");
+    assert.ok(d4.detail.includes("old context-mode data dir"), d4.detail);
   });
 
   // The real v1 1.0.169 file (package/configs/codex/config.toml) and its tool tables (Codex adapter removes
