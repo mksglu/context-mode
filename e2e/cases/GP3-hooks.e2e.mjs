@@ -2,7 +2,7 @@
 // Merged from GP3-hook-perf, GP3-hooks and GP3-zcode-names. Plain blocks, not describe: e2e/cases/run.mjs counts every pass event, and a describe adds one. Names unchanged.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runHookFixture } from "../harness/hook-runner.mjs";
@@ -438,5 +438,35 @@ process.on("exit", () => {
     assert.equal(second.length, 2, "a second call appends one row");
     assert.deepEqual(second[0], first[0], "the earlier row is never rewritten");
     assert.ok(second[1].seq > second[0].seq);
+  });
+
+  // GP3/subagent-pointer-callable (#1342, ADR-0016 lines 11 and 16, D-CC-POINTER-1): a large subagent output gets the
+  // same replace budget as the main session, and the pointer names only tools the subagent can call.
+  const subBash = (repo, sid, type, n) => ({
+    session_id: sid, cwd: repo, hook_event_name: "PostToolUse", agent_id: "a-" + n, agent_type: type, tool_name: "Bash",
+    tool_input: { command: "seq 1 4000" }, tool_use_id: "toolu_gp3_sub_" + n,
+    tool_response: { stdout: Array.from({ length: 4000 }, (_, i) => String(i + 1)).join("\n"), stderr: "", interrupted: false, isImage: false },
+  });
+
+  test("[M3] GP3/subagent-pointer-callable: a restricted subagent gets a replace that names no ctx tool (#1342)", (t) => {
+    const f = fixture(t);
+    const agents = path.join(f.repo, ".claude", "agents");
+    mkdirSync(agents, { recursive: true });
+    writeFileSync(path.join(agents, "reader.md"), "---\nname: reader\ntools: Read, Bash\n---\nreads\n");
+    const r = f.hook(subBash(f.repo, "gp3-sub-1", "reader", 1));
+    assert.equal(r.status, 0, r.stderr);
+    const out = JSON.stringify(JSON.parse(r.stdout).hookSpecificOutput.updatedToolOutput);
+    assert.ok(out.length < 18892, "replaced, not the full output");
+    assert.equal(out.includes("ctx_"), false, out);
+    assert.ok(out.includes("search.mjs"), "the subagent has Bash, so it gets the MCP-free search call: " + out);
+  });
+
+  test("[M3] GP3/subagent-pointer-callable: general-purpose gets the callable ctx_search pointer, not the full output (#1342)", (t) => {
+    const f = fixture(t);
+    const r = f.hook(subBash(f.repo, "gp3-sub-2", "general-purpose", 2));
+    assert.equal(r.status, 0, r.stderr);
+    const out = JSON.stringify(JSON.parse(r.stdout).hookSpecificOutput.updatedToolOutput);
+    assert.ok(out.length < 18892, "replaced, not a passthrough");
+    assert.ok(out.includes("ctx_search({queries:["), out);
   });
 }
