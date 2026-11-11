@@ -508,6 +508,23 @@ describe("ADR-0010 doctor D3, D4, D5b: host config, double fire, v1 leftovers", 
     });
   }
 
+  // D-R54-OC-PLUGINS-DIR-1 (#1349, OpenCode 2.2.6): `npm i --prefix ~/.config/opencode context-mode` plus
+  // ~/.config/opencode/plugins/context-mode/index.js = `export { default } from "context-mode/server";`, no opencode.json.
+  // OpenCode logs one "loading plugin" line for it; D3 said "wrong: MCP entry".
+  const OC_DIR = [
+    ["a plugins dir file that re-exports context-mode/server, no opencode.json", ["plugins", "context-mode", "index.js"], 'export { default } from "context-mode/server";\n', "PASS"],
+    ["a loose plugins dir file that imports context-mode", ["plugins", "cm.ts"], "import plugin from 'context-mode';\nexport default plugin;\n", "PASS"],
+    ["a plugins dir file of another plugin", ["plugins", "other", "index.js"], 'export { default } from "other-plugin/server"; // context-mode is better\n', "FAIL"],
+  ];
+  for (const [name, rel, text, want] of OC_DIR) {
+    test(`[D-R54-OC-PLUGINS-DIR-1] doctor-config/D3 opencode: ${name} is ${want} (#1349)`, (t) => {
+      const home = tmp(t);
+      put(path.join(home, ".config", "opencode", ...rel), text);
+      const d3 = checkHostConfig(getAdapter("opencode"), { HOME: home, USERPROFILE: home }, home);
+      assert.equal(d3.status, want, d3.detail);
+    });
+  }
+
   test("[D-R44-OC-D3-1] doctor-config/D3 opencode: an mcp entry that runs another script is FAIL", (t) => {
     const home = tmp(t);
     put(path.join(home, ".config", "opencode", "opencode.json"), JSON.stringify({ mcp: { servers: { "context-mode": { type: "local", command: ["node", "/x/other.mjs", "--agent", "opencode"] } } } }));

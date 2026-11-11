@@ -736,6 +736,36 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       assert.ok(d.agents[0].reason.includes("context-mode setup"), d.agents[0].reason);
     });
 
+    // D-R54-OC-PLUGINS-DIR-1 (#1349): OpenCode 2.2.6 loads ~/.config/opencode/plugins/context-mode/index.js
+    // (`export { default } from "context-mode/server";`). Setup then wrote plugin:[<pkgDir>] and OpenCode logged TWO
+    // "loading plugin" lines (the dir file and <pkgDir>/opencode/plugin.js): the doctor's own fix made it load twice.
+    test("a plugins dir file of ours: setup adds no plugin list entry (no second load), then doctor passes (#1349)", SKIP_SH_OC, async (t) => {
+      const s = sandbox(t);
+      fakeOpencode(s, "opencode v2.2.6");
+      const dirFile = path.join(path.dirname(s.file), "plugins", "context-mode", "index.js");
+      mkdirSync(path.dirname(dirFile), { recursive: true });
+      writeFileSync(dirFile, 'export { default } from "context-mode/server";\n');
+      const d0 = await runDoctor(opts(s));
+      assert.ok(!d0.agents[0].reason?.includes("opencode plugin add"), d0.agents[0].reason);
+      const res = await runSetup({ ...opts(s), runId: "j" });
+      assert.equal(res.exitCode, 0, JSON.stringify(res.agents.map((a) => [a.id, a.status, a.reason])));
+      assert.equal(plugins(s), undefined, "no plugin list entry next to the plugins dir file");
+      assert.equal(JSON.parse(readFileSync(s.file, "utf8")).plugins, undefined);
+      const d = await runDoctor(opts(s));
+      assert.equal(d.agents[0].status, "PASS", JSON.stringify(d.agents[0]));
+    });
+
+    test("our path entry next to a plugins dir file of ours loads twice: doctor FAILs hook-registered (#1349)", SKIP_SH_OC, async (t) => {
+      const s = sandbox(t);
+      fakeOpencode(s, "opencode v2.2.6");
+      const dirFile = path.join(path.dirname(s.file), "plugins", "context-mode", "index.js");
+      mkdirSync(path.dirname(dirFile), { recursive: true });
+      writeFileSync(dirFile, 'export { default } from "context-mode/server";\n');
+      put(s, { plugin: [own(s)] });
+      const c = registered(await runDoctor(opts(s)));
+      assert.ok(c && !c.ok && c.detail.includes("twice"), JSON.stringify(c));
+    });
+
     test("1.19 control: the bare name under the 1.x plugin key stays the v1 entry (D4), unchanged by #1344", SKIP_SH_OC, async (t) => {
       const s = sandbox(t);
       fakeOpencode(s, "1.19.5");
