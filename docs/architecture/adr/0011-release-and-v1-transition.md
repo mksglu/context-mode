@@ -16,7 +16,7 @@ Why `main` stays frozen: v1 `/ctx-upgrade` clones `main` and compares the `packa
 
 Amended (#1363, DEVIATIONS D-V1-UPGRADE-STOP-1): since the MAIN-ONLY merge (30b95f76, D-REL-MAIN-VERSION-1) `main` carries the v2 version, so the version compare no longer stops v1. The guard is now `main`'s `package.json` `scripts.build`: v1 runs `npm run build` in its clone (`cli.ts:1369-1374`) before it writes anything, and `scripts/v1-upgrade-stop.mjs` exits 1 there with the `npm i -g context-mode` line. v1 then takes its own "In-place files were NOT updated" path and the install stays whole. Contributors build with `npm run build:release`.
 
-When v2 is released, `main` gets the v2 source (docs, README) but keeps the frozen v1 `package.json`. v1 `/ctx-upgrade` then still writes nothing (since #1363: it stops at the `build` script, above).
+When v2 is released, `main` gets the v2 source and the v2 `package.json` version; v1 `/ctx-upgrade` still writes nothing because it stops at the `build` script (above).
 
 ## Release steps
 

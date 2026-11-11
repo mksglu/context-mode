@@ -47,6 +47,7 @@ This is Assumption A1 (§7 below): ADR-0011 names the sentence ("context-mode v2
 2. Append the same line, verbatim, as the last line of `ctx_stats`'s printed report.
 3. No other line in either report changes. This is "the only v1 change" (ADR-0017 R2: "the last v1 build (one owner-approved v1 patch, the only change to `main`'s code)").
 4. Cut `package.json`'s `version` field: **do not bump it.** ADR-0011 "Why `main` stays frozen": v1's own `/ctx-upgrade` compares `package.json` version against `main`'s; if they are equal it does nothing. Bumping the version here would make v1's own upgrade command try to rebuild from `main`, which breaks R1 ("`main` stays frozen").
+   Amended (#1363, DEVIATIONS D-V1-UPGRADE-STOP-1): since the MAIN-ONLY merge (30b95f76, D-REL-MAIN-VERSION-1) `main` carries the v2 version (2.1.7 at the time of writing). R1 now holds through `main`'s `package.json` `scripts.build`: v1's upgrade runs `npm run build` in its clone before any write, and `scripts/v1-upgrade-stop.mjs` exits 1 there with the `npm i -g context-mode` line, so v1 takes its own "In-place files were NOT updated" path.
 5. Publish this single patch to npm under the current v1 major/minor, as a new patch version (so `npm install -g context-mode` picks it up, but v1's own `main`-vs-`package.json` check in step 4 still reports "already on latest" for everything else).
 
 ### 1.4 Errors
