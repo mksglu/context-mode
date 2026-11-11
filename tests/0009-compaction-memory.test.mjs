@@ -1307,19 +1307,24 @@ describe("ADR-0009 section 8: decision tag, timeline and cross-session ranking i
     assert.equal(c.isError, true);
   }));
 
-  // #1354 (D-R54-SEARCH-ZERO-1): a client that sends the whole schema fills offset:0 and after:0.
-  // 0 is the first page of either cursor, so it is not paging and the call answers as if the field were absent.
+  // #1354 (D-R54-SEARCH-ZERO-1): a client that sends the whole schema fills offset:0, after:0 and source:"".
+  // 0 is the first page of either cursor and a blank source names no source, so the call answers as if the
+  // fields were absent and finds the indexed row.
   test("[M4] GP5/explicit-zero-is-not-paging", withRoot("cm-sd12z-", async (root) => {
     const ctx = ctxAt(root, "s1");
+    await ctxIndex.handler({ content: "README overview: how the project starts", source: "readme-notes" }, ctx);
     const pairs = [
       [{ queries: ["README overview"], scope: "session", sort: "timeline", offset: 0, after: 0 }, { queries: ["README overview"], scope: "session", sort: "timeline" }],
       [{ queries: ["README overview"], scope: "session", offset: 0, after: 0 }, { queries: ["README overview"], scope: "session" }],
+      [{ queries: ["README overview"], source: "", offset: 0, after: 0 }, { queries: ["README overview"] }],
+      [{ queries: ["README overview"], source: "  ", sort: "timeline", offset: 0, after: 0 }, { queries: ["README overview"], sort: "timeline" }],
     ];
     for (const [zero, bare] of pairs) {
       const z = await ctxSearch.handler(zero, ctx);
       const b = await ctxSearch.handler(bare, ctx);
       assert.equal(z.isError, false, JSON.stringify(zero) + " -> " + z.text);
-      assert.equal(z.text, b.text);
+      assert.ok(b.text.includes("README overview"), JSON.stringify(bare) + " -> " + b.text);
+      assert.equal(z.text, b.text, JSON.stringify(zero));
     }
   }));
 
