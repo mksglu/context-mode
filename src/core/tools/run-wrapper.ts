@@ -154,7 +154,7 @@ export async function runWrapperMain(argv: string[], env: NodeJS.ProcessEnv): Pr
   }
 }
 
-/** D-M3-X1-2: search.mjs <source-id> "<terms>" [<project dir>]: the chunks of one indexed output that match the terms.
+/** D-M3-X1-2: search.mjs <source-id> '<terms>' [<project dir>]: the chunks of one indexed output that match the terms.
  * D-CC-POINTER-2 (#1358): the source id is the number or the short handle (s<base36>) a replace names; the
  * optional project dir lets the call work from any cwd. */
 export async function searchWrapperMain(argv: string[], _env: NodeJS.ProcessEnv): Promise<never> {
