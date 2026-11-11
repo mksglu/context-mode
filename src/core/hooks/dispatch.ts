@@ -444,7 +444,7 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
 function ownRead(ev: CanonicalHookEvent, tool: ToolCall, env: NodeJS.ProcessEnv): boolean {
   if (!RANGE_READ_TOOLS.includes(tool.canonicalName)) return false;
   const p = READ_PATH_KEYS.map((k) => tool.input[k]).find((v): v is string => typeof v === "string" && v !== "");
-  return p !== undefined && isOwnFile(ev.agent, resolve(ev.cwd, p), env);
+  return p !== undefined && isOwnFile(ev.agent, ev.cwd, p, env);
 }
 
 async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext, env: NodeJS.ProcessEnv,

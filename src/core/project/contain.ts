@@ -58,8 +58,16 @@ export function isInsideAny(roots: readonly string[], p: string): boolean {
   });
 }
 
+/** D-R54-OWN-FILE-LINK-1 (#1345): true when `p` as the tool gave it, or `cwd` when `p` is relative, has a ".."
+ *  component. path.resolve folds ".." by text, but the OS folds it after a link, so such a path is not "as written". */
+export function hasParentStep(cwd: string, p: string): boolean {
+  const parts = isAbsolute(p) ? components(p) : [...components(cwd), ...components(p)];
+  return parts.includes("..");
+}
+
 /** D-R54-OWN-FILE-LINK-1 (#1345): true when the path as written (path.resolve, no realpath) has every component of a
- *  root, in order. A link the user made under the root counts. A ".." in `p` is never folded across a link: false.
+ *  root, in order. A link the user made under the root counts. The caller passes a path with no ".." step
+ *  (hasParentStep on the raw tool path, before resolve); a ".." left in `p` still gives false.
  *  This grants no access: use it only for "is this the agent's own file" (own-file.ts), never for containment. */
 // The roots are fixed dirs (agent config dir, shared skill dir): their resolved components are kept, the same way
 // rootReal keeps their realpaths, so a project-file Read pays only the walk of `p` (review r54 perf finding).

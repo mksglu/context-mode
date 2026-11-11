@@ -157,7 +157,7 @@ function bigRead(agent: AgentId, input: Rec, cwd: string): boolean {
   // D-R47-READ-MEDIA-1: an image or PDF the host shows as a block is not denied (same as decide).
   // D-R48-OWN-FILE-1 (#1326): the agent's own skill and rule files are not denied (same as decide).
   return [firstString(input, READ_PATH_KEYS), ...many].some((p) => p !== "" && bigFile(resolve(cwd, p))
-    && !isMediaRead(agent, resolve(cwd, p)) && !isOwnFile(agent, resolve(cwd, p)));
+    && !isMediaRead(agent, resolve(cwd, p)) && !isOwnFile(agent, cwd, p));
 }
 
 /**
