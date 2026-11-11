@@ -181,7 +181,7 @@ describe("ADR-0016: subagent policy cases", { concurrency: CONC }, () => {
       }
       for (const t of ["Explore", "Plan"]) {
         const set = toolSetForAgentType(sub("claude-code", t), { projectDir: f.project, env: f.env });
-        for (const n of ["Edit", "Write", "NotebookEdit"]) assert.equal(set.includes(n), false, t + " " + n);
+        for (const n of ["Agent", "Artifact", "ArtifactComments", "ArtifactData", "ArtifactCheck", "ExitPlanMode", "Edit", "Write", "NotebookEdit"]) assert.equal(set.includes(n), false, t + " " + n);
       }
     } finally { f.done(); }
   });
