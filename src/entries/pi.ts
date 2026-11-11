@@ -34,10 +34,17 @@ export interface PiTool {
   execute(toolCallId: string, params: unknown, signal?: AbortSignal): Promise<PiToolResult>;
 }
 
-/** The Pi extension API surface this file uses. */
+/** The Pi extension API surface this file uses. getSettings is Pi >= 1.4 (types.d.ts "Get a copy of the effective settings"). */
 export interface PiApi {
   on(event: string, handler: (event: Record<string, unknown>, ctx?: PiContext) => unknown): void;
   registerTool(tool: PiTool): void;
+  getSettings?(): unknown;
+}
+
+/** The tool_result patch: Pi keeps a field the patch omits, except structuredContent on a content change. */
+interface PiResultPatch {
+  content: { type: "text"; text: string }[];
+  structuredContent?: unknown;
 }
 
 type PiEvent = Record<string, unknown>;
@@ -51,6 +58,24 @@ function textOf(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content.map((part: { type?: unknown; text?: unknown }) => (part.type === "text" ? str(part.text) : "")).join("");
+}
+
+function field(v: unknown, key: string): unknown {
+  return typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>)[key] : undefined;
+}
+
+// D-R54-PI-META-1 (#1352): contextMode.excludeTools in Pi settings, exact tool names whose result stays whole.
+// Read on each call, so a settings change counts at once. A missing or malformed value, a Pi with no getSettings
+// (0.73.1) or a throw (runtime not bound yet) is the empty list: the default replace.
+function excludedTools(pi: PiApi): readonly string[] {
+  let settings: unknown;
+  try {
+    settings = pi.getSettings?.();
+  } catch {
+    return [];
+  }
+  const list = field(field(settings, "contextMode"), "excludeTools");
+  return Array.isArray(list) ? list.filter((n): n is string => typeof n === "string") : [];
 }
 
 function errorReply(err: unknown): ToolReply {
@@ -179,16 +204,20 @@ export default function piExtension(pi: PiApi): void {
     return checkPermission(out);
   });
 
-  // impl/12 §3.5: journal append happens inside handleHook; a replace (case C) sets content and
-  // details together (ADR-0016 Pi row).
+  // impl/12 §3.5: journal append happens inside handleHook. D-R54-PI-META-1 (#1352): a replace (case C) sets
+  // content and the tool's own structuredContent together (ADR-0016:48 Pi row) and leaves details to Pi, so the
+  // tool keeps its continuation state. An excludeTools name is sent as keep: journaled, never replaced.
   pi.on("tool_result", async (event, ctx) => {
     identify(ctx);
     const out = await hook({
       type: "tool_result", toolName: event.toolName, toolCallId: event.toolCallId, input: event.input,
       content: textOf(event.content), isError: event.isError === true,
+      keep: excludedTools(pi).includes(str(event.toolName)),
     }, turn);
     if (out.stdout === "") return undefined;
-    return { content: [{ type: "text", text: out.stdout }], details: { text: out.stdout } };
+    const patch: PiResultPatch = { content: [{ type: "text", text: out.stdout }] };
+    if (event.structuredContent !== undefined) patch.structuredContent = event.structuredContent;
+    return patch;
   });
 
   // impl/12 §3.6: only the flag; the next before_agent_start delivers (D-M5-P1-1).
