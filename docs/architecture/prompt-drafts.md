@@ -159,6 +159,11 @@ context-mode: This command sends its body into the conversation.
 Run the command on the line above with Bash instead. It runs the same command in the same folder, indexes the full output and prints only the part that matches your intent, with the same exit code.
 ```
 
+<!-- id: subagent-handle -->
+```text
+The full output (18892 B) is stored as s1; above is the best-matching part. Read the file with offset and limit for other lines.
+```
+
 ## Changes
 
 r10 (owner decision 2026-10-20): `instructions` cut from 1,238 to 646 chars. No hint text. It says a large tool result is indexed and replaced by its best-matching parts, and ctx_search finds the rest. The tool list moved to the tool descriptions. The routing sentence is kept (GP-LIVE-ROUTING). The hint-* blocks are removed by a separate task.
