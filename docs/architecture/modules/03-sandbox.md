@@ -93,7 +93,7 @@ Absolute path to the interpreter binary, or `null` if none is found on PATH.
 
 ### Error cases
 
-None inside `findRuntime` — absence is a valid `null` return, not a thrown error. The caller (`src/core/tools/execute.ts`, outside this module) turns a `null` into the `NO_RUNTIME` error text.
+None inside `findRuntime` — absence is a valid `null` return, not a thrown error. A PATH candidate whose stat fails for any reason (EACCES on the Windows Store app alias, EPERM, UNKNOWN, ELOOP) is skipped like an absent one (DEVIATIONS D-1373-STAT-1); `lookupRuntime` also returns those paths so doctor D11 can name them. The caller (`src/core/tools/execute.ts`, outside this module) turns a `null` into the `NO_RUNTIME` error text.
 
 ### Constants used
 
