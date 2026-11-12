@@ -838,6 +838,21 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.ok(last.includes("searches the whole output (" + Buffer.byteLength(text) + " B)."), last);
   });
 
+  // D-CC-POINTER-7 (#1342, #1358): the twin names the project dir in its native form (resolve.ts realpathSync.native:
+  // the long Windows name, the on-disk letter case). A CLAUDE_PROJECT_DIR alias (8.3 short name on windows-latest,
+  // other letter case here) gives the same line. realpathSync (not .native) keeps the alias: CI 43100308997.
+  test("D-CC-POINTER-7: a project dir alias: the search.mjs twin names the native project dir", async (t) => {
+    const flip = join(dirname(repo), "REPO");
+    if (!existsSync(flip) || realpathSync.native(flip) === flip) return t.skip("no case alias on this filesystem");
+    const p = { ...mainBashPost(bigText(40000)), cwd: flip };
+    const out = parsed(await handleHook("claude-code", p, { ...env, CLAUDE_PROJECT_DIR: flip }));
+    const replaced = replacedText(out.updatedToolOutput);
+    const src = query("SELECT id FROM sources WHERE session_id = ?", p.session_id);
+    const id = "s" + Number(src[0].id).toString(36);
+    const twin = SEARCH_TWIN_LINE(join(dirname(process.argv[1]), SEARCH_WRAPPER_FILE), id, p.tool_input.description, realpathSync(flip));
+    assert.ok(replaced.endsWith(twin), replaced.slice(replaced.lastIndexOf("\n") + 1));
+  });
+
   // D-CR3-HANDLE-2: above SYNC_INDEX_MAX_BYTES the source row id is reserved before the detached write, so the
   // handle is the short id too (not the full label) and the selection budget stays above 0.
   test("D-CR3-HANDLE-2: a > SYNC_INDEX_MAX_BYTES output: the handle is the short id of the stored row, the body keeps chunks", async () => {
