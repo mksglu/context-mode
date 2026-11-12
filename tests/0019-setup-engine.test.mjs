@@ -150,7 +150,7 @@ rl.on("line", (l) => {
     const reg = buildRegistry({ home: "/h", pkgDir: "/abs/pkg", env: {} });
     for (const r of reg.filter((x) => x.hookCommand)) {
       // D-C166-WIN-FIRE-2: codex on Windows writes bare node (0.166 runs hooks in PowerShell); the doctor runs hookRunCommand
-      const node = (r.id === "codex" || r.id === "qwen") && process.platform === "win32" ? "node" : NODE; // D-R44-QWEN-WIN-1
+      const node = ["codex", "qwen", "copilot-cli", "vscode"].includes(r.id) && process.platform === "win32" ? "node" : NODE; // D-R44-QWEN-WIN-1, #1375
       assert.deepEqual(r.hookCommand, [node, path.join("/abs/pkg", "hook.mjs"), "--agent", r.id]);
       assert.equal(r.hookRunCommand[0], NODE);
     }

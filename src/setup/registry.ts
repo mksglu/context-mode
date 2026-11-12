@@ -183,6 +183,10 @@ export function stableNodePath(execPath: string, fs: NodePathFs = REAL_FS): stri
   return execPath;
 }
 
+/** Agents whose Windows hook shell may be PowerShell: their written hook line starts with bare `node`
+ *  (D-C166-WIN-FIRE-1 codex, D-R44-QWEN-WIN-1 qwen, D-1375-COPILOT-WIN-1 copilot-cli and vscode). */
+const BARE_NODE_ON_WINDOWS: readonly AgentId[] = ["codex", "qwen", "copilot-cli", "vscode"];
+
 /** The node setup writes into host configs (D-STABLE-NODE-1). */
 export const SETUP_NODE = stableNodePath(process.execPath);
 
@@ -321,7 +325,9 @@ export function buildRegistry(ctx: SetupContext): CheckRow[] {
     // D-C166-WIN-FIRE-1: Codex 0.166 runs a hook through the session shell, PowerShell on Windows, and PowerShell reads a
     // leading quoted path as a string. A bare `node` word runs in sh, cmd.exe and PowerShell; the doctor still runs the absolute node.
     // D-R44-QWEN-WIN-1 (host audit qwen-3): Qwen spawns a hook through cmd.exe /d /s /c (ComSpec) or PowerShell, so the same bare word.
-    const bareNode = (id === "codex" || id === "qwen") && (ctx.platform ?? process.platform) === "win32";
+    // #1375 D-1375-COPILOT-WIN-1: the GitHub Copilot app runs the `command` field as `pwsh -NoProfile -Command` and skips the
+    // `powershell` field, so copilot-cli and vscode take the same bare word on Windows.
+    const bareNode = BARE_NODE_ON_WINDOWS.includes(id) && (ctx.platform ?? process.platform) === "win32";
     const hookCommand = bareNode ? [HOST_NODE_COMMAND, ...runCommand.slice(1)] : runCommand;
     const command = `${bareNode ? HOST_NODE_COMMAND : `"${hookCommand[0]}"`} "${hookCommand[1]}" ${AGENT_FLAG} ${id}`;
     const hookInstall = hookInstallFor(ctx, getAdapter(id), command);

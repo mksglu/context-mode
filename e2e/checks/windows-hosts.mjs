@@ -335,7 +335,7 @@ function stepHook(id, home, project, env) {
     writeFileSync(path.join(project, "big.log"), text);
     const line = registeredHook(id, home, project, notes, env);
     const spec = HOOKS[id];
-    const r = runShellLine(line, { env, cwd: project, input: JSON.stringify(payloadFor(id, project, text)), powershell: id === "gemini" });
+    const r = runShellLine(line, { env, cwd: project, input: JSON.stringify(payloadFor(id, project, text)), powershell: ["gemini", "copilot-cli", "vscode"].includes(id) }); // #1375: the Copilot app runs `command` through PowerShell
     const seen = spec.answerOn === "stderr" ? r.stderr : r.stdout;
     const cmdNote = `command=${line.slice(0, 260)}${notes.length ? " NOTE " + notes.join("; ") : ""}`;
     if (r.error || r.status === null) return record(id, "hook", false, `did not finish: ${r.error ?? r.signal}; ${cmdNote}`);

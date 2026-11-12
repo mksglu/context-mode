@@ -67,7 +67,8 @@ createInterface({ input: process.stdin }).on("line", (l) => {
   }
 
   // D-C166-WIN-FIRE-2: codex on Windows writes bare node (0.166 runs hooks in PowerShell)
-  const hookCmd = (pkgDir, id) => `${id === "codex" && process.platform === "win32" ? "node" : `"${NODE}"`} "${path.join(pkgDir, "hook.mjs")}" --agent ${id}`;
+  // #1375 D-1375-COPILOT-WIN-1: copilot-cli and vscode on Windows write bare node too
+  const hookCmd = (pkgDir, id) => `${["codex", "copilot-cli", "vscode"].includes(id) && process.platform === "win32" ? "node" : `"${NODE}"`} "${path.join(pkgDir, "hook.mjs")}" --agent ${id}`;
   // Agents setup writes by file (no host CLI needed): their hook file and skill dir sit under HOME.
   const FILE_AGENTS = ["codex", "copilot-cli", "vscode", "kiro", "zcode", "opencode"];
 
@@ -472,7 +473,7 @@ describe("ADR-0020 Windows hook shell command", { concurrency: CONC }, () => {
   }
 
   test("D-HW-PS-1: copilot-cli and vscode hook entries carry an explicit powershell field: call operator + the command", () => {
-    const reg = buildRegistry({ home: WIN_HOME, pkgDir: WIN_PKG, env: {} });
+    const reg = buildRegistry({ home: WIN_HOME, pkgDir: WIN_PKG, env: {}, platform: "linux" });
     for (const id of ["copilot-cli", "vscode"]) {
       const row = reg.find((r) => r.id === id);
       const entries = hookEntries(row);
@@ -480,7 +481,7 @@ describe("ADR-0020 Windows hook shell command", { concurrency: CONC }, () => {
       for (const e of entries) {
         assert.equal(e.command, row.hookInstall.command, id + ": command stays the sh/cmd form");
         assert.equal(e.powershell, "& " + row.hookInstall.command, id + ": powershell field starts with the call operator");
-        assert.ok(e.command.startsWith('"'), id + ": command starts with a quoted path (what PowerShell cannot parse)");
+        assert.ok(e.command.startsWith('"'), id + ": off Windows the command starts with the quoted absolute node (#1375: bare node on Windows)");
       }
     }
   });
@@ -499,7 +500,7 @@ describe("ADR-0020 Windows hook shell command", { concurrency: CONC }, () => {
       const dir = path.join(root, "pkg dir");
       mkdirSync(dir, { recursive: true });
       writeFileSync(path.join(dir, "hook.mjs"), "process.stdout.write('ran:' + process.argv.slice(2).join(' '));\n");
-      const reg = buildRegistry({ home: root, pkgDir: dir, env: {} });
+      const reg = buildRegistry({ home: root, pkgDir: dir, env: {}, platform: "linux" }); // the quoted absolute form
       const row = reg.find((r) => r.id === "copilot-cli");
       const entry = hookEntries(row)[0];
       const ps = (line) => spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", line], { encoding: "utf8", windowsHide: true });
@@ -598,9 +599,10 @@ describe("ADR-0020 Codex 0.166 hook shell command (D-C166-WIN-FIRE-1)", { concur
     for (const c of codexCommands(row)) assert.ok(c.startsWith('"' + SETUP_NODE + '" "'), c);
   });
 
-  test("D-C166-WIN-FIRE-1: only codex and qwen (D-R44-QWEN-WIN-1) change; every other host keeps the quoted absolute form on Windows", () => {
+  test("D-C166-WIN-FIRE-1: only codex, qwen (D-R44-QWEN-WIN-1), copilot-cli and vscode (#1375) change; every other host keeps the quoted absolute form on Windows", () => {
     const reg = buildRegistry({ home: WIN_HOME, pkgDir: WIN_PKG, env: {}, platform: "win32" });
-    for (const row of reg.filter((r) => r.id !== "codex" && r.id !== "qwen" && r.hookCommand)) assert.ok(hookCommandString(row).startsWith('"'), row.id);
+    const bare = ["codex", "qwen", "copilot-cli", "vscode"];
+    for (const row of reg.filter((r) => !bare.includes(r.id) && r.hookCommand)) assert.ok(hookCommandString(row).startsWith('"'), row.id);
   });
 
   // Windows only: PowerShell runs the line the way 0.166 builds it (hook_environment_executor.rs): the JSON line is piped in.
