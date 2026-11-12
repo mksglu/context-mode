@@ -1034,9 +1034,11 @@ describe("PRD-v2 section 9: runtime lookup", () => {
   describe("[#1373] a PATH candidate that stat cannot read is skipped", () => {
     function lanes() {
       const root = mkdtempSync(join(tmpdir(), "cm-1373-"));
-      const stub = join(root, "WindowsApps"); mkdirSync(stub); writeFileSync(join(stub, "python3"), "x");
-      const good = join(root, "real"); mkdirSync(good); writeFileSync(join(good, "python3"), "#!/bin/sh\necho REAL_PYTHON_1373\n"); chmodSync(join(good, "python3"), 0o755);
-      return { root, stub, good, bin: join(good, "python3"), env: { PATH: [stub, good].join(delimiter) } };
+      // The first python candidate name on this platform (runtimes.ts candidates: python.exe on Windows, python3 on POSIX).
+      const name = process.platform === "win32" ? "python.exe" : "python3";
+      const stub = join(root, "WindowsApps"); mkdirSync(stub); writeFileSync(join(stub, name), "x");
+      const good = join(root, "real"); mkdirSync(good); writeFileSync(join(good, name), "#!/bin/sh\necho REAL_PYTHON_1373\n"); chmodSync(join(good, name), 0o755);
+      return { root, stub, good, name, bin: join(good, name), env: { PATH: [stub, good].join(delimiter) } };
     }
     function statThrows(code, under, only = "") {
       const real = fs.statSync;
@@ -1072,7 +1074,7 @@ describe("PRD-v2 section 9: runtime lookup", () => {
     test("a symlink loop (ELOOP) is skipped", () => {
       if (process.platform === "win32") return;
       const l = lanes();
-      rmSync(join(l.stub, "python3")); symlinkSync(join(l.stub, "python3"), join(l.stub, "python3"));
+      rmSync(join(l.stub, l.name)); symlinkSync(join(l.stub, l.name), join(l.stub, l.name));
       try { assert.equal(findRuntime("python", l.env), l.bin); } finally { rmSync(l.root, { recursive: true, force: true }); }
     });
 
@@ -1083,6 +1085,8 @@ describe("PRD-v2 section 9: runtime lookup", () => {
     });
 
     test("ctx_execute python with the Store alias first: the real python later on PATH runs", async () => {
+      // The fake python is a #!/bin/sh script; Windows cannot start it. The findRuntime tests above cover Windows.
+      if (process.platform === "win32") return;
       const l = lanes();
       const restore = statThrows("EACCES", l.stub);
       const before = process.env.PATH;
