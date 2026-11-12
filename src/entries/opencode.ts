@@ -245,7 +245,8 @@ export async function setupLegacy(app: OpenCodeApp) {
 // Shapes read from @opencode/plugin 2.2.5 (dist/promise: plugin.d.ts, session.d.ts, tool.d.ts) and probed live on the 2.2.5
 // loader. 1.19 hook -> 2.x hook: tool.execute.before -> ctx.tool.hook("execute.before") (throw = deny, the message reaches
 // the model), tool.execute.after -> "execute.after" (status completed | error), chat.message -> ctx.session.hook("prompt"),
-// experimental.chat.system.transform -> ctx.session.hook("context") (push a text part to `system`),
+// experimental.chat.system.transform -> ctx.session.hook("context") and ctx.session.hook("generate") (push a text part
+// to `system`; "generate" is the 2.x session.generate kind with no 1.19 match, D-R54-OC2-GENERATE-1),
 // experimental.session.compacting -> ctx.session.hook("compaction"), event step-finish -> ctx.event.subscribe
 // ("session.step.ended"), plugin tools -> ctx.tool.transform(editor.add). setup returns a dispose function.
 
@@ -397,11 +398,15 @@ export async function setup(ctx: OpenCode2Context): Promise<() => void> {
   await ctx.session.hook("prompt", async (p: { sessionID?: string; prompt?: { text?: string } }) => {
     await hooks["chat.message"]({ sessionID: p.sessionID }, { parts: [{ type: "text", text: p.prompt?.text ?? "" }] });
   });
-  await ctx.session.hook("context", async (c: { sessionID?: string; system: Oc2Part[] }) => {
+  // D-R54-OC2-GENERATE-1 (#1369): core 2.2.6 sends the primary request through "context" and session.generate
+  // (cache warming) through "generate"; both get the same memoised payload, so the warmed prefix is the one read.
+  const injectSystem = async (c: { sessionID?: string; system: Oc2Part[] }) => {
     const system: string[] = [];
     await hooks["experimental.chat.system.transform"]({ sessionID: c.sessionID }, { system });
     for (const text of system) if (!c.system.some((p) => p.text === text)) c.system.push({ type: "text", text });
-  });
+  };
+  await ctx.session.hook("context", injectSystem);
+  await ctx.session.hook("generate", injectSystem);
   await ctx.session.hook("compaction", async (c: { sessionID?: string }) => {
     await hooks["experimental.session.compacting"]({ sessionID: c.sessionID });
   });
