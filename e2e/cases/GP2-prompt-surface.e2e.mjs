@@ -136,6 +136,32 @@ test("[M5] GP2/opencode-single-system-message: SessionStart lines merge into one
   await dispose();
 });
 
+// #1369: @opencode/core 2.2.6 sends the primary request through the hook "context" and session.generate (WarmingPlugin)
+// through the hook "generate". Both must carry the same system parts, or the warmed cache prefix is one the next turn
+// never reads. Red run (main 890a3f6b, built plugin): context 2 parts (29+592 bytes), generate 1 part (29 bytes).
+test("[M5] GP2/opencode-generate-same-system: a generate request of one session gets the system parts of its context request (#1369)", async () => {
+  const bundlePath = path.join(REPO_ROOT, "release-out", "opencode", "plugin.js");
+  const mod = await import(new URL(`file://${bundlePath}`).href);
+  const plugin = mod.default ?? mod;
+  const hooks = {};
+  const ctx = {
+    location: { directory: process.cwd() },
+    tool: { hook: async () => ({}), transform: async () => ({}), list: async () => [] },
+    session: { hook: async (n, fn) => { hooks[n] = fn; return {}; } },
+    event: { subscribe: () => (async function* () {})() },
+  };
+  const dispose = await plugin.setup(ctx);
+  const base = () => [{ type: "text", text: "<opencode base system prompt>" }];
+  const primary = { sessionID: "ses_1369", agent: "build", system: base(), messages: [], tools: {} };
+  await hooks.context(primary);
+  assert.equal(typeof hooks.generate, "function", "setup(ctx) registers the session hook generate");
+  const warm = { sessionID: "ses_1369", agent: "build", system: base(), messages: [], tools: {} };
+  await hooks.generate(warm);
+  assert.ok(primary.system.length > 1, "the context request carries the context-mode system payload");
+  assert.deepStrictEqual(warm.system, primary.system);
+  await dispose();
+});
+
 test("[M5] GP2/pi-hint-not-user-role: a context-mode hint on Pi is never role user (#1263)", async () => {
   const bundlePath = path.join(REPO_ROOT, "release-out", "pi", "index.js");
   const mod = await import(`file://${bundlePath}`);

@@ -445,6 +445,32 @@ describe("ADR-0021 OpenCode cache break guard", () => {
     await b["chat.message"]({ sessionID: "oc-b" }, { parts: [{ type: "text", text: "next" }] });
     assert.deepEqual(await systemOf(b, "oc-b"), ref, "session B turn 2 system[] differs");
   });
+
+  // #1369: @opencode/core 2.2.6 SessionModelRequest sends the primary request through the session hook "context" and a
+  // session.generate request (WarmingPlugin cache warming) through the hook "generate" (SessionGenerate extends
+  // SessionContext). A generate request with other system bytes warms a prefix the next primary request never reads.
+  // Red run (main 890a3f6b): setup(ctx) registered prompt,context,compaction only; generate got 1 part, context 2.
+  test("prefix: opencode 2 setup(ctx) gives a generate request (session warming) the same system parts as the context request of the same session (#1369)", async () => {
+    const session = {};
+    const ctx = {
+      location: { directory: repo, project: { id: "p", directory: repo, canonical: repo } },
+      tool: { hook: async () => ({}), transform: async (cb) => { cb({ add() {} }); return {}; }, list: async () => [] },
+      session: { hook: async (n, cb) => { session[n] = cb; return {}; } },
+      event: { subscribe: () => (async function* () {})() },
+    };
+    const dispose = await opencodePlugin.default.setup(ctx);
+    const request = async (hook) => {
+      const ev = { sessionID: "oc-1369", agent: "build", model: {}, system: [{ type: "text", text: "HOST SYSTEM" }], messages: [], options: {}, tools: {} };
+      assert.equal(typeof session[hook], "function", `setup(ctx) registers the session hook "${hook}"`);
+      await session[hook](ev);
+      return ev.system.map((p) => p.text);
+    };
+    const primary = await request("context");
+    const warm = await request("generate");
+    assert.ok(primary.length > 1, "the context request carries the context-mode system payload");
+    assert.deepEqual(warm, primary, "the generate request warms the same system prefix the primary request reads");
+    await dispose();
+  });
 });
 
   // serial: before/after set process.env.HOME

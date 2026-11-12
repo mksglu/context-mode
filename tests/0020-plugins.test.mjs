@@ -100,7 +100,8 @@ describe("ADR-0020 plugins", () => {
       const dispose = await opencodePlugin.default.setup(f.ctx);
       assert.equal(typeof dispose, "function");
       for (const n of ["execute.before", "execute.after"]) assert.equal(typeof f.hooks.tool[n], "function", n);
-      for (const n of ["prompt", "context", "compaction"]) assert.equal(typeof f.hooks.session[n], "function", n);
+      // "generate" (#1369): @opencode/core 2.2.6 sends session.generate (cache warming) through its own hook kind.
+      for (const n of ["prompt", "context", "generate", "compaction"]) assert.equal(typeof f.hooks.session[n], "function", n);
       assert.deepEqual(f.subs.map((s) => s.types), [["session.step.ended"]]);
       await dispose();
     });
