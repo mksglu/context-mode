@@ -4,6 +4,24 @@
 // Spec: docs/architecture/modules/14-tests.md §1, 00-architecture.md e2e table.
 import { spawn } from "node:child_process";
 
+// D-E2E-HOST-ENV-1: the env names a replayed hook may inherit from the runner when the caller passes no env.
+// Run inside a Claude Code session the runner holds CLAUDE_PROJECT_DIR / CLAUDE_PLUGIN_ROOT / CLAUDE_PLUGIN_DATA;
+// the hook reads CLAUDE_PROJECT_DIR before the payload cwd (ADR-0001, D-FU-PS-1), so a full process.env copy made
+// the recorded fixtures resolve the runner's repo. Only OS basics pass: PATH, home and temp dirs, Windows shell vars.
+export const INHERITED_ENV_NAMES = [
+  "PATH", "PATHEXT", "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA",
+  "TMPDIR", "TEMP", "TMP", "SYSTEMROOT", "WINDIR", "COMSPEC", "LANG", "LC_ALL",
+];
+
+/** The child env built from the allowlist. Names compare upper-case, since Windows env names are case-insensitive. */
+export function hookChildEnv(source = process.env) {
+  const out = {};
+  for (const [name, value] of Object.entries(source)) {
+    if (value !== undefined && INHERITED_ENV_NAMES.includes(name.toUpperCase())) out[name] = value;
+  }
+  return out;
+}
+
 /**
  * @param {string} bundlePath
  * @param {{agent:string, event:string, payload:unknown, env?:Record<string,string>}} opts
@@ -16,7 +34,7 @@ export function runHook(bundlePath, opts) {
     const child = spawn(
       process.execPath,
       [bundlePath, "--agent", agent, "--event", event],
-      { stdio: ["pipe", "pipe", "pipe"], env: env ?? process.env }
+      { stdio: ["pipe", "pipe", "pipe"], env: env ?? hookChildEnv() }
     );
 
     let stdout = "";
