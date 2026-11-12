@@ -222,6 +222,24 @@ import { DatabaseSync } from "node:sqlite";
     });
   }
 
+  // D-E2E-HOST-ENV-1: run inside a Claude Code session, the runner's env holds CLAUDE_PROJECT_DIR (a real git repo).
+  // The replay child must not inherit it: by ADR-0001 / D-FU-PS-1 the hook reads CLAUDE_PROJECT_DIR before the payload
+  // cwd, so a leaked value turns the recorded "<proj>" payload into a real project and the NO_GIT_DIR line vanishes.
+  test("[M0] GP3/fixture-replay-ignores-host-env: a CLAUDE_* value in the runner's env does not reach the replayed hook", async () => {
+    const fx = fixtures.find((f) => f.agent === "claude-code" && f.event === "SessionStart");
+    assert.ok(fx, "claude-code SessionStart fixture is recorded");
+    const leaked = { CLAUDE_PROJECT_DIR: REPO_ROOT, CLAUDE_PLUGIN_ROOT: REPO_ROOT, CLAUDE_PLUGIN_DATA: tmpdir() };
+    const saved = Object.fromEntries(Object.keys(leaked).map((k) => [k, process.env[k]]));
+    Object.assign(process.env, leaked);
+    try {
+      const result = await runHookFixture(HOOK_BUNDLE, fx.agent, JSON.parse(readFileSync(fx.filePath, "utf8")));
+      const normalized = normalize({ agent: fx.agent, event: fx.event, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr });
+      assert.deepStrictEqual(normalized, loadGolden(`fixture-replay-${fx.agent}-${fx.event}`));
+    } finally {
+      for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    }
+  });
+
   // D-FU-OI-KIRO-1: Kiro CLI V3 SessionStart, payload shape from https://kiro.dev/docs/hooks/types/ (read 2026-10-23).
   // Fresh git repo and temp HOME. Documented contract: exit 0 stdout goes to the agent context. First call of a
   // session id prints the resume line; the same id again prints nothing (once per session, not a failure).
