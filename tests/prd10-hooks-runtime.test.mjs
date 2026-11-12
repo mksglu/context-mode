@@ -817,7 +817,7 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     const golden = CCP + "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output (" + Buffer.byteLength(text) + " B).";
     // D-CC-POINTER-2 (#1358): the claude-code line then names the MCP-free search.mjs call; it sits outside the
     // selection budget, so the body is the same as before and the bound grows by the twin only.
-    const twin = SEARCH_TWIN_LINE(join(dirname(process.argv[1]), SEARCH_WRAPPER_FILE), id, intent, realpathSync(repo));
+    const twin = SEARCH_TWIN_LINE(join(dirname(process.argv[1]), SEARCH_WRAPPER_FILE), id, intent, realpathSync.native(repo));
     assert.equal(replaced.slice(nl + 1), golden + twin);
     assert.equal(replaced.split("\n" + CCP + "ctx_search(").length, 2, "one call line, no second more line: " + replaced);
     for (const r of lintPromptText(golden)) assert.ok(r.ok, r.rule + " " + JSON.stringify(r.matches));
@@ -840,7 +840,7 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
 
   // D-CC-POINTER-7 (#1342, #1358): the twin names the project dir in its native form (resolve.ts realpathSync.native:
   // the long Windows name, the on-disk letter case). A CLAUDE_PROJECT_DIR alias (8.3 short name on windows-latest,
-  // other letter case here) gives the same line. realpathSync (not .native) keeps the alias: CI 43100308997.
+  // other letter case here) gives the same line. Expected values use .native too: realpathSync keeps the alias (CI 43100308997).
   test("D-CC-POINTER-7: a project dir alias: the search.mjs twin names the native project dir", async (t) => {
     const flip = join(dirname(repo), "REPO");
     if (!existsSync(flip) || realpathSync.native(flip) === flip) return t.skip("no case alias on this filesystem");
@@ -849,7 +849,7 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     const replaced = replacedText(out.updatedToolOutput);
     const src = query("SELECT id FROM sources WHERE session_id = ?", p.session_id);
     const id = "s" + Number(src[0].id).toString(36);
-    const twin = SEARCH_TWIN_LINE(join(dirname(process.argv[1]), SEARCH_WRAPPER_FILE), id, p.tool_input.description, realpathSync(flip));
+    const twin = SEARCH_TWIN_LINE(join(dirname(process.argv[1]), SEARCH_WRAPPER_FILE), id, p.tool_input.description, realpathSync.native(flip));
     assert.ok(replaced.endsWith(twin), replaced.slice(replaced.lastIndexOf("\n") + 1));
   });
 
@@ -867,7 +867,7 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     const nl = replaced.lastIndexOf("\n");
     assert.ok(nl > 0, "a body, then the handle line");
     const intent = p.tool_input.description;
-    const twin = SEARCH_TWIN_LINE(join(dirname(process.argv[1]), SEARCH_WRAPPER_FILE), id, intent, realpathSync(repo));
+    const twin = SEARCH_TWIN_LINE(join(dirname(process.argv[1]), SEARCH_WRAPPER_FILE), id, intent, realpathSync.native(repo));
     assert.equal(replaced.slice(nl + 1), CCP + "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output (" + Buffer.byteLength(text) + " B)." + twin);
     assert.ok(Buffer.byteLength(replaced.slice(0, nl)) > 0 && replaced.slice(0, nl).includes("needle target"), "the selection budget is not 0");
     const bound = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, src[0].label)) + Buffer.byteLength(twin);

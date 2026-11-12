@@ -2,6 +2,7 @@
 // One file per area (docs/architecture/TEST-LAYOUT.md).
 import { test, before, after, describe } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
+import { rmTemp } from "./_lib/fs.mjs";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync, readdirSync } from "node:fs";
 import path, { basename, join, resolve } from "node:path";
@@ -308,7 +309,8 @@ describe("ADR-0016: replace pointer the caller can call (#1342, #1358)", () => {
 
   after(() => {
     if (oldData === undefined) delete process.env[C.DATA_DIR_ENV]; else process.env[C.DATA_DIR_ENV] = oldData;
-    rmSync(root, { recursive: true, force: true, maxRetries: 3 });
+    // D-CC-POINTER-7: on Windows the detached index write can still hold context.db here (EPERM, CI 43100308997).
+    rmTemp(root);
   });
 
   const big = (n, word = "row") => Array.from({ length: n }, (_, i) => word + "-" + i + " filler words for the line " + i).join("\n") + "\n";
@@ -385,7 +387,7 @@ describe("ADR-0016: replace pointer the caller can call (#1342, #1358)", () => {
       const found = runTwin(line, "row-777");
       assert.equal(found.status, 0, found.stderr);
       assert.ok(found.stdout.includes("row-777 "), found.stdout.slice(0, 300));
-    } finally { rmSync(box, { recursive: true, force: true }); }
+    } finally { rmTemp(box); }
   });
 
   test("#1358 main-session MCP result: query is never empty, and the search.mjs line returns a middle line from any cwd", async () => {
