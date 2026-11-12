@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -236,5 +236,65 @@ exit 127
     assert.equal(out.includes("FAIL"), false, out);
     assert.equal(existsSync(path.join(home, ".copilot")), false, "nothing written for a missing host");
     assert.equal(readFileSync(log, "utf8").includes("mcp add"), false, readFileSync(log, "utf8"));
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
+});
+
+// #1335 (D-R54-CLAUDE-MISE-1): mise installs `claude` as a symlink shim, shims/claude -> ../bin/mise, a native
+// multi-call binary that reads argv[0] to pick the tool. Setup ran the realpath of the PATH file, so mise saw argv[0]
+// "mise" and printed "error: unrecognized subcommand 'marketplace'" (exit 2): setup FAIL, bin: .../bin/mise. The stand-in
+// below is compiled C with the same dispatch: argv[0] "claude" acts as Claude Code, any other name acts as mise.
+const MISE_STANDIN = String.raw`#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <libgen.h>
+int main(int argc, char **argv) {
+  const char *state = getenv("FAKE_STATE");
+  if (strcmp(basename(argv[0]), "claude") != 0) {
+    if (argc > 2 && (strcmp(argv[1], "plugin") == 0 || strcmp(argv[1], "plugins") == 0)) {
+      fprintf(stderr, "error: unrecognized subcommand '%s'\n\nUsage: mise plugins [FLAGS] [SUBCOMMAND]\n", argv[2]);
+      return 2;
+    }
+    return 2;
+  }
+  if (argc > 1 && strcmp(argv[1], "--version") == 0) { puts("2.1.319 (Claude Code)"); return 0; }
+  if (argc > 2 && strcmp(argv[1], "plugin") == 0) {
+    if (strcmp(argv[2], "install") == 0) { FILE *f = fopen(state, "w"); if (f) fclose(f); return 0; }
+    if (strcmp(argv[2], "uninstall") == 0) { remove(state); return 0; }
+    if (strcmp(argv[2], "list") == 0) { FILE *f = fopen(state, "r"); if (f) { fclose(f); puts("context-mode@context-mode 2.0.0"); } return 0; }
+  }
+  return 0;
+}
+`;
+
+test("[M6] GP-SETUP/claude-mise-shim: setup claude-code via a mise-style symlink shim runs the shim, PASS, and the bin line names the shim (#1335)", { timeout: 300_000, skip: WIN && "mise shims are symlinks to a Unix binary" }, (t) => {
+  const tmp = mkdtempSync(path.join(tmpdir(), "cm-setup-mise-"));
+  try {
+    const home = path.join(tmp, "home");
+    const miseBin = path.join(tmp, "mise", "bin");
+    const shims = path.join(tmp, "mise", "shims");
+    const outDir = path.join(tmp, "out");
+    for (const d of [home, miseBin, shims]) mkdirSync(d, { recursive: true });
+    writeFileSync(path.join(tmp, "mise.c"), MISE_STANDIN);
+    try { execFileSync("cc", ["-O2", "-o", path.join(miseBin, "mise"), path.join(tmp, "mise.c")], { stdio: "pipe" }); }
+    catch (e) { t.skip(`no C compiler for the mise stand-in: ${e.message}`); return; }
+    symlinkSync(path.join("..", "bin", "mise"), path.join(shims, "claude"));
+    execFileSync(process.execPath, [path.join(REPO_ROOT, "build", "build.mjs"), "--out", outDir, "--version", VERSION], { cwd: REPO_ROOT, stdio: "pipe" });
+    const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: path.join(home, ".config"), CLAUDE_CONFIG_DIR: path.join(home, ".claude"),
+      FAKE_STATE: path.join(tmp, "claude.state"), PATH: [shims, path.dirname(process.execPath), "/usr/bin", "/bin"].join(path.delimiter) };
+    delete env.CLAUDE_PROJECT_DIR;
+    const cli = (...args) => {
+      try { return { code: 0, out: execFileSync(process.execPath, [path.join(outDir, "cli.mjs"), ...args], { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) }; }
+      catch (e) { return { code: e.status, out: `${e.stdout ?? ""}${e.stderr ?? ""}` }; }
+    };
+    const shimBin = `bin: ${path.join(shims, "claude")}`;
+    const setup = cli("setup", "--agents", "claude-code", "--yes", "--no-input");
+    assert.equal(setup.out.includes("unrecognized subcommand"), false, `mise never saw the claude call: ${setup.out}`);
+    assert.equal(setup.code, 0, setup.out);
+    const row = setup.out.split("\n").find((l) => l.trimStart().startsWith("claude-code") && l.includes("PASS"));
+    assert.ok(row, `a claude-code PASS row: ${setup.out}`);
+    assert.ok(row.includes(shimBin), `the row names the shim it ran: ${row}`);
+    const doc = cli("doctor", "--agents", "claude-code");
+    const drow = doc.out.split("\n").find((l) => l.trimStart().startsWith("claude-code") && l.includes(shimBin));
+    assert.ok(drow && drow.includes("PASS"), `doctor PASS through the shim: ${doc.out}`);
   } finally { rmSync(tmp, { recursive: true, force: true }); }
 });
