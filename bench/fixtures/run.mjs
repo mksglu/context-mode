@@ -102,7 +102,14 @@ function hook(env, project, rel, text, n) {
   if (r.stdout.trim() === "") return { seen: text, replaced: false, ms }; // allow: the model sees the raw stdout
   const out = JSON.parse(r.stdout).hookSpecificOutput?.updatedToolOutput;
   const seen = typeof out === "string" ? out : (out?.stdout ?? "") + (out?.stderr ?? "");
-  return { seen, replaced: true, ms };
+  return { seen: fixedPaths(seen, project), replaced: true, ms };
+}
+
+// D-CC-POINTER-6: the search.mjs line names the bundle dir and the project dir. Their length depends on the
+// machine's temp dir (macOS /var/folders/..., Linux /tmp, Windows C:\Users\...\Temp), so the bench counts each
+// as a fixed token. The same text then gives the same bytes on every OS and --check compares like with like.
+function fixedPaths(s, project) {
+  return s.split(path.dirname(path.join(BUNDLE, "hook.mjs"))).join("<bundle>").split(project).join("<project>");
 }
 
 const tmp = realpathSync.native(mkdtempSync(path.join(tmpdir(), "cm-bench-fixtures-")));

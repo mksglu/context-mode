@@ -6,14 +6,14 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readdirSync, existsSync, readFileSync, realpathSync, statSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import path, { join, sep } from "node:path";
+import path, { dirname, join, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { handleHook } from "../src/core/hooks/dispatch.ts";
 import { ctxSearch } from "../src/core/tools/search.ts";
 import { ctxStats } from "../src/core/tools/stats.ts";
 import { chunkText } from "../src/core/index/chunk.ts";
 import { getAdapter, ADAPTERS, hasRecall, hasReplace } from "../src/adapters/table.ts";
-import { COMPACT_POINTER_LINE, OUTPUT_CAP, REPLACE_TRIGGER_BYTES, REPLACE_RETURN_BYTES, REPLACE_CHUNK_BYTES, SYNC_INDEX_MAX_BYTES, PENDING_COMPACT_META_PREFIX, DECISION_OPTION_KEY, DECISION_SOURCE, RECALL_BUDGET_BYTES, RECALL_CLOSE_TAG, RECALL_OPEN_TAG, STATE_BUDGET, HOOK_TIMEOUT_MS,D5_LAST_HOOK_ERROR, MCP_HINT_EVERY, PARSE_ERROR_DENY_LINE, POLICY_UNREADABLE_LINE, REPLACE_HANDLE_LINE, REQUIRE_SECURITY_ENV, TOOL_ORDER, prefixToolNames } from "../src/core/contracts/constants.ts";
+import { SEARCH_TWIN_LINE, SEARCH_WRAPPER_FILE, COMPACT_POINTER_LINE, OUTPUT_CAP, REPLACE_TRIGGER_BYTES, REPLACE_RETURN_BYTES, REPLACE_CHUNK_BYTES, SYNC_INDEX_MAX_BYTES, PENDING_COMPACT_META_PREFIX, DECISION_OPTION_KEY, DECISION_SOURCE, RECALL_BUDGET_BYTES, RECALL_CLOSE_TAG, RECALL_OPEN_TAG, STATE_BUDGET, HOOK_TIMEOUT_MS,D5_LAST_HOOK_ERROR, MCP_HINT_EVERY, PARSE_ERROR_DENY_LINE, POLICY_UNREADABLE_LINE, REPLACE_HANDLE_LINE, REQUIRE_SECURITY_ENV, TOOL_ORDER, prefixToolNames } from "../src/core/contracts/constants.ts";
 import { answerDecisions, askOptionLabels, listOptionLabels, optionEchoDecision } from "../src/core/hooks/decision.ts";
 import { decode } from "../src/adapters/claude-code.ts";
 import { openDb, closeDb, withWrite, metaGet } from "../src/core/store/db.ts";
@@ -285,10 +285,13 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     const src = query("SELECT label, bytes_total FROM sources WHERE session_id = ?", p.session_id);
     // bytes_total is the sum of chunk bytes (store rule): the trailing newline is not a chunk byte.
     assert.equal(src.length, 1);
-    assert.equal(src[0].label, "subagent:Read:0");
+    // D-CC-POINTER-4 (#1342): the label carries the call id (here the adapter's hash id), so two calls stay two sources.
+    assert.ok(src[0].label.startsWith("subagent:Read:") && src[0].label !== "subagent:Read:0", src[0].label);
     assert.ok(src[0].bytes_total >= Buffer.byteLength(text) - 1, "the whole text is indexed, nothing cut");
     // Whole chunks only: the selected chunks, joined by one "\n", make up the body byte for byte.
-    const body = replaced.slice(0, replaced.lastIndexOf("\n" + CCP + "ctx_search(") < 0 ? replaced.length : replaced.lastIndexOf("\n" + CCP + "ctx_search("));
+    // D-CC-POINTER-1: a case C subagent gets a handle line with no ctx tool; the body is all before the last line.
+    assert.equal(replaced.includes("ctx_"), false, replaced);
+    const body = replaced.slice(0, replaced.lastIndexOf("\n"));
     const whole = chunkText(text, "text", REPLACE_CHUNK_BYTES).filter((c) => body.includes(c.text));
     assert.ok(whole.length > 0);
     const joined = whole.reduce((n, c) => n + Buffer.byteLength(c.text), 0) + whole.length - 1;
@@ -812,10 +815,13 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.ok(nl > 0, "a body, then the handle line");
     const intent = p.tool_input.description ?? p.tool_input.command;
     const golden = CCP + "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output (" + Buffer.byteLength(text) + " B).";
-    assert.equal(replaced.slice(nl + 1), golden);
+    // D-CC-POINTER-2 (#1358): the claude-code line then names the MCP-free search.mjs call; it sits outside the
+    // selection budget, so the body is the same as before and the bound grows by the twin only.
+    const twin = SEARCH_TWIN_LINE(join(dirname(process.argv[1]), SEARCH_WRAPPER_FILE), id, intent, realpathSync(repo));
+    assert.equal(replaced.slice(nl + 1), golden + twin);
     assert.equal(replaced.split("\n" + CCP + "ctx_search(").length, 2, "one call line, no second more line: " + replaced);
     for (const r of lintPromptText(golden)) assert.ok(r.ok, r.rule + " " + JSON.stringify(r.matches));
-    const bound = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, src[0].label));
+    const bound = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, src[0].label)) + Buffer.byteLength(twin);
     assert.ok(Buffer.byteLength(replaced) <= bound, Buffer.byteLength(replaced) + " > " + bound);
   });
 
@@ -829,7 +835,7 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.equal(src.length, 1);
     const last = replaced.slice(replaced.lastIndexOf("\n") + 1);
     assert.ok(last.includes(", source:" + JSON.stringify("s" + Number(src[0].id).toString(36)) + "})"), last);
-    assert.ok(last.endsWith("(" + Buffer.byteLength(text) + " B)."), last);
+    assert.ok(last.includes("searches the whole output (" + Buffer.byteLength(text) + " B)."), last);
   });
 
   // D-CR3-HANDLE-2: above SYNC_INDEX_MAX_BYTES the source row id is reserved before the detached write, so the
@@ -846,9 +852,10 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     const nl = replaced.lastIndexOf("\n");
     assert.ok(nl > 0, "a body, then the handle line");
     const intent = p.tool_input.description;
-    assert.equal(replaced.slice(nl + 1), CCP + "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output (" + Buffer.byteLength(text) + " B).");
+    const twin = SEARCH_TWIN_LINE(join(dirname(process.argv[1]), SEARCH_WRAPPER_FILE), id, intent, realpathSync(repo));
+    assert.equal(replaced.slice(nl + 1), CCP + "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output (" + Buffer.byteLength(text) + " B)." + twin);
     assert.ok(Buffer.byteLength(replaced.slice(0, nl)) > 0 && replaced.slice(0, nl).includes("needle target"), "the selection budget is not 0");
-    const bound = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, src[0].label));
+    const bound = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, src[0].label)) + Buffer.byteLength(twin);
     assert.ok(Buffer.byteLength(replaced) <= bound, Buffer.byteLength(replaced) + " > " + bound);
     const chunks = await waitRows("SELECT ord FROM chunks WHERE source_id = ?", [src[0].id], 1);
     assert.ok(chunks.length > 0, "the detached write stores the chunks under the reserved id");
