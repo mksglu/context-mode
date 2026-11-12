@@ -181,8 +181,13 @@ async function handler(raw: ExecuteInput, ctx: ToolContext): Promise<ToolReply> 
     if (bad !== null) return fail(bad);
     extra.CTX_FILE = abs;
   }
-  // Step 4.
-  const runtime = findRuntime(input.language);
+  // Step 4. D-1373-STAT-1: a lookup failure is a named error line, never the generic internal error.
+  let runtime: string | null;
+  try {
+    runtime = findRuntime(input.language);
+  } catch {
+    runtime = null;
+  }
   if (runtime === null) return fail(noRuntimeError(input.language).toLine());
   // Steps 6-7.
   const env = buildChildEnv(process.env, extra);

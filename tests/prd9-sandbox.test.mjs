@@ -1038,10 +1038,10 @@ describe("PRD-v2 section 9: runtime lookup", () => {
       const good = join(root, "real"); mkdirSync(good); writeFileSync(join(good, "python3"), "#!/bin/sh\necho REAL_PYTHON_1373\n"); chmodSync(join(good, "python3"), 0o755);
       return { root, stub, good, bin: join(good, "python3"), env: { PATH: [stub, good].join(delimiter) } };
     }
-    function statThrows(code, under) {
+    function statThrows(code, under, only = "") {
       const real = fs.statSync;
       const m = mock.method(fs, "statSync", (p, o) => {
-        if (String(p).startsWith(under)) throw Object.assign(new Error(code + ": injected"), { code });
+        if (String(p).startsWith(under) && String(p).includes(only)) throw Object.assign(new Error(code + ": injected"), { code });
         return real(p, o);
       });
       syncBuiltinESMExports();
@@ -1109,7 +1109,7 @@ describe("PRD-v2 section 9: runtime lookup", () => {
     test("doctor D11 names a language whose runtime cannot be found, with the reason; PASS when all resolve", async () => {
       const { checkRuntimes } = await import("../src/core/ops/doctor-env.ts");
       const l = lanes();
-      const restore = statThrows("EACCES", l.root);
+      const restore = statThrows("EACCES", l.root, "python");
       try {
         const pass = { id: "D11", label: "shell", status: "PASS", detail: "sh: /bin/sh" };
         const row = checkRuntimes({ PATH: l.env.PATH }, pass);

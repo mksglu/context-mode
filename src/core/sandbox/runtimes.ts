@@ -43,21 +43,38 @@ function fileNames(name: string, pathExt: string[]): string[] {
   return [...pathExt.map((ext) => name + ext), name];
 }
 
-/** Steps 4-5: a regular file; on POSIX it must carry the exec bit, on Windows it must be startable. */
-function isRunnable(full: string): boolean {
-  const st = statSync(full, { throwIfNoEntry: false });
-  if (st === undefined || !st.isFile()) return false;
+/**
+ * Steps 4-5: a regular file; on POSIX it must carry the exec bit, on Windows it must be startable.
+ * DEVIATIONS D-1373-STAT-1: a stat that fails for any reason (EACCES on the Microsoft Store app alias, EPERM,
+ * UNKNOWN, ELOOP) is "unreadable": not runnable, and the walk goes on to the next PATH entry. Only ENOENT is "absent".
+ */
+type Probe = "runnable" | "absent" | "unreadable";
+function probe(full: string): Probe {
+  let st;
+  try {
+    st = statSync(full, { throwIfNoEntry: false });
+  } catch {
+    return "unreadable";
+  }
+  if (st === undefined || !st.isFile()) return "absent";
   if (isWin()) {
     const ext = path.extname(full).toLowerCase();
-    return ext === "" || WIN_STARTABLE_EXT.includes(ext);
+    return ext === "" || WIN_STARTABLE_EXT.includes(ext) ? "runnable" : "absent";
   }
   try {
     accessSync(full, fsConstants.X_OK);
-    return true;
+    return "runnable";
   } catch {
-    return false;
+    return "absent";
   }
 }
+
+function isRunnable(full: string): boolean {
+  return probe(full) === "runnable";
+}
+
+/** What a PATH walk found: the runtime (or null) and every candidate that exists but cannot be read. */
+export interface RuntimeLookup { found: string | null; unreadable: string[] }
 
 /**
  * Absolute interpreter path for `lang`, or null when no PATH directory has one. Re-walks PATH every call.
@@ -66,7 +83,13 @@ function isRunnable(full: string): boolean {
  * extensionless shim; the first shim seen is returned only when the whole walk finds no such hit.
  */
 export function findRuntime(lang: string, env: NodeJS.ProcessEnv = process.env): string | null {
-  if (isWin() && WIN_SHELL_LANGS.includes(lang)) return findGitBash(env);
+  return lookupRuntime(lang, env).found;
+}
+
+/** findRuntime with the reason a miss happened: doctor names the unreadable candidates (D-1373-STAT-1). */
+export function lookupRuntime(lang: string, env: NodeJS.ProcessEnv = process.env): RuntimeLookup {
+  const unreadable: string[] = [];
+  if (isWin() && WIN_SHELL_LANGS.includes(lang)) return { found: findGitBash(env), unreadable };
   // W-CODEX-6: a Windows PATH entry may be wrapped in double quotes; the shared helper cuts them off.
   // D-1371-PATH-CASE-1: on Windows the key is read without case (a Bun host spells it `Path`).
   const dirs = pathEntries(envValue(env, "PATH") ?? "", process.platform, path.delimiter);
@@ -79,13 +102,15 @@ export function findRuntime(lang: string, env: NodeJS.ProcessEnv = process.env):
     for (const name of names) {
       for (const file of fileNames(name, pathExt)) {
         const full = path.join(dir, file);
-        if (!isRunnable(full)) continue;
-        if (!isWin() || path.extname(full) !== "") return full;
+        const state = probe(full);
+        if (state === "unreadable") unreadable.push(full);
+        if (state !== "runnable") continue;
+        if (!isWin() || path.extname(full) !== "") return { found: full, unreadable };
         if (shim === null) shim = full;
       }
     }
   }
-  return shim;
+  return { found: shim, unreadable };
 }
 
 /**

@@ -810,6 +810,9 @@ export const OC_ANY_RESOURCE = "*";
 export const D11_WIN_DETAIL = "Git Bash not found"; export const D11_WIN_FIX = "install Git for Windows";
 export const D11_POSIX_DETAIL = "no sh on PATH"; export const D11_POSIX_FIX = "install sh or add it to PATH";
 export function D11_PASS_DETAIL(shell: string, win: boolean): string { return `${win ? "Git Bash" : "sh"}: ${shell}`; }
+// D-1373-STAT-1: a sandbox language whose PATH candidates exist but cannot be read (Windows Store app alias: EACCES).
+export function D11_RUNTIME_DETAIL(lang: string, unreadable: readonly string[]): string { return `${lang} not found, unreadable on PATH: ${unreadable.join(", ")}`; }
+export function D11_RUNTIME_FIX(lang: string): string { return `install ${lang}, or turn off its app alias and PATH entry that cannot be read`; }
 // doctor-heal.ts: D8 heal (impl/07 §5 step 7). Order: main file, then WAL, then SHM.
 export const DB_SIBLING_SUFFIXES = Object.freeze(["", DB_WAL_SUFFIX, DB_SHM_SUFFIX] as const);
 export const HEAL_TMP_SUFFIX = ".heal"; // VACUUM INTO <context.db>.heal, then rename over context.db
