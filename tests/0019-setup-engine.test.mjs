@@ -403,7 +403,8 @@ exit 0`;
   test("[H8] setup: a shim first on PATH is skipped; setup and doctor run the real claude behind it and name it", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
     const s = sandbox(t);
     const ran = path.join(s.root, "shim-ran");
-    const real = fakeClaude(s.root, s.bin, CLAUDE_FAKE(path.join(s.root, "claude.state")));
+    fakeClaude(s.root, s.bin, CLAUDE_FAKE(path.join(s.root, "claude.state")));
+    const real = path.join(s.bin, "claude"); // #1335: the PATH file that passed the check, not its realpath
     const env = { ...s.env, PATH: [claudeShim(s.root, ran), s.env.PATH].join(path.delimiter) };
     const opts = { home: s.home, pkgDir: s.pkgDir, env, agents: ["claude-code"] };
     const res = await runSetup({ ...opts, runId: "r" });
@@ -433,11 +434,26 @@ exit 0`;
     mkdirSync(native);
     symlinkSync(process.execPath, path.join(native, "claude"));
     const env = { PATH: [shims, native].join(path.delimiter) };
-    assert.deepEqual(hostBin("claude", env), { file: realpathSync(process.execPath), shims: [path.join(shims, "claude")] });
+    assert.deepEqual(hostBin("claude", env), { file: path.join(native, "claude"), shims: [path.join(shims, "claude")] });
     assert.deepEqual(hostBin("claude", { PATH: shims }), { file: undefined, shims: [path.join(shims, "claude")] });
     writeFileSync(path.join(shims, "codex"), "#!/bin/sh\n");
     chmodSync(path.join(shims, "codex"), 0o755);
     assert.deepEqual(hostBin("codex", env), { file: path.join(shims, "codex"), shims: [] });
+  });
+
+  test("[H8] hostBin #1335: a mise-style shim (claude -> multi-call native launcher) runs as the PATH file, so argv[0] stays claude", { skip: process.platform === "win32" && "symlinks need admin on Windows" }, (t) => {
+    // mise layout: ~/.local/share/mise/shims/claude -> ../bin/mise. mise reads argv[0] to pick the tool; run through the
+    // realpath it sees argv[0] "mise" and answers `claude plugin marketplace add` with "unrecognized subcommand".
+    // process.execPath is a native multi-call stand-in: node prints the argv[0] it was started with.
+    const s = sandbox(t);
+    const shimDir = path.join(s.root, "mise", "shims");
+    mkdirSync(shimDir, { recursive: true });
+    const shim = path.join(shimDir, "claude");
+    symlinkSync(process.execPath, shim);
+    const got = hostBin("claude", { PATH: shimDir });
+    assert.deepEqual(got, { file: shim, shims: [] }, "the PATH file passed the native check and is the file that runs");
+    const r = spawnSync(got.file, ["-e", "process.stdout.write(process.argv0)"], { encoding: "utf8" });
+    assert.equal(path.basename(r.stdout), "claude", "the launcher sees the name the user typed");
   });
 
   test("[M7] setup/doctor: a report-only v1 finding (shared OS temp file) does not fail an agent that is set up", async (t) => {
