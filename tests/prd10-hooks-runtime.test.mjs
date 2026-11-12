@@ -1936,6 +1936,7 @@ describe("PRD-v2 section 10: hook never errors (D-HNE-GUARD-1)", () => {
     opencode: { pay: (t, i) => ({ type: "execute.before", sessionID: "s1", directory: repo, tool: t, args: i }), shell: "bash", own: "context-mode_ctx_execute", safe: "todowrite" },
   };
   const EXIT2 = new Set(["kiro", "pi", "opencode"]); // these hosts deny by exit code 2 and text
+  const INPROC = new Set(["pi", "opencode"]); // installMode "in-process": ctx_* tools live in the host process, no MCP server
 
   function run(host, payload, { fault, env = {}, preload } = {}) {
     const home = mkdtempSync(join(root, "home-"));
@@ -1991,18 +1992,35 @@ describe("PRD-v2 section 10: hook never errors (D-HNE-GUARD-1)", () => {
       });
     }
 
-    test(`[D-HNE-GUARD-1] ${host}: Node below 24.15 gives the same failure decision and does not crash at load`, () => {
-      const pre = join(root, "oldnode.cjs");
-      writeFileSync(pre, "Object.defineProperty(process, 'version', { value: 'v22.1.0' });");
-      const r = run(host, h.pay(h.shell, CMD), { preload: pre });
-      const reason = denyText(host, r);
-      assert.notEqual(reason, null, `${host} old node not a deny: status=${r.status} stderr=${r.stderr.slice(0, 200)}`);
-      assert.ok(reason.includes("NODE_TOO_OLD"), reason);
-      assert.ok(reason.includes("ctx_doctor"), reason);
-      assert.equal(logLines(r.home)[0].stage, "node");
-      const own = run(host, h.pay(h.own, { code: "1" }), { preload: pre });
-      assert.equal(own.status, 0);
-      assert.equal(denyText(host, own), null);
+    // D-1370-OLDNODE-ALLOW-1 (#1370): on Node below 24.15 the MCP server runs on the same node and is degraded (PRD §13: it
+    // lists ctx_doctor only), so a deny that redirects to ctx_execute blocks the host. The 8 server hosts allow and still log
+    // the error (D5); Pi and OpenCode register ctx_* in-process with no version gate, so their redirect target exists.
+    test(`[D-1370] ${host}: Node below 24.15 ${INPROC.has(host) ? "keeps the redirect deny (ctx_* is in-process)" : "allows shell, large Read, Grep and fetch"}`, () => {
+      const big = join(root, "big-1370.txt");
+      writeFileSync(big, "x".repeat(40000));
+      for (const v of ["v22.1.0", "v18.20.5"]) {
+        const pre = join(root, `oldnode-${v}.cjs`);
+        writeFileSync(pre, `Object.defineProperty(process, 'version', { value: '${v}' });`);
+        const calls = [[h.shell, CMD], ["Read", { file_path: big }], ["Grep", { pattern: "x" }], ["WebFetch", { url: "https://example.com" }]];
+        for (const [tool, input] of calls) {
+          const r = run(host, h.pay(tool, input), { preload: pre });
+          const reason = denyText(host, r);
+          if (INPROC.has(host)) {
+            if (tool !== h.shell) continue;
+            assert.notEqual(reason, null, `${host}/${v} in-process shell keeps the deny: stdout=${r.stdout.slice(0, 200)}`);
+            assert.ok(reason.includes("NODE_TOO_OLD") && reason.includes("ctx_doctor"), reason);
+          } else {
+            assert.equal(r.status, 0, `${host}/${v}/${tool} exit ${r.status}: ${r.stderr.slice(0, 200)}`);
+            assert.equal(reason, null, `${host}/${v}/${tool} must not be denied (the degraded server has no ctx_execute): ${r.stdout.slice(0, 300)}`);
+            if (r.stdout !== "") JSON.parse(r.stdout); // a valid document for the host (Copilot CLI)
+          }
+          assert.ok(r.stderr.includes("NODE_TOO_OLD") || r.stderr.includes("needs Node 24.15.0"), `${host}/${v} stderr names the error: ${r.stderr.slice(0, 200)}`);
+          assert.equal(logLines(r.home)[0]?.stage, "node", `${host}/${v}/${tool} hook-errors.log line`);
+        }
+        const own = run(host, h.pay(h.own, { code: "1" }), { preload: pre });
+        assert.equal(own.status, 0);
+        assert.equal(denyText(host, own), null);
+      }
     });
 
     test(`[D-HNE-GUARD-1] ${host}: unreadable stdin is logged and answered with exit 0`, () => {
