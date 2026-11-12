@@ -52,7 +52,7 @@ export interface Change { file?: string; path?: string; before?: unknown; after?
 export interface Check { name: string; ok: boolean; warn?: boolean; detail?: string; overheadP95Ms?: number; wallP95Ms?: number; bareP95Ms?: number; }
 export interface AgentResult {
   id: AgentId; status: AgentStatus; reason?: string; v1: V1Finding[]; changes: Change[]; checks: Check[]; rolledBack?: boolean;
-  /** OPEN-ITEMS H8: the host CLI file setup and doctor ran for this agent (absolute, resolved). */
+  /** OPEN-ITEMS H8, #1335: the host CLI file setup and doctor ran for this agent (absolute PATH file that passed the check). */
   bin?: string;
   /** D-R54-OC-PLUGINS-DIR-1: the fix line when it is not the setup command. */
   fix?: string;
@@ -101,7 +101,10 @@ function owningPackage(dir: string): string | undefined {
 }
 
 /** The host CLI file setup runs. An agent with no REAL_HOST row: the first PATH hit. claude: the first PATH candidate
- *  that is the real Claude Code; every other candidate seen before it is listed in `shims` and never run. */
+ *  that is the real Claude Code; every other candidate seen before it is listed in `shims` and never run.
+ *  #1335: the check reads the resolved file (magic bytes, owning package.json through npm/Homebrew symlinks), but the
+ *  returned file is the PATH candidate itself, so a multi-call launcher (mise: shims/claude -> ../bin/mise) still sees
+ *  argv[0] "claude". */
 export function hostBin(bin: string, env: SetupContext["env"], platform: NodeJS.Platform = process.platform): { file: string | undefined; shims: string[] } {
   const real = REAL_HOST[bin];
   if (!real) return { file: which(bin, env, platform), shims: [] };
@@ -112,7 +115,7 @@ export function hostBin(bin: string, env: SetupContext["env"], platform: NodeJS.
     for (const f of [own, ...real.extra.map((p) => path.join(dir, ...p))]) {
       if (!f || !existsSync(f) || !statSync(f).isFile()) continue;
       const file = realpathSync(f);
-      if (isNativeBinary(file) || owningPackage(path.dirname(file)) === real.pkg) return { file, shims };
+      if (isNativeBinary(file) || owningPackage(path.dirname(file)) === real.pkg) return { file: f, shims };
       shims.push(f);
     }
   }
