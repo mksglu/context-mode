@@ -669,6 +669,8 @@ describe("ADR-0019 cli", () => {
     });
 
     // OPEN-ITEMS H8: a wrapper first on PATH (claude-worktree shim) is skipped; doctor names the claude it ran.
+    // #1335: the bin line names the PATH file that passed the check (bin/claude), not its realpath, so a
+    // multi-call launcher (mise shim) keeps argv[0] "claude".
     test("[H8] cli/doctor-bin: setup and doctor skip a claude shim first on PATH and print the real binary they used", { skip: process.platform === "win32" && "fake agent CLIs are sh scripts" }, (t) => {
       const s = sandbox(t);
       const pkg = path.join(s.root, "npm", "lib", "node_modules", "@anthropic-ai", "claude-code");
@@ -687,7 +689,7 @@ describe("ADR-0019 cli", () => {
       assert.equal(r.status, 0, r.stderr + r.stdout);
       const d = run(s, ["doctor", "--agents", "claude-code"], { env });
       assert.equal(d.status, 0, d.stderr + d.stdout);
-      assert.match(d.stdout, new RegExp(`claude-code\\s+PASS\\s+checked: .*; bin: ${realpathSync(real).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"));
+      assert.match(d.stdout, new RegExp(`claude-code\\s+PASS\\s+checked: .*; bin: ${path.join(s.bin, "claude").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"));
       assert.equal(existsSync(path.join(s.root, "shim-ran")), false, "the shim never ran");
     });
 
