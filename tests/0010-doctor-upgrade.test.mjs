@@ -14,7 +14,7 @@ import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { createServer } from "node:http";
 import { unsupportedHostOf, unsupportedHostByName } from "../src/core/ops/unsupported-host.ts";
-import { issueTitle, summaryOf } from "../src/core/ops/doctor-issue.ts";
+import { environmentLine, issueTitle, summaryOf } from "../src/core/ops/doctor-issue.ts";
 import { checkDoubleFire, checkHostConfig, checkV1Leftovers, composeMatcher } from "../src/core/ops/doctor-config.ts";
 import { bundleDirOf, ownBundleDir } from "../src/core/ops/bundle-dir.ts";
 import { hostUpdateCommand } from "../src/core/project/config-dir.ts";
@@ -1529,6 +1529,55 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
     assert.equal(slow.fixCommand, C.D5_FIX);
   });
 
+  // #1350 (emngny, OpenCode 2.2.7 on a corporate-managed Windows 11 laptop): D5 FAIL "88/98 ms over bare node, over 40 ms".
+  // The reporter's walls: bare `node -e ""` 594-749 ms, hook - bare per pair 84, 127, 78, 52, 68, 16, 66, 62, 87, 67 ms.
+  // The hook adds ~12% to a node start there (27% on the owner's Mac); the 40 ms bound was set where node starts in ~40 ms
+  // (TECH-SPEC GS6, D-D5-BARE-1). The bound scales with the measured start: max(HOOK_P95_MS, D5_BARE_SHARE x fastest bare).
+  const REPORTER_BARE = [612, 598, 640, 625, 655, 749, 594, 610, 633, 702];
+  const REPORTER_DELTA = [84, 127, 78, 52, 68, 16, 66, 62, 87, 67];
+  function pairClock(hooks) { const ticks = []; let at = 0; for (const w of hooks) { ticks.push(at, at + w); at += w + 1; } return clock(...ticks); }
+
+  test("[#1350] D5 on a slow, noisy node start (the reporter's walls) PASSes and names the slow start", async (t) => {
+    let b = 0;
+    const r = await checkHookRoundTrip(input(bundle(t, native), {
+      samples: undefined, now: pairClock(REPORTER_BARE.map((w, n) => w + REPORTER_DELTA[n])), bareMs: async () => REPORTER_BARE[b++],
+    }));
+    assert.equal(r.status, "PASS", r.detail);
+    // pairs 1-3: fastest hook 696 ms, fastest bare 598 ms: 98 ms (the reporter's own D5 number), inside max(40, 299) ms.
+    assert.equal(r.detail, C.D5_SLOW_START_DETAIL(98, 598, 299));
+    assert.equal(b, 3, "stops at the 3-pair minimum once inside the bound");
+  });
+
+  test("[#1350] D5: a slow hook on a fast machine still FAILs at the 40 ms bound", async (t) => {
+    const r = await checkHookRoundTrip(input(bundle(t, native), { samples: undefined, now: pairClock(Array(9).fill(130)), bareMs: async () => 30 }));
+    assert.equal(r.status, "FAIL");
+    assert.equal(r.detail, C.D5_SLOW_DETAIL(100));
+    assert.equal(r.fixCommand, C.D5_FIX);
+  });
+
+  test("[#1350] D5: a slow hook on a slow machine FAILs over half a node start", async (t) => {
+    const r = await checkHookRoundTrip(input(bundle(t, native), { samples: undefined, now: pairClock(Array(9).fill(1000)), bareMs: async () => 600 }));
+    assert.equal(r.status, "FAIL");
+    assert.equal(r.detail, C.D5_SLOW_DETAIL(400, 300));
+  });
+
+  // #1350: OpenCode and Pi (installMode in-process) run every hook inside the host process; a tool call never starts node.
+  // D5 checks the bundle's output shape with one spawn and times nothing: a spawn time there is not the user's path.
+  for (const id of ADAPTERS.filter((a) => a.installMode === "in-process").map((a) => a.id)) {
+    test(`[#1350] D5 ${id} (in-process): one hook run for the shape, no bare-node pairs, never a timing FAIL`, async (t) => {
+      let bareRuns = 0;
+      const r = await checkHookRoundTrip(input(bundle(t, "", { fixture: SHIPPED }), {
+        agent: id, samples: undefined, now: pairClock(Array(9).fill(5000)), bareMs: async () => { bareRuns++; return 10; },
+      }));
+      assert.equal(r.status, "PASS", r.detail);
+      assert.equal(r.detail, C.D5_IN_PROCESS_DETAIL);
+      assert.equal(bareRuns, 0);
+      const bad = await checkHookRoundTrip(input(bundle(t, "", { fixture: SHIPPED, exit: 1 }), { agent: id }));
+      assert.equal(bad.status, "FAIL");
+      assert.equal(bad.detail, C.D5_SHAPE_DETAIL);
+    });
+  }
+
   // D-D5-TEST-TIMEOUT-1: release run 41679948852 (macos-latest, node 26): 12 stub-hook tests each took 6-8 s and got
   // "not the agent's native shape", because the busy runner needed over HOOK_TIMEOUT_MS (5000) to start a stub hook.
   // The kill limit is an input, so the tests give the stub room; the server keeps HOOK_TIMEOUT_MS, the host limit.
@@ -1559,7 +1608,8 @@ describe("ADR-0010 doctor D5: hook round trip", { concurrency: CONC }, () => {
       assert.equal(decoded.event, SHIPPED[id].event, id);
       assert.equal(decoded.tool?.canonicalName, "Bash", id);
       const r = await checkHookRoundTrip(input(bundle(t, "", { fixture: SHIPPED }), { agent: id, codexConfigDir: path.join(tmpdir(), "cm-no-codex-home") }));
-      assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "PASS", detail: C.DOCTOR_PASS_DETAIL }, id);
+      const detail = getAdapter(id).installMode === "in-process" ? C.D5_IN_PROCESS_DETAIL : C.DOCTOR_PASS_DETAIL; // #1350
+      assert.deepEqual(r, { id: "D5", label: C.DOCTOR_LABEL.D5, status: "PASS", detail }, id);
     });
   }
 
@@ -2818,6 +2868,21 @@ describe("ADR-0010 ctx_doctor agent issue path (D-DOCTOR-ISSUE-1)", { concurrenc
     assert.equal(d3.status, "FAIL");
     assert.equal(d3.detail, "wrong: MCP entry, hook entries");
     assert.equal(d3.fixCommand, "context-mode setup --agents codex");
+  });
+
+  // #1350 (emngny): under OpenCode 2 the line said "Node v26.3.0" (Bun 1.4.4's node-compat version) while the hooks ran
+  // PATH node v24.22.2. Under Bun the line names the host runtime and, on a line of its own, the node that runs hooks.
+  test("[#1350] the environment line names the host's embedded Bun and the node that runs the hooks", (t) => {
+    const h = home(t);
+    const env = { SHELL: "/bin/sh" };
+    const lines = (rt) => environmentLine(ctxOf(h, "opencode"), getAdapter("opencode"), env, "2.1.9", rt).split("\n");
+    const os = `${process.platform}-${process.arch}`;
+    assert.deepEqual(lines({ node: "v26.3.0", bun: "1.4.4", hookNode: "v24.22.2" }).slice(1), [
+      `Environment: ${os}, host runtime Bun 1.4.4 (node-compat v26.3.0)`,
+      "Environment: hook node v24.22.2 (PATH), shell /bin/sh",
+    ]);
+    assert.equal(lines({ node: "v26.3.0", bun: "1.4.4", hookNode: null })[2], "Environment: hooks run on the host's Bun (no node on PATH), shell /bin/sh");
+    assert.deepEqual(lines({ node: "v24.15.0" }).slice(1), [`Environment: ${os}, Node v24.15.0, shell /bin/sh`]);
   });
 
   test("[M5] doctor-issue/every-UNKNOWN-row-names-its-cause", async (t) => {
