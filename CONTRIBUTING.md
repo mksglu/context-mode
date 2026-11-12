@@ -9,3 +9,6 @@ If you are a person: ask your agent to "file a context-mode issue", or run `/ctx
 Security problems go to https://github.com/mksglu/context-mode/security/advisories/new, never to a public issue.
 
 Main is the only source: every fix lands on main, and the next release run ships it.
+
+When a `fix:`, `feat:` or `perf:` commit that names `#N` lands on main, a GitHub Action adds the label `fixed-on-main` to issue N (a revert takes it off again).
+When a release ships that fix, the release run posts one comment with your agent's own update command, removes the label and closes the issue; reopen it if the problem still happens on that version.

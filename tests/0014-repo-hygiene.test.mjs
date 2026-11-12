@@ -676,7 +676,7 @@ describe("ADR-0013 repo: main-only release workflow", () => {
     const l = body(name).find((x) => x.startsWith("needs:"));
     return l === undefined ? [] : l.slice(6).split("[").join("").split("]").join("").split(",").map((s) => s.trim()).filter(Boolean);
   };
-  const MAIN_JOBS = ["main-plan", "main-build", "main-smoke", "main-npm", "main-commit", "main-github-release", "main-rollback"];
+  const MAIN_JOBS = ["main-plan", "main-build", "main-smoke", "main-npm", "main-commit", "main-github-release", "main-close-issues", "main-rollback"];
   const inputBlock = (name) => {
     const i = LINES.indexOf("      " + name + ":");
     assert.ok(i > 0, "input " + name);
@@ -718,7 +718,7 @@ describe("ADR-0013 repo: main-only release workflow", () => {
   test("[MAIN-ONLY] release.yml main path: job order ci/route -> plan -> build -> smoke -> npm -> commit on main -> github release", () => {
     assert.deepEqual(MAIN_JOBS.filter((j) => J[j]), MAIN_JOBS);
     assert.ok(Object.keys(J).indexOf("main-plan") < Object.keys(J).indexOf("main-build"));
-    const chain = { "main-plan": "ci", "main-build": "main-plan", "main-smoke": "main-build", "main-npm": "main-smoke", "main-commit": "main-npm", "main-github-release": "main-commit" };
+    const chain = { "main-plan": "ci", "main-build": "main-plan", "main-smoke": "main-build", "main-npm": "main-smoke", "main-commit": "main-npm", "main-github-release": "main-commit", "main-close-issues": "main-github-release" };
     for (const [j, dep] of Object.entries(chain)) assert.ok(needsOf(j).includes(dep), j + " needs " + dep + ": " + needsOf(j));
     assert.ok(needsOf("main-rollback").includes("ci"));
   });
@@ -2582,5 +2582,178 @@ describe("ADR-0014 issue intake: score, one comment, issue state stays with main
     assert.deepEqual(plan({ result, author: "NONE", labels: [], comments: [owner] }), { skip: "a maintainer commented", actions: [] });
     const user = { id: 2, body: "more info", bot: false, assoc: "NONE" };
     assert.equal(plan({ result, author: "CONTRIBUTOR", labels: [], comments: [user] }).skip, null);
+  });
+});
+
+describe("ADR-0014 issue flow: fixed-on-main label on push, close on release (D-FIXED-ON-MAIN-1)", () => {
+  // Owner 2026-11-12: "tamam supermis bu fixed-on-main etiket fikri bunu bot da uygulasin otomatik".
+  // Fixtures: main.log = `git log --reverse --format=%H%x1f%s%x1f%b%x1e 4d45b836^..06520806` (100 real commits with the
+  // r54 revert pair and the #1350, #1371, #1373 fixes); tag-v2.1.10.txt = the shas of that range in tag v2.1.10
+  // (git merge-base --is-ancestor); subjects.txt = real subjects of each commit type; issue bodies of #1350, #1371, #1373.
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const readRepo = (rel) => readFileSync(path.join(REPO, rel), "utf8");
+  const FX = "tests/fixtures/fixed-on-main/";
+  const bot = () => import("../.github/scripts/fixed-on-main.mjs");
+  const mainLog = async () => (await bot()).parseLog(readRepo(FX + "main.log"));
+  const TAG = new Set(readRepo(FX + "tag-v2.1.10.txt").split("\n").filter(Boolean));
+  const inTag = (sha) => TAG.has(sha);
+  const issue = (n) => {
+    const body = readRepo(`tests/fixtures/issue-intake/${n}.md`);
+    const first = body.split("\n")[0];
+    return { number: n, title: first.slice("<!-- Title: ".length, first.length - " -->".length), body };
+  };
+  const shaOf = (log, short) => log.find((c) => c.sha.startsWith(short)).sha;
+
+  test("commit kinds: fix, feat, perf (any scope, fix+docs) label; revert removes; test, docs, chore, data, refactor never", async () => {
+    const { commitKind } = await bot();
+    const subjects = readRepo(FX + "subjects.txt").split("\n").filter(Boolean);
+    assert.deepEqual(subjects.map(commitKind), ["fix", "fix", "fix", "revert", "unrevert", "fix", "fix", null, null, null, null, null]);
+    assert.equal(commitKind("fix(core)!: x (#1)"), "fix");
+    assert.equal(commitKind("Revert \"fix: x (#1)\""), "revert");
+    assert.equal(commitKind("Merge branch 'main' (#1)"), null);
+    assert.equal(commitKind("fixes: x (#1)"), null);
+  });
+
+  test("issue refs: (#N) and #N, each once; a#1, &#123; and #12a are no reference", async () => {
+    const { issueRefs } = await bot();
+    assert.deepEqual(issueRefs("revert: lane r54 (#1342, #1358) and #1342"), [1342, 1358]);
+    assert.deepEqual(issueRefs("fix: #7: x"), [7]);
+    for (const s of ["a#1", "&#123;", "#12a", "#", "# 5", "D-REL-WHO-1"]) assert.deepEqual(issueRefs(s), [], s);
+  });
+
+  test("live fixes on the real main log: the r54 revert pair leaves #1342 and #1358 fixed; #1373, #1371, #1350 hold their fix commits", async () => {
+    const { liveFixes } = await bot();
+    const log = await mainLog();
+    assert.equal(log.length, 100);
+    const live = liveFixes(log);
+    for (const n of [1342, 1358, 1371, 1350, 1373]) assert.ok(live.has(n), "#" + n);
+    assert.deepEqual([...live.get(1373)], [shaOf(log, "08bb798b")]);
+    assert.deepEqual([...live.get(1371)], [shaOf(log, "29fd99d9")]);
+    assert.deepEqual([...live.get(1350)].sort(), [shaOf(log, "16dac25e"), shaOf(log, "877eebcc")].sort());
+    assert.ok(live.get(1342).has(shaOf(log, "921ba58c")) && live.get(1342).has(shaOf(log, "6a001fe6")));
+    // Up to the revert only: the revert removed every r54 fix commit.
+    const cut = log.findIndex((c) => c.sha.startsWith("92c1ad26"));
+    const before = liveFixes(log.slice(0, cut + 1));
+    assert.ok(!before.has(1342) && !before.has(1358), JSON.stringify([...before.keys()]));
+  });
+
+  test("live fixes: a revert by sha removes that commit only; a revert with no sha removes the issue; a later fix counts", async () => {
+    const { liveFixes } = await bot();
+    const a = "a".repeat(40), b = "b".repeat(40), r = "c".repeat(40), f = "d".repeat(40);
+    const two = [{ sha: a, subject: "fix: x (#5)", body: "" }, { sha: b, subject: "fix: y (#5)", body: "" }];
+    const bySha = liveFixes([...two, { sha: r, subject: "Revert \"fix: x (#5)\"", body: "This reverts commit " + a + "." }]);
+    assert.deepEqual([...bySha.get(5)], [b]);
+    assert.ok(!liveFixes([...two, { sha: r, subject: "revert: lane x (#5)", body: "" }]).has(5));
+    const again = liveFixes([...two, { sha: r, subject: "revert: lane x (#5)", body: "" }, { sha: f, subject: "fix: z (#5)", body: "" }]);
+    assert.deepEqual([...again.get(5)], [f]);
+  });
+
+  test("label plan: a fix push labels open issues once and creates the label; test/docs/chore/data pushes never label", async () => {
+    const { labelPlan, liveFixes, LABEL } = await bot();
+    const log = await mainLog();
+    const live = liveFixes(log);
+    const pushed = log.filter((c) => c.subject.includes("(#1373)"));
+    const open = new Map([[1373, ["bug", "repro-ready"]], [1371, []]]);
+    assert.deepEqual(labelPlan({ pushed, live, open }), [
+      { op: "label-create", name: "fixed-on-main", color: "0E8A16", description: "Fix is on main, ships in the next release" },
+      { op: "label-add", issue: 1373, name: LABEL.name },
+    ]);
+    const noFix = ["test: red x (#1373)", "docs: y (#1373)", "chore: z (#1373)", "data: w (#1373)"].map((subject) => ({ sha: "e".repeat(40), subject }));
+    assert.deepEqual(labelPlan({ pushed: noFix, live, open }), []);
+    assert.deepEqual(labelPlan({ pushed, live, open: new Map([[1373, ["fixed-on-main"]]]) }), [], "already labeled");
+    assert.deepEqual(labelPlan({ pushed, live, open: new Map() }), [], "closed issue or a pull request number");
+  });
+
+  test("label plan: a revert removes the label only when no un-reverted fix for the issue stays on main", async () => {
+    const { labelPlan, liveFixes } = await bot();
+    const log = await mainLog();
+    const cut = log.findIndex((c) => c.sha.startsWith("92c1ad26"));
+    const revert = [log[cut]];
+    const open = new Map([[1342, ["fixed-on-main"]], [1358, ["fixed-on-main"]]]);
+    assert.deepEqual(labelPlan({ pushed: revert, live: liveFixes(log.slice(0, cut + 1)), open }).map((a) => a.op + a.issue),
+      ["label-remove1342", "label-remove1358"]);
+    assert.deepEqual(labelPlan({ pushed: revert, live: liveFixes(log), open }), [], "the revert of the revert keeps the fix");
+  });
+
+  test("agent of an issue: form field, title prefix, doctor env line (real bodies #1373, #1371, #1350)", async () => {
+    const { agentOf } = await bot();
+    assert.equal(agentOf(issue(1373)), "claude-code");
+    assert.equal(agentOf(issue(1371)), "opencode");
+    assert.equal(agentOf(issue(1350)), "opencode");
+    assert.equal(agentOf({ title: "[claude-code] hook fails", body: "" }), "claude-code");
+    assert.equal(agentOf({ title: "Pi: search is slow", body: "" }), "pi");
+    assert.equal(agentOf({ title: "OpenCode plugin does not load", body: "" }), "opencode");
+    assert.equal(agentOf({ title: "x", body: "### Agent\n\ngemini\n\n### Problem\n\ny" }), "gemini");
+    assert.equal(agentOf({ title: "ctx_search misses a file", body: "### Agent config\n\n_No response_" }), null);
+  });
+
+  test("release comment: version, the agent's own update command from UPGRADE_HOST_COMMAND, reopen line; unknown agent links the install guide", async () => {
+    const { releaseComment, MARKER, INSTALL_GUIDE } = await bot();
+    const { UPGRADE_HOST_COMMAND } = await import("../src/core/contracts/constants.ts");
+    for (const [agent, cmd] of Object.entries(UPGRADE_HOST_COMMAND)) {
+      const c = releaseComment("2.1.11", agent);
+      assert.equal(c, `${MARKER}\nReleased in v2.1.11. Update with \`${cmd}\`. If it still happens on v2.1.11, please reopen this issue.`);
+    }
+    const u = releaseComment("v2.1.11", null);
+    assert.ok(u.includes(INSTALL_GUIDE) && u.startsWith(MARKER + "\nReleased in v2.1.11."), u);
+    const src = readRepo(".github/scripts/fixed-on-main.mjs");
+    assert.ok(!src.includes("claude plugin update") && !src.includes("pi update"), "commands come from constants.ts only");
+    for (const w of ["weekly", "next week", "Weekly"]) assert.ok(!(releaseComment("2.1.11", "pi") + u).includes(w), w);
+  });
+
+  test("close plan against the v2.1.10 tag stub: in-tag fixes close with one comment; later fixes, maintainer comments, no fix skip", async () => {
+    const { closePlan, liveFixes, MARKER, namesVersion } = await bot();
+    const live = liveFixes(await mainLog());
+    const L = ["bug", "fixed-on-main"];
+    const issues = [
+      { ...issue(1350), labels: L, comments: [] },
+      { ...issue(1373), labels: L, comments: [] },
+      { ...issue(1371), labels: ["bug"], comments: [] },
+      { number: 1342, title: "[claude-code] x", body: "", labels: L, comments: [{ body: "Fixed in v2.1.10, thanks", bot: false, assoc: "OWNER" }] },
+      { number: 1358, title: "x", body: "", labels: L, comments: [{ body: MARKER + "\nReleased in v2.1.10.", bot: true, assoc: "NONE" }] },
+      { number: 9999, title: "x", body: "", labels: L, comments: [] },
+    ];
+    const { actions, skipped } = closePlan({ version: "2.1.10", issues, live, inTag });
+    assert.deepEqual(actions.map((a) => a.op + " #" + a.issue), [
+      "comment-create #1350", "label-remove #1350", "close #1350", "label-remove #1358", "close #1358",
+    ]);
+    assert.ok(actions[0].body.includes("opencode plugin update") && actions[0].body.includes("v2.1.10"), actions[0].body);
+    assert.deepEqual(skipped.map((s) => s.issue), [1373, 1342, 9999]);
+    assert.ok(!namesVersion("Fixed in v2.1.10", "2.1.1") && namesVersion("Released in v2.1.10.", "v2.1.10"));
+  });
+
+  test("scripts: string scanning only (no regex), the close run never fails the release", () => {
+    const src = readRepo(".github/scripts/fixed-on-main.mjs");
+    for (const s of ["RegExp", ".match(", ".matchAll(", ".test(", ".search(", ".replace(", "/g,", "/g)"]) assert.ok(!src.includes(s), s);
+    assert.ok(src.includes('process.exitCode = mode === "close" ? 0 : 1;'));
+  });
+
+  test("fixed-on-main.yml: push to main only, issues: write and contents: read, full history, runs the label mode", () => {
+    const y = readRepo(".github/workflows/fixed-on-main.yml").split("\n").map((l) => l.trim());
+    for (const l of ["push:", "branches: [main]", "issues: write", "contents: read", "fetch-depth: 0", 'node-version: "24.15.0"',
+      "GH_TOKEN: ${{ github.token }}", "run: node .github/scripts/fixed-on-main.mjs label"]) assert.ok(y.includes(l), l);
+    const perms = y.filter((l) => l.endsWith(": write") || l.endsWith(": read"));
+    assert.deepEqual(perms, ["issues: write", "contents: read"]);
+    assert.ok(!y.some((l) => l.includes("issue comment") || l.includes("issue close")), "the label run never comments or closes");
+  });
+
+  test("release.yml main-close-issues: after the GitHub release, issues: write and contents: read, never fails the release", () => {
+    const L = readRepo(".github/workflows/release.yml").split("\n");
+    const at = L.indexOf("  main-close-issues:");
+    assert.ok(at > L.indexOf("  main-github-release:"), "after main-github-release");
+    const b = [];
+    for (let k = at + 1; k < L.length && (L[k].startsWith("   ") || L[k].trim() === ""); k++) b.push(L[k].trim());
+    for (const l of ["needs: [route, main-plan, main-github-release]", "continue-on-error: true", "issues: write", "contents: read",
+      "fetch-depth: 0", "GH_TOKEN: ${{ github.token }}", "VERSION: ${{ needs.main-plan.outputs.version }}",
+      'run: node .github/scripts/fixed-on-main.mjs close --version "$VERSION"']) assert.ok(b.includes(l), l + "\n" + b.join("|"));
+    assert.deepEqual(b.filter((l) => l.endsWith(": write") || l.endsWith(": read")), ["issues: write", "contents: read"]);
+  });
+
+  test("docs: CONTRIBUTING names the flow; one DEVIATIONS row quotes the owner", () => {
+    const c = readRepo("CONTRIBUTING.md");
+    assert.ok(c.includes("`fixed-on-main`") && c.includes("closes"), c);
+    const rows = readRepo("docs/architecture/DEVIATIONS.md").split("\n").filter((l) => l.startsWith("| D-FIXED-ON-MAIN-1 |"));
+    assert.equal(rows.length, 1);
+    assert.ok(rows[0].includes("bunu bot da uygulasin otomatik"), rows[0]);
   });
 });

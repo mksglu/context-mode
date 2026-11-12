@@ -1,0 +1,31 @@
+# D-FIXED-ON-MAIN-1: a fix:, feat: or perf: commit on main that names #N adds the label "fixed-on-main" to open issue N;
+# a revert removes it when no un-reverted fix for N stays on main. It never comments and never closes: the release
+# (release.yml job main-close-issues) closes the labeled issues whose fix is in the new tag.
+name: fixed-on-main
+on:
+  push:
+    branches: [main]
+
+permissions:
+  issues: write
+  contents: read
+
+concurrency:
+  group: fixed-on-main
+  cancel-in-progress: false
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - name: label the open issues a pushed fix names
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/fixed-on-main.mjs label

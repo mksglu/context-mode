@@ -521,6 +521,30 @@ jobs:
           VERSION: ${{ needs.main-plan.outputs.version }}
           NOTES: ${{ needs.main-plan.outputs.notes }}
         run: node scripts/release/publish.mjs --github-release --version "$VERSION" --notes "$NOTES"
+  # D-FIXED-ON-MAIN-1: each open issue labeled fixed-on-main whose fix commits are in the new tag gets one comment with
+  # its agent's own update command, loses the label and closes as completed. It never fails the release.
+  main-close-issues:
+    needs: [route, main-plan, main-github-release]
+    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' && !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - name: close the fixed-on-main issues this release ships
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.main-plan.outputs.version }}
+        run: node .github/scripts/fixed-on-main.mjs close --version "$VERSION"
   main-rollback:
     needs: [ci, route]
     if: ${{ needs.route.outputs.layout == 'main' && inputs.mode == 'rollback' }}

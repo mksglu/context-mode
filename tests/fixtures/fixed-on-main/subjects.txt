@@ -1,0 +1,12 @@
+fix(sandbox): a PATH candidate stat cannot read is skipped, lookup failures are named, D11 names a language it cannot resolve (#1373)
+fix: read the PATH and PATHEXT keys without case on Windows, one envValue reader for findRuntime, D11, the doctor report and setup (#1371)
+fix+docs: Explore/Plan deny list matches the 2.1.322 binary; DEVIATIONS D-CC-POINTER-5, bench replay and LV8 evidence (#1342, #1358)
+revert: lane r54-cc-pointer on main, Windows CI red (#1342, #1358)
+Revert "revert: lane r54-cc-pointer on main, Windows CI red (#1342, #1358)"
+feat(release): plan shows who gets each release; dry_run input (D-REL-WHO-1)
+perf: keep own-dir root components, skip resolve for absolute POSIX paths (#1345)
+test: red a PATH candidate stat cannot read is skipped, lookup failures are named, doctor names a missing runtime (#1373)
+docs: DEVIATIONS D-1373-STAT-1 and sandbox module error cases (#1373)
+chore(release): v2.1.10
+data: adoption history for 2026-11-12
+refactor(doctor): D5 keeps the fastest bare start in one place, env line fits 80 columns (#1350)

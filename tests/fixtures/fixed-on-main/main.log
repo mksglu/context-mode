@@ -1,0 +1,602 @@
+9ed3323cf7e034dfa94bc4ae92d2f1ca05adbf98test: red Pi tool_result keeps details and structuredContent, excludeTools keeps a tool whole (#1352)Unit (tests/0020-plugins, tests/0020-adapters, ADR-0020) and e2e (GP3, Pi's own
+ExtensionRunner.emitToolResult). They fail on main: the replace sends
+details: {text} and no structuredContent, so Pi drops it (ADR-0016:48 Pi row).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+cbd773279fe85fb9c91f4a12f02f50ae4a904d01fix: Pi tool_result keeps details and structuredContent, contextMode.excludeTools keeps a tool whole (#1352)A case-C replace now returns { content } plus the event's structuredContent
+(ADR-0016:48 Pi row; Pi types.d.ts ToolResultEventResult: replacing content
+without structuredContent drops it). details is omitted, so Pi keeps the
+tool's own value. contextMode.excludeTools (exact names, read through
+pi.getSettings) sends keep: true; the pi adapter copies it to result.keep and
+dispatch returns ALLOW at the existing D-M2-MCP-1 point. Journal rows are
+still written. Pi with no getSettings, or a malformed value, keeps the default.
+
+Profile, src/entries/pi.ts tool_result, 23 KB result, median of 50 (p90):
+before: replace 7.14-8.02 ms (15.47-17.93 ms)
+after:  replace 7.44-7.64 ms (14.12-14.68 ms); excluded tool 0.04 ms (0.05 ms)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+73632a808d45229494d0de290ee3d582ef46787erefactor: drop the unused fakePi getSettings option; docs and DEVIATIONS D-R54-PI-META-1 (#1352)docs/install/pi.md: tool_result keeps structuredContent and details; new
+section "Keep a tool's result whole" (contextMode.excludeTools).
+DEVIATIONS D-R54-PI-META-1 amends D-M5-P1-1 (ADR-0016:48, archaeology 526e1c57).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+35e2194fb7c55bc3202b69e65202e6db5887b18atest: red copilot-cli SKIPPED when VS Code's copilot launcher has no Copilot CLI (#1360)Unit (tests/0019-setup-engine.test.mjs, next to D-SETUP-HOST-BROKEN-1): a fake copilot that prints the
+copilot_shim app.rs l.485 (no terminal) and l.475 (policy) texts and exits 127. Setup must be SKIPPED with
+npm install -g @github/copilot, write nothing, run no mcp add, exit 0; doctor SKIPPED too.
+E2E (GP-SETUP-npm-install): built cli.mjs setup --agents copilot-cli --yes --no-input with the stand-in on PATH.
+Today all three fail: FAIL (rolled back), exit 1, gh issue prompt. #1361 is a duplicate.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+714a2fc3126ccf0f79dcce4881b641fe5041be20fix: copilot-cli is SKIPPED with npm install -g @github/copilot when VS Code's copilot launcher has no CLI (#1360)VS Code ships a copilot launcher (microsoft/vscode copilot_shim; Linux /usr/bin/copilot). With no Copilot CLI
+installed and no terminal it prints "GitHub Copilot CLI was not found. ..." and exits 127 (app.rs l.42, l.485).
+Setup took any PATH hit as the host (966af39f), so mcp add failed, rolled back, exit 1 and an issue prompt.
+HOST_BROKEN (034e7519, #1308) now holds a list per bin; the shim prefix covers all its variants (includes, no regex).
+listState sees it on the first host call, before any write: SKIPPED, nothing written, no mcp add, exit 0;
+doctor shares listState and reports SKIPPED. The #1308 case keeps its exact wording.
+
+Profile (median of 50, runSetup/runDoctor copilot-cli with the launcher stand-in):
+  before: setup 143.8 ms (FAIL + rollback), doctor 4.0 ms
+  after:  setup 142.9 ms (SKIPPED),         doctor 3.6 ms
+#1361 is a duplicate.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+5172e15cf5af114245d82e91c2bdec3e638e0610docs: DEVIATIONS D-SETUP-COPILOT-SHIM-1 (#1360)Cites #1360/#1361, ADR-0019 l.56/l.66, D-SETUP-HOST-BROKEN-1 (l.195) and the archaeology
+(966af39f, 37fd45c8, 034e7519). Profile: setup 143.8 -> 142.9 ms, doctor 4.0 -> 3.6 ms (median of 50).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+d1ca9a21e0dffa6fb3ebf01f0194758e2262bee9refactor: HOST_BROKEN reuses HOST_BROKEN_PREFIX for the #1308 entry (#1360)No behavior change: 0019-setup-engine 96/96, e2e copilot-launcher 1/1, tsc clean, build --generated-only clean.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+f0ec05658ccacf111c51b5547e1f8dc1e7a320c0test: red ctx_search zero cursors and ctx_resume blank session (#1354, #1353)Unit (ADR-0009 group): [M4] GP5/explicit-zero-is-not-paging, [M4] resume/blank-session-falls-back.
+The cross-mode guard test now uses real cursors (offset:20, after:1700000000).
+Pi path (ADR-0007 group): whole-schema zero payloads through the Pi execute().
+E2E: GP5 search-param-schema-match gets zero-filled inputs; GP6 resume-blank-session-falls-back.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+0af5f262f89eda9ad208d6829465b11979a69f91fix: ctx_search accepts offset:0/after:0, ctx_resume treats a blank session as absent (#1354, #1353)non-zero cursor. 0 is the first page of either cursor; whole-schema clients (Pi) send it on
+every call. Every non-zero conflict keeps its exact INVALID_ARGS line. ADR-0009 line 215 and
+the 00-architecture INVALID_ARGS row say so. Archaeology: dfac356e (M2-T9, spec review).
+
+ctx.sessionId (06-tools-session.md step 2). Archaeology: 0e3b3828 copied the spec's
+'input.session ?? ...' literally; v1 used a truthy check.
+
+The GP5 cross-mode e2e case now uses real cursors (offset:20, after:1700000000); the
+golden is unchanged.
+
+Profile, handler, median of 50 runs, 20 journal rows, before -> after (ms):
+  ctx_search timeline   0.478 -> 0.467
+  ctx_search relevance  0.742 -> 0.752
+  ctx_resume {}         0.515 -> 0.525
+  ctx_resume {seq:1}    0.326 -> 0.317
+(no change beyond noise)
+
+Tests: 0009 + 0007 + doc-reading unit files 1849 pass, 0 fail; GP5 + GP6 e2e 45/45; tsc clean.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+e3648b80873acfcdf978117cf90835d3f177b868test: red ctx_search blank source with the reporter's whole-schema payload (#1354)The #1354 payload also holds source:"". The zero-paging unit test and the Pi
+execute test now seed one ctx_index row, send source:"" with offset:0/after:0,
+and check for the hit (and for the <context_mode_state block on ctx_resume).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+548c305516a53d5fa2ec037744033fc5a6215c68fix: ctx_search treats a blank source as absent (#1354)The #1354 payload holds source:"" next to offset:0/after:0. With the cursors
+fixed, the blank source still filtered on a source named "" and the search
+found nothing. A blank or whitespace-only source now counts as absent, the
+same rule as ctx_resume's blank session (D-1353-RESUME-BLANK-1).
+
+ADR-0009 §8.1 rule 6 (line 168) now matches §8.4: a non-zero cursor conflicts,
+0 is the first page, and a blank source names no source. The
+D-R54-SEARCH-ZERO-1 row cites line 168 and the blank-source reason.
+
+Profile, handler, median of 50 runs, 20 indexed rows, before -> after (ms):
+  bare call      1.830 -> 1.943
+  blank source   1.774 -> 1.851
+  named source   1.722 -> 1.817
+(3 runs after stay in 1.7-2.1 ms: noise)
+
+Tests: 0009 + 0007 157/157; GP5 + GP6 e2e 45/45; tsc clean.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+7961c51bc92a459ecd9f6f300189add2e3e827b8test: red Codex D4 treats user tool approval tables and user hooks/codex/*.mjs hooks as v1 (#1359 #1364)Repro on main f681b458: doctor --agents codex exits 1 on the reporter's two
+[mcp_servers.context-mode.tools.*] approval_mode tables, setup again deletes them,
+and ctx_upgrade removes a user hook under ~/.agents/hooks/codex/.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+3d845758f6aea56cbc6c32160f3f3dacc099b802fix: Codex D4 keeps user tool approval tables and user hooks/codex/*.mjs hooks (#1359 #1364)- detect-v1 scanCodex: a sub-table of a v2 [mcp_servers.context-mode] entry (env,
+  tools.<tool> approval_mode) is Codex config, never a v1 leftover. Under a v1 parent
+  (command = "context-mode") every sub-table is still flagged. Replaces the env-only
+  exception (D-1327-CODEX-ENV-1).
+- detect-v1 isCodexScript: v1 only for hooks/codex/<event>.mjs with the six v1.0.169
+  Codex event names (LEGACY_HOOK_PATH_SUFFIXES), POSIX or Windows separators.
+- setup ownConfigEdits keeps the user tools table, as it keeps env_vars.
+- D-DOC-RT-1 CODEX_HOME test now uses a v1 data dir as the leftover in CODEX_HOME.
+- DEVIATIONS D-1359-CODEX-TOOLS-1, D-1364-CODEX-V1-SCRIPT-1.
+
+Profile detectV1("codex"), median of 50 (3 runs): before 163.1/169.3/163.9 us,
+after 167.0/168.1/167.8 us.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+8100813c919c0d6fd9160e4c543991fe9ca2f149test: red v1 upgrade against main leaves a hybrid install (#1363)Unit (tests/0011, ADR-0011 v1 upgrade stop): main's build script must stop a v1
+upgrade and name npm i -g context-mode. E2E (GP11): the real 1.0.169 upgrade
+against this checkout must write nothing; npm i -g of the release tree gives 2.x.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+de5ed0c8cd94c69c5c4891fce6c3d148ffafca89fix: main's build script stops a 1.0.x upgrade before any write (#1363)v1 context-mode upgrade clones main, runs npm install and npm run build in the
+clone, then copies package.json and src/ over the install. Since the MAIN-ONLY
+merge (30b95f76) main carries the 2.x version, so the ADR-0011 frozen-main
+guard was gone and v1 left a hybrid tree (package.json 2.1.7, bin 1.0.169).
+scripts.build now runs scripts/v1-upgrade-stop.mjs: it writes nothing, names
+npm i -g context-mode and exits 1, so v1 takes its own NOT updated path.
+build:release stays the contributor build.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+6e8c89590cc40bffe0b2aed300584900326729bbtest: GP11 v1 upgrade case builds its own 2.x release tree (#1363)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+509d68837d1d01d1bc4068bb9c6961c5c7e2f772docs: ADR-0011/0017/PRD guard is main's build script; DEVIATIONS D-V1-UPGRADE-STOP-1 (#1363)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+d9b5f00f1c6cd4f1fc2455496cee8ab899ac78acdocs: D-V1-UPGRADE-STOP-1 profile numbers (#1363)Median of 50 runs, macOS arm64, Node 26.8.1:
+- npm run build, before: 473.4 ms (p10 453.7, p90 509.1), full build, exit 0
+- npm run build, after: 146.3 ms (p10 139.4, p90 171.8), stop script, exit 1, no write
+- npm run build:release, after: 469.3 ms and 523.6 ms (two runs; same work as the
+  old build, spread is load from parallel lanes)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+314ee9e19080a73c97c063c0afe67bf265680cbdtest: red docs must state the build-script guard for v1 upgrade (#1363)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+fb4d6a5aea84aeb00bc3d1053eae9ea0d8c9cda7docs: ADR-0011/0017, module 15 and install guide match the build-script guard (#1363)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+3d0fe344075ad4a35a326e88bffb2cf0a14bdb62test: #1359 ctx_upgrade test writes a Windows server path as an escaped TOML string (#1359)The Windows CI runner failed: C:\Users\... inside a TOML basic string is an
+invalid escape, so config.toml did not parse. JSON.stringify escapes it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+e2e11f7179379cac3c44575c5ebbbd71ce125fa9test: red skill reference under a symlinked skill dir is replaced and denied (#1345)D-R54-OWN-FILE-LINK-1: ~/.claude/skills/<skill> as a symlink to a dir outside
+~/.claude. PostToolUse Read is replaced by a ctx_search pointer, PreToolUse Read
+over OUTPUT_CAP is denied, the fallback deny misses it too. Negatives: a .jsonl
+through the same link and the link target by its own path keep the rules.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+84bc3bd42c49f380528decd2f3fde90f726538b9fix: a skill file under a symlinked skill dir reaches the model whole (#1345)D-R54-OWN-FILE-LINK-1. isOwnFile now counts a Markdown path inside an own
+dir by the path as written (path.resolve, components, no realpath) or by
+realpath components as before. One change at the decision point covers
+decide.ts bigDeny, fallback.ts bigRead and dispatch.ts ownRead.
+
+Archaeology: ee0a1f60 (#1326) reused the realpath containment predicate of
+5e26bdb5 (D-M1-T3-4, GP7), made for ctx_execute(file=) containment (#852).
+No ADR or PRD line asks for realpath here; this exemption opens no file.
+isInside and isInsideAny are unchanged, so #852 keeps realpath.
+
+Profile, isOwnFile, median of 50 runs x 1000 calls:
+  own file          16.71 us -> 3.24 us
+  linked own file   48.37 us (false) -> 3.27 us (true)
+  project file      29.19 us -> 31.47 us
+
+Tests: 0008-enforcement 197/0, prd10-hooks-runtime 302/0, 0007-identity
+87/0, GP3-hooks e2e 23/0, 0023-install-docs 46/0, 0014-repo-hygiene 157/0.
+tsc --noEmit clean, build --generated-only clean.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+5717cfb55ba7cc1442e08d2bf1803bb248c47209perf: keep own-dir root components, skip resolve for absolute POSIX paths (#1345)Review r54 finding: the project-.md Read path was 10-12% slower because
+isLexicallyInsideAny resolved and split every fixed root on each call.
+The roots' components are now kept in a Map (as rootReal keeps their
+realpaths) and an absolute POSIX path skips path.resolve. Project file
+28.7 -> 29.4 us (+2.3%), own file 15.9 -> 1.6 us, linked own file
+48.1 us (false) -> 1.5 us (true); median of 50 x 1000 calls, 5 runs.
+D-R54-OWN-FILE-LINK-1 row updated; 0008 test covers a '.' step.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+474468e1b50cfd35853f0c49a2dbe56361c6b638test: red a .. step through a symlinked skill dir still replaces (#1345)path.resolve folds skills/linked/.. to skills, but the OS reads the parent of
+the link target. isOwnFile must see the raw tool path. Review r54 round 2.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+1f3e5a46db1fb64979e865d50bde9b5a20e38e3afix: isOwnFile checks for .. on the raw tool path, before resolve (#1345)isOwnFile(agent, cwd, p, env) takes the path as the tool gave it. The lexical
+branch runs only when p (and cwd for a relative p) has no .. component
+(hasParentStep, by path components). The realpath branch is unchanged.
+Callers decide.ts bigDeny, dispatch.ts ownRead, fallback.ts bigRead pass cwd + p.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+2407821cd1dfc4d75eb2d8a9b5d23f533ac2a52edocs: D-R54-OWN-FILE-LINK-1 names the raw-path .. rule and new profile (#1345)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+4d45b836d62f33cd47e3d07d8e2e37f6059ece57test: red replace pointer the caller can call, built-in and synced agents, subagent labels (#1342, #1358)ADR-0016 line 16: one budget everywhere, and the follow-up names only a tool the caller can call.
+- general-purpose, fork, Explore, Plan resolve to ctx tools (LV8); claude-code-guide, statusline-setup, unknown stay not A
+- synced plugin agents under plugins/synced/<id>/<plugin>/agents; dot dirs never read
+- case C and case B replaces name no ctx tool; case B line runs search.mjs
+- two subagent calls give two labels (today both subagent:Grep:0)
+- main-session MCP result: no empty query; search.mjs line works from any cwd
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+87d829a4015cc30d1dd8b13cb5c54ce4e358ce1btest: red, OpenCode 1.x list check fails on a slow user MCP server and on an unreadable version (#1362)A fake opencode 1.x whose mcp list takes 15 s (one user server that never answers)
+makes setup FAIL 'list: opencode mcp list --pure does not list context-mode'.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+ede6046cf78af999323d9c8304b6a33665021388fix: OpenCode 1.x list check reads debug config --pure, not the slow mcp list (#1362)mcp list --pure connects every user MCP server; one that never answers held it
+past the 10 s budget and setup rolled back. 1.x now reads the merged config the
+CLI loaded (mcp.context-mode), as 2.x already does (D-OC2-LIST-1). A --version
+with no digits is reported as such, with no silent 1.x fallback.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+9db3f80a061d2ea57eff93bef0758ef0d04fb440test: red, OpenCode 2 bare native entry plugins:["context-mode"] is not seen by setup and doctor (#1344)After `opencode plugin add context-mode` (2.2.6) doctor says 'not set up, ... or run:
+opencode plugin add context-mode', setup adds a second path entry, and a path entry
+next to the bare entry is not reported as a double load. 1.19 control stays green.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+d7bef0931ff19c3e4a75261dbe07e7af85856fbbfix: OpenCode 2 bare native entry plugins:["context-mode"] counts as the hooks entry (#1344)`opencode plugin add context-mode` (2.2.6) writes the bare name under plugins. The
+engine only knew the context-mode@<tag> prefix of the @next era (765964a7 changed the
+command, not the rule), so doctor said 'not set up ... or run: opencode plugin add' and
+setup added a second path entry (loads twice). One rule, isNativeOpencodeEntry, now
+serves setup and D3; the native entry is read from opencode.jsonc too. 1.x plugin key:
+the bare name stays the v1 entry (D4).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+2d29c780dd05384f21a0e3466945fe30bb527b6etest: red, OpenCode plugins dir file of ours is not seen by D3, setup and doctor (#1349)~/.config/opencode/plugins/context-mode/index.js re-exporting context-mode/server
+(OpenCode 2.2.6 loads it): D3 says 'wrong: MCP entry', doctor says 'not set up ...
+or run: opencode plugin add', and setup adds a path entry that loads it twice.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+92d4ea4e6416a2c91ec0d8c64f31e9937695ce29fix: an OpenCode plugins dir file of ours counts as the hooks entry (#1349)OpenCode 2.2.6 loads ~/.config/opencode/plugins/<name>/index.js with no config entry.
+A file whose module names are context-mode, context-mode/server or our bundle's
+opencode/plugin.js now passes D3 and hook-registered, and setup writes no path entry
+next to it (that entry made the plugin load twice). The scan reads string literals
+with a quote-aware scanner (no regex); files over 64 KB are skipped.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+ebc4f3fd5a5bc79fdee3bcee000a002f99408436docs: DEVIATIONS rows and install doc for the OpenCode list check, bare native entry and plugins dir (#1362, #1344, #1349)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+0cabec3bd1e3b065ef1bdb7e561dca0d03970a7bdocs: profile numbers for the OpenCode list check and native entry fixes (#1362, #1344, #1349)cli.mjs doctor --agents opencode, median of 50 runs, temp HOME, before (main f681b458) -> after:
+- 1.19.5, one user MCP server that never answers: 10502 ms FAIL -> 913 ms PASS
+- 1.19.5, plain setup:                           1191 ms PASS -> 895 ms PASS
+- 2.2.6, plugins:["context-mode"] only:          112 ms -> 55 ms (fix line no longer repeats plugin add)
+- 2.2.6, plugins dir file only:                   160 ms -> 55 ms
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+adab8b84670c9aecadaa10834ba821e4a1052a6btest: red, OpenCode project .opencode/plugins file and a plugins dir file with no package (#1349)Review round 1: setup wrote a path entry next to <project>/.opencode/plugins/context-mode/index.js (two plugin
+loads on 2.2.6, doctor PASS), and a dir file that re-exports context-mode/server with no node_modules/context-mode
+passed setup and doctor while OpenCode logged "Cannot find package 'context-mode'".
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+6bb2b778a6f068f6497ce62d01e4612e899ad62bfix: OpenCode project .opencode/plugins file counts for setup, and a dir file with no package is no entry (#1349)nativePluginsKey now reads the same plugins dirs as D3 (opencodePluginDirs: config dir and <project>/.opencode), so
+setup adds no path entry next to a project plugins file and doctor FAILs one as "loads twice". A dir file counts only
+when OpenCode can resolve its module (node_modules/context-mode next to it or above it, or an existing plugin.js path);
+otherwise doctor names the file and the missing package, and setup writes the path entry.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+29de2ee7fe0e6b3c1f60dbb4e5efa4518bf7b810docs: OpenCode plugins dir row and install doc for the project dir and the package check; doctor reads debug config (#1349)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+851300de48b9d70376e4bd66c3fb1cc3f2b5230dtest: red, setup in a project with .opencode/plugins keeps the global OpenCode path entry; doctor names the project file (#1349)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+cdb1050134797bfff51e83782c4fec475beb343efix: only the OpenCode config plugins dir decides the global entry; a project plugins file next to it names the file to remove (#1349)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+2da9830c33c8f95546d5ab8711202aa6937debd8docs: OpenCode plugins dir row and install doc, a project plugins file keeps the global entry (#1349)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+011d86cda3ba47dc99c94d322570ca134a92705btest: red, the CLI Fix: line names the OpenCode project plugins file to remove, not setup (#1349)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+133c1b653e027719a4ec8be3b74015d3ed946d0bfix: the CLI Fix: line names the OpenCode project plugins file to remove; doctor does not offer setup for it (#1349)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+8f5e533dac08fd2810e1a59d19835c750fc92f14e2e: real OpenCode 2 loads context-mode once after setup, with the bare plugins entry and with a config plugins dir file (#1344, #1349)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+8a50942a59c5a72b1bd2bcbe4184d74f28f32c79e2e: real OpenCode 1.19.5 setup PASSes in under 10 s next to a user MCP server that never answers (#1362)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+a69161b458d683fe405667c824e3806e5e2aaa3adocs: round 2 profiling in the OpenCode plugins dir row (#1349)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+658e224824db0065e62f65147ab9f010cf519b94test: red, fresh HOME setup in a project with a .opencode/plugins file keeps the MCP and global entry and names the file to remove (#1349)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+e90d64be5c3c835ce52a64cf1257c6208a68663ffix: setup keeps the MCP and global OpenCode entry when only a project .opencode/plugins file loads twice, and its Fix: line names that file (#1349)The fix line now reads the files before any rollback.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+64bd22cf09cc8a0025c4ce8260930ebeeae26693docs: round 3 in the OpenCode plugins dir row, setup keeps its entries when only a project file loads twice (#1349)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+fb04aed39bf22e593560e99f6d27f518415ed18edocs: round 3 profiling in the OpenCode plugins dir row (#1349)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+921ba58c6b969b02d667291e477a25940e67c356fix: Claude Code replace pointer names only tools the caller can call (#1342, #1358)- D-CC-POINTER-1 (#1342, ADR-0016 line 16): every caller keeps the same replace budget. Case A subagents get
+  the main-path replace with the callable ctx_search pointer (no passthrough). Case B/C subagents get a
+  handle line that names no ctx tool; it names Read offset/limit only when the subagent has Read.
+- D-CC-POINTER-2 (#1358): on the claude-code row a caller with a shell also gets the MCP-free
+  search.mjs call (short id + project dir), so the pointer works when the MCP server is not connected.
+  search.mjs accepts the s<base36> handle and an explicit project dir. An MCP input with no intent
+  field falls back to the tool name (never an empty query).
+- D-CC-POINTER-3 (#1342): built-in agent row for claude-code (general-purpose, fork: all tools; Explore,
+  Plan: all minus disallowed; claude-code-guide, statusline-setup stay restricted) and the synced
+  plugin store <claude dir>/plugins/synced/<id>/<plugin>/agents (dot dirs skipped).
+- D-CC-POINTER-4 (#1342): subagent label is subagent:<tool>:<callId ?? turn>, as mainLabel.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+17f8ab11a6b10a4e5d86be2df303a622b5a25cfetest: the ADR-0007 XDG OpenCode fake prints a version and its debug config, the list check reads (#1362)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+17ea79e3f0dfd0db939ab3c23822bd7598e1c37cdocs: ADR-0016 LV8 row and synced store, DEVIATIONS D-CC-POINTER-1..4, subagent-handle draft (#1342, #1358)Profile (paired, 50 runs each, built hook.mjs, --agent claude-code):
+- mcpMain (MCP replace): median 96.4 -> 101.3 ms, p95 130.1 -> 125.0 ms
+- subGP (general-purpose Bash): median 107.1 -> 108.2 ms, p95 137.5 -> 136.2 ms
+- subC (unknown type Grep): median 110.2 -> 109.9 ms, p95 138.0 -> 132.8 ms
+No measurable change (shared machine, load 14).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+f0e952d6351038975b879adab98e5f19a9735677test: e2e GP3 subagent pointer is callable (#1342)On the base build (f681b458) a restricted subagent (tools: Read, Bash) got a replace that named ctx_search,
+which it cannot call: the first case fails there and passes on the fix. The general-purpose case guards
+against case A turning into a passthrough (full output).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+79fa820cc24c1bb93435619cf60bafae321b9173e2e: the GP-SETUP fake opencode prints a version and its debug config, the list check reads (#1362)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+4a50c4b0758208e38ca9fee82f8a88a6aebab31ftest: red OpenCode agent tool set and in-process replace (#1348, #1347)#1348: an OpenCode 2 subagent whose permissions deny every ctx_* tool gets a
+webfetch deny that names ctx_index (ADR-0016 l.23, l.91 D-SUB-NOCTX-1).
+#1347: a large completed shell result reaches the model unchanged on 2.x
+(278889 bytes) and on 1.19 (208000 bytes) (ADR-0016 l.49, 12-plugins 4.5).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+0fe650eeb6c3e1c7a4fc5de97bbc75dd4e671308fix: OpenCode 2 subagent tool set and in-process replace (#1348, #1347)#1348 (ADR-0016 l.23, D-SUB-NOCTX-1): the 2.x bridge now forwards the
+event's agent. ctx.agent.get gives Agent.Info once per agent (cached); a
+"subagent" mode agent gets agentId/agentType and the tools its permissions
+leave on (core whollyDisabled rule), passed as the manifestTools source.
+A subagent whose permissions deny every ctx_* tool now runs webfetch
+instead of a deny that names tools it lacks.
+
+#1347 (modules/12 §4.5 step 3, ADR-0016 l.49): opencode joins
+REPLACE_ROWS (not DUMP_REPLACE_ROWS). encode returns the replace on
+PostToolUse; the 2.x bridge writes it into result.content (output and
+metadata stay), the 1.19 hook into output.output. The impl/10 §11 reason
+"no replace field" came from the 1.19 shape and no longer holds.
+
+Tests: 5 pinned tests moved from D to R for opencode (D-M7-RR-1), doctor
+hook sample carries the output on a replace row.
+
+Profile (median of 50, OpenCode 2 setup() hooks, before -> after):
+- execute.before subagent webfetch: 0.061 ms -> 0.058 ms
+- execute.after small result: 0.747 ms -> 0.50 ms
+- execute.after 278 KB result: 0.882 ms -> 69 ms (now indexes and
+  replaces; before it passed 278889 bytes to the model)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+2be951c23792cfdcbd6243b51affe7ca08e85f2adocs: OpenCode subagent fields and replace channel, DEVIATIONS rows (#1348, #1347)D-R54-OC-AGENT-1 and D-R54-OC-REPLACE-1. modules/10 §11 now names the
+2.x agent field and the mutable execute.after result; ADR-0020 opencode
+row moves from D to R.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+ab0dcb0a0f6c9b2818963b3ff1f28513cb0d4d7dtest: real-host OpenCode 1.19 and 2.x replace of a large grep (#1347)Fire cases drive the real opencode binaries against a fake provider.
+On c4c0f13e (no fix) both fail: the model gets the whole grep output.
+On the fix both pass: the model gets the replace with the ctx_search line.
+This is the gate the #1347 plan asked for before the row split.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+a75a6753c2a9f4f5adb89d3eaf53648aa48e7418test: red search.mjs line must not run $( ), backticks or $VAR from the intent (#1358, #1342)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+d6e54c84456d723b04ee382911b007c949b29b73fix: quote the search.mjs line as POSIX single-quoted words (#1358, #1342)The twin line and the case B more: line used JSON.stringify, which is not a shell quote.
+A $( ) or backtick in the intent ran again when the agent ran the line.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+81d4360f3857cc867fbaa5717aa4f64fbf009e56docs+test: ADR-0008 row 4 and the not-connected row name the search.mjs recovery; GP3 runs the printed line (#1358, #1342)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+a4a318f4e255329ca3b89a69d1ce77d6da79c70atest: red Explore and Plan drop the Agent, Artifact and ExitPlanMode tools of the LV8 list (#1342)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+6a001fe6e06d5458fac058de1101b734835657b2fix+docs: Explore/Plan deny list matches the 2.1.322 binary; DEVIATIONS D-CC-POINTER-5, bench replay and LV8 evidence (#1342, #1358)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+4b6292d7bef6193ed4ed99a157a6e77f9db1949fmerge origin/main into lane/r54-cc-pointer (#1342, #1358)postReplace keeps the lane block and takes toolSetSources(ev, project, env) from
+0fe650ee (#1348), so the OpenCode 2.x agentTools still reach the subagent tool set.
+GP3 has one node:fs import. DEVIATIONS keeps both sides; D-CC-POINTER-1 names
+OpenCode 2.x as a replace row this change affects.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+f0aa73bc456d73e6e2766c0e6bd9d73bd18a57a8docs: D-CC-POINTER-1 profile after the origin/main merge (#1342, #1358)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+8e12296165e6c779b0bee7872ee77c58db6859cebench: count the search.mjs paths as fixed tokens, results.json from this build (D-CC-POINTER-6, #1358, #1342)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+92c1ad26d57b45e786a3dc9149549c416badca09revert: lane r54-cc-pointer on main, Windows CI red (#1342, #1358)Reverts the tree changes of 4d45b836 921ba58c 17ea79e3 f0e952d6 a75a6753 d6e54c84
+81d4360f a4a318f4 6a001fe6 f0aa73bc 8e122961 (pushed as ab0dcb0a..8e122961).
+CI run 43100308997 failed on windows-latest (node 24.15.0 and 26):
+- prd10-hooks-runtime.test.mjs:804 and :843 expect the 8.3 temp path
+  (RUNNER~1); the hook prints the long path (runneradmin).
+- 0016-subagent.test.mjs:288 EPERM on the temp dir cleanup.
+- 0018-build.test.mjs:1421 the printed search.mjs line is not runnable
+  through the Windows test runner (quoted path read as a module name).
+The work stays on lane/r54-cc-pointer for a fix forward.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+d55bdb551cf46f337af038caf5bd7b992886cc58chore(release): v2.1.8
+890a3f6b8015b0ca4ab5761db8335c02325b0470data: adoption history for 2026-11-12
+f322c514557fd631c14fce455bc4dff66ea24939Revert "revert: lane r54-cc-pointer on main, Windows CI red (#1342, #1358)"This reverts commit 92c1ad26d57b45e786a3dc9149549c416badca09.
+
+7828f882417e118b87ecce35205c611f53d904e1test: red a project dir alias makes the search.mjs twin expectation differ (#1342, #1358)windows-latest CI 43100308997: tests expect the 8.3 form (RUNNER~1) from realpathSync,
+the hook prints the native long form (runneradmin) from resolve.ts realpathSync.native.
+This host has no 8.3 names; a letter-case alias (REPO for repo) on the case-insensitive
+APFS volume gives the same split: realpathSync keeps the alias, .native does not.
+The new case uses the same expectation as D-CR3-HANDLE-1/2 (realpathSync), so it fails here
+the way those two fail on windows-latest.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+e61c00cb65add7f06deb0c67f3a9f55b0821f5cefix: twin tests expect the native project dir; Windows-safe temp cleanup (#1342, #1358)D-CC-POINTER-7. The hook names the project dir from resolve.ts realpathSync.native (the long
+Windows name, on-disk letter case). D-CR3-HANDLE-1/2 built the expected line with realpathSync,
+which keeps an 8.3 alias (RUNNER~1) on windows-latest: CI 43100308997. Expected values now use
+realpathSync.native. The ADR-0016 pointer suite cleans its temp dirs with tests/_lib/fs.mjs
+rmTemp (EPERM on Windows while the detached index write holds context.db). Product code is
+unchanged. 0018-build:1421 in that run is the todo Q-WIN-5 (known defect, not this lane).
+
+Tests: prd10-hooks-runtime + 0016-subagent 369/369 pass; tsc --noEmit ok; build --generated-only ok.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+61280e8e77d8910e3d1779a725b0b1c5e0d5cdaadocs: DEVIATIONS D-CC-POINTER-7, Windows twin path tests (#1342, #1358)Hook profile, median of 50 paired runs (origin/main 890a3f6b -> lane e61c00cb):
+mcpMain 92.6 -> 94.2 ms, subGP 99.5 -> 100.0 ms, subC 100.2 -> 101.5 ms. No regression.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+2a5d3bed7e4796fafc6dc40832511ebbd9a93e03test: red opencode 2 generate request misses the system payload (#1369)@opencode/core 2.2.6 SessionModelRequest sends the primary request through the
+session hook "context" and session.generate (WarmingPlugin) through "generate".
+setup(ctx) registers prompt,context,compaction only, so a generate request gets
+1 system part (29 B) where the context request of the same session gets 2
+(29+592 B): the warmed cache prefix is one the next turn never reads.
+
+Red run on main 890a3f6b:
+- tests/0021-cache-safety.test.mjs: setup(ctx) registers the session hook "generate"
+- tests/0020-plugins.test.mjs: generate
+- e2e GP2/opencode-generate-same-system: setup(ctx) registers the session hook generate
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+85a9431b87f7a2ecf6f49214d95b00b7c23ff057fix: opencode 2 generate request gets the same system payload as context (#1369)setup(ctx) now registers one named system handler on the session hooks
+"context" and "generate". @opencode/core 2.2.6 sends session.generate
+(WarmingPlugin cache warming) through "generate"; the payload is memoised per
+session, so both requests carry the same bytes and the warmed prefix is the
+one the next primary request reads. compaction and title stay as they are
+(ADR-0021 rule 5; title has no agent or tools). setupLegacy (1.19, KiloCode)
+does not change.
+
+DEVIATIONS: D-R54-OC2-GENERATE-1 (ADR-0021 l.15-18, PRD.md l.270).
+Archaeology: 2600c92b (D-OC2-SETUP-1) ported the 1.19 hooks one to one; the
+2.x generate kind has no 1.19 match and no record chose to skip it.
+
+Profile (built release-out/opencode/plugin.js, median of 50, 3 runs):
+- generate hook: not registered before; 0.54 / 0.58 / 0.54 us after
+- context hook: 0.67 / 0.67 / 0.63 us before; 0.67 / 0.63 / 0.67 us after
+
+Green: tests/0021-cache-safety + tests/0020-plugins 93/93, e2e GP2 9/9,
+tests/0014 + 0013 237/237, tsc --noEmit clean.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+1d8e2ab2ca61aa0bd4524ccb297f81b6915dcd07test: red hostBin runs the realpath, a mise shim loses argv[0] claude (#1335)A mise shim (shims/claude -> ../bin/mise) passes the native check, but setup
+runs realpath(f), so mise sees argv[0] 'mise' and answers
+'claude plugin marketplace add' with 'unrecognized subcommand'.
+New case: [H8] hostBin #1335. Two H8 assertions now expect the PATH file.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+d798452e2e5be980ac031048fe6f225c4351cddefix: hostBin runs the PATH file that passed the check, not its realpath (#1335)The native/package check still reads realpath(f). The returned run path is f,
+so a multi-call launcher (mise: shims/claude -> ../bin/mise) sees argv[0]
+'claude'. Repro with the mise stand-in: marketplace add exits 0 through the
+shim, row ends 'bin: .../fakemise/shims/claude' (was '.../bin/mise').
+
+Tests: tests/0019-setup-engine.test.mjs 100 pass, 0 fail, 2 skipped.
+tsc --noEmit: 0. build --generated-only: 0.
+Profile hostBin('claude'), mise PATH, median of 50 (x100 calls each):
+before 138.42 us (p95 162.42), after 141.05 us (p95 163.93), same within noise.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+7d18a0786a783eb09ae151607296dbd3cd67b28ftest: e2e setup claude-code via a mise-style symlink shim (#1335)Compiled argv[0]-dispatch stand-in (shims/claude -> ../bin/mise).
+Without the fix (9bb6f669): FAIL 'claude plugin marketplace add ... exited 2:
+error: unrecognized subcommand marketplace ... bin: .../mise/bin/mise
+(rolled back)', the reporter's exact text. With the fix: PASS, setup and
+doctor rows end 'bin: .../mise/shims/claude'.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+40ed0fbcc2619fcd16b361e7803bb7c72e36f747test: red, Node below 24.15 must not deny native tools on the 8 server hosts (#1370)The degraded server (PRD §13) lists ctx_doctor only, so the hook deny that
+redirects to ctx_execute blocks the host. Red on main for claude-code, codex,
+gemini, qwen, copilot-cli, vscode, kiro, zcode. Pi and OpenCode keep the deny:
+their ctx_* tools register in-process with no version gate.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+f277c7bcc9be574333c97ee76887373f03428976fix: hook allows native tools on Node below 24.15 for the 8 server hosts (#1370)The MCP server runs on the same node and is degraded there (PRD §13:
+ctx_doctor only), so the D-HNE-GUARD-1 redirect to ctx_execute blocked
+the host. dispatch.ts now logs the NODE_TOO_OLD line (stderr and
+hook-errors.log, D5 still shows it) and returns this host's allow reply.
+Pi and OpenCode (installMode in-process) keep the deny: their ctx_*
+tools register in the host with no version gate. Other stages unchanged.
+
+E2E GP3/old-node-hook-allows: real Node 18.18.2, reporter payload, no
+deny; server.mjs tools/list on the same node lists ctx_doctor only.
+
+Profile (hook, Bash PreToolUse, median of 50, 3 warm-up runs):
+  Node 24.15.0 before 30.4 / 32.3 ms, after 32.7 ms (unchanged path, noise)
+  Node 18.18.2 before 37.4 / 38.8 ms (deny), after 40.0 ms (allow)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+3ed42c46a16649034809f32366b963e30b5c8768docs: DEVIATIONS row D-1370-OLDNODE-ALLOW-1 (#1370)Cites DEVIATIONS.md:104 (D-HNE-GUARD-1), PRD.md:284 (§13 degraded server),
+fallback.ts:3 and 6de98259. Profile numbers in the row.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+189aaddd51c38c89fdd4480d3d7e51067b65775drefactor: failureOutput calls allowOutput directly (#1370)No behavior change. 105/105 hook-never-errors tests and the GP3 Node 18 e2e
+stay green.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+a1ca27b7951cc1089bccc319529e8b86acc30ea4docs: DEVIATIONS row D-R54-CLAUDE-MISE-1, hostBin returns the PATH file (#1335)Cites #1335, ADR-0012:21, DEVIATIONS.md:602 (D-HF-CLAUDE-SHIM-1, text updated:
+bin holds the PATH file that passed the check), archaeology 37fd45c8.
+Profile hostBin median of 50: 138.42 us before, 141.05 us after.
+Docs/hygiene tests: 0014, 0011, 0017, 0018, 0023 pass, 0 fail.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+39bbc4d5b1c83d8b87655472bf432eaebb2d0025test: H8 cli/doctor-bin expects the PATH file on the bin line (#1335)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+ccc066a65aa5c4a9d676c17c86022ab56c744150test: red, findRuntime and doctor D11 read a Path-only env on Windows (#1371)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+29fd99d9557d7cd324e7b4ee51460f92aafe4e95fix: read the PATH and PATHEXT keys without case on Windows, one envValue reader for findRuntime, D11, the doctor report and setup (#1371)OpenCode 2 runs the plugin in-process under Bun; Bun's process.env is case-sensitive on Windows and a process started
+from PowerShell or cmd spells the key Path, so env.PATH was undefined: every ctx_execute language was NO_RUNTIME and
+doctor D11 said Git Bash not found. POSIX keeps exact-case names.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+0f9dfc392540a468fddf6a202b98c2fac25df667docs: DEVIATIONS D-1371-PATH-CASE-1, impl/03 step 2 reads PATH without case on Windows (#1371)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+9c0c8a6d580cf4a310ff2d3138ad3c24f6a1dcdetest: D1 git timeout test uses a 3000 ms limit so the local registry answers first (D-R55-D1-TIMEOUT-1)CI 43188103173 macos node 26: the 300 ms limit also cut the local
+registry read on a loaded runner. Product code unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+edbebef22f63733c4dc61f3a45826cd481aa32c2chore(release): v2.1.9
+7cf736524c2778a3d650f7ad8c98b500f1c1fd91test: red D5 scales the hook-cost bound with the node start, in-process hosts check shape only, env line names the host Bun (#1350)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+16dac25e52101efdaa5b811747fe7390dbdc71f3fix(doctor): D5 bound scales with the node start, in-process hosts check shape only, env line names the host Bun (#1350)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+a19421afa478334b723c37ee2465b8c765bd903fdocs: ADR-0010 D5 row and DEVIATIONS D-1350-D5-SCALE-1 (#1350)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+acc539885e94e1224b555369a018fe5d950756f7refactor(doctor): D5 keeps the fastest bare start in one place, env line fits 80 columns (#1350)Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+877eebcc432f90882c2b5ea04ad22fc95e9dc6c2fix(doctor): env line names the PATH node for ctx_execute, PATH node version read beside the checks (#1350)On a Bun host (OpenCode 2, Pi) every hook runs in the host process, so the
+PATH node runs ctx_execute javascript, not hooks. The line now says
+"ctx_execute node vX (PATH)" or "ctx_execute node: none on PATH".
+runtimeInfo is async (runProcess) and doctorReply starts it beside the
+checks: ctx_doctor under bun with a 600 ms node start, median of 50,
+1308.1 -> 670.2 ms. ADR-0010 D5 row: positive wording.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+4bffb4283bf2198b959062192882a8f33655c8d0chore(release): v2.1.10
+e1c844abbf2aa15ba0ae798935dccc3cbd92006etest: red a PATH candidate stat cannot read is skipped, lookup failures are named, doctor names a missing runtime (#1373)
+08bb798b59ca07e2d6a78584b0f5764b1d9f2a2dfix(sandbox): a PATH candidate stat cannot read is skipped, lookup failures are named, D11 names a language it cannot resolve (#1373)
+065208062c58c154c884ed5df48ee5ece5083202docs: DEVIATIONS D-1373-STAT-1 and sandbox module error cases (#1373)
