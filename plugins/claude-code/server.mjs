@@ -8,7 +8,7 @@ var __export = (target, all) => {
 // src/entries/server.ts
 import { randomUUID } from "node:crypto";
 import { existsSync as existsSync23, realpathSync as realpathSync12, rmSync as rmSync9 } from "node:fs";
-import { dirname as dirname13, join as join23 } from "node:path";
+import { dirname as dirname14, join as join23 } from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 
 // node_modules/@modelcontextprotocol/server/dist/chunk-Br0eD_fh.mjs
@@ -28446,7 +28446,7 @@ function PURGE_SUMMARY(rows, scope) {
 var DECISION_SOURCE = "decision";
 var DECISION_USER_LABEL = "decision (user)";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
-var BUNDLE_SHA = true ? "9c0c8a6d580cf4a310ff2d3138ad3c24f6a1dcde" : void 0;
+var BUNDLE_SHA = true ? "877eebcc432f90882c2b5ea04ad22fc95e9dc6c2" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10", "D11"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -28791,9 +28791,14 @@ var D5_READ_RANGE_DETAIL = "PostToolUse Read with offset/limit over the replace 
 var D5_READ_OWN_DETAIL = "PreToolUse Read of a skill file over the one-read limit under the agent's own config dir came back denied: skill and rule files must reach the model whole (#1326)";
 var D5_READ_MEDIA_DETAIL = "PreToolUse Read of a PNG over the one-read limit came back denied: an image Read must reach the model as an image block (#1321)";
 var D5_READ_SHAPE_DETAIL = `PostToolUse Read replace is not Read's output shape {type:"text", file:{filePath, content, numLines, startLine, totalLines}}: Claude Code drops it and shows a hook warning`;
-function D5_SLOW_DETAIL(ms) {
-  return `hook round trip took ${ms} ms over bare node, over ${HOOK_P95_MS} ms`;
+var D5_BARE_SHARE = 0.5;
+function D5_SLOW_DETAIL(ms, bound = HOOK_P95_MS) {
+  return `hook round trip took ${ms} ms over bare node, over ${bound} ms`;
 }
+function D5_SLOW_START_DETAIL(ms, bare2, bound) {
+  return `hook adds ${ms} ms to a ${bare2} ms node start, inside ${bound} ms (half a start): node starts slowly on this machine`;
+}
+var D5_IN_PROCESS_DETAIL = "native shape ok; hooks run inside the host process, so a tool call pays no node start";
 var D5_STOP_DETAIL = "Codex Stop event: the hook did not give an empty or Codex Stop reply, or it logged a hook error";
 var D5_FIX = "run ctx_upgrade";
 var PRAGMA_INTEGRITY_CHECK = "PRAGMA integrity_check";
@@ -52215,10 +52220,13 @@ async function checkHookRoundTrip(i) {
     await runProcess([node3.file, "-e", ""], { cwd: i.bundleDir, env: node3.env, signal: i.signal, timeoutMs });
     return performance.now() - t;
   });
+  const inProcess = getAdapter(i.agent).installMode === "in-process";
   const hookWalls = [];
   const bareWalls = [];
   let ms = 0;
-  for (let n = 1; n <= maxPairs; n++) {
+  let fastBare = 0;
+  let bound = HOOK_P95_MS;
+  for (let n = 1; n <= (inProcess ? 1 : maxPairs); n++) {
     const start = now();
     const node3 = nodeLaunch(i.env);
     const r = await runProcess([node3.file, path7.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
@@ -52230,13 +52238,17 @@ async function checkHookRoundTrip(i) {
     });
     hookWalls.push(now() - start);
     if (!isNativeShape(i.agent, r.stdout.toString("utf8"), r.exitCode, r.killed, fixture.event)) return row("FAIL", D5_SHAPE_DETAIL, D5_FIX);
+    if (inProcess) return row("PASS", D5_IN_PROCESS_DETAIL);
     bareWalls.push(await bareMs());
-    ms = Math.max(0, Math.round(Math.min(...hookWalls) - Math.min(...bareWalls)));
-    if (n >= minPairs && ms <= HOOK_P95_MS) break;
+    fastBare = Math.round(Math.min(...bareWalls));
+    ms = Math.max(0, Math.round(Math.min(...hookWalls)) - fastBare);
+    bound = Math.max(HOOK_P95_MS, Math.round(D5_BARE_SHARE * fastBare));
+    if (n >= minPairs && ms <= bound) break;
   }
-  if (ms > HOOK_P95_MS) return row("FAIL", D5_SLOW_DETAIL(ms), D5_FIX);
+  if (ms > bound) return row("FAIL", D5_SLOW_DETAIL(ms, bound), D5_FIX);
   const readDetail = i.agent === "claude-code" ? await readProbeDetail(i, timeoutMs) : i.agent === "zcode" ? await mediaProbeDetail(i, timeoutMs) : i.agent === "codex" ? await codexStopDetail(i, timeoutMs) : null;
   if (readDetail !== null) return row("FAIL", readDetail, D5_FIX);
+  if (ms > HOOK_P95_MS) return row("PASS", D5_SLOW_START_DETAIL(ms, fastBare, bound));
   return row("PASS", DOCTOR_PASS_DETAIL);
 }
 
@@ -52463,7 +52475,7 @@ function unsupportedHostOf(sig) {
 // src/core/ops/doctor-issue.ts
 import { spawnSync as spawnSync3 } from "node:child_process";
 import { closeSync as closeSync2, existsSync as existsSync16, fstatSync, mkdirSync as mkdirSync7, openSync as openSync2, readFileSync as readFileSync12, readSync as readSync2, realpathSync as realpathSync9, writeFileSync as writeFileSync4 } from "node:fs";
-import { delimiter, join as join16 } from "node:path";
+import { delimiter, dirname as dirname9, join as join16 } from "node:path";
 var TOKEN_PREFIXES = ["ghp_", "gho_", "github_pat_", "sk-", "xoxb-", "AKIA"];
 function tildeOf(env) {
   const home = homeDirOf(env);
@@ -52486,13 +52498,28 @@ function maskLine(line) {
   const at = Math.max(line.indexOf(":"), line.indexOf("="));
   return at === -1 ? DOCTOR_MASK : line.slice(0, at + 1) + " " + DOCTOR_MASK;
 }
-function environmentLine(ctx, adapter, env, version4) {
+async function runtimeInfo(env, signal, host = { bun: process.versions.bun, node: process.version }) {
+  if (host.bun === void 0) return { node: host.node };
+  const node3 = findRuntime("javascript", env);
+  if (node3 === null) return { node: host.node, bun: host.bun, pathNode: null };
+  const childEnv = {};
+  for (const [k, v] of Object.entries(env)) if (v !== void 0) childEnv[k] = v;
+  const r = await runProcess([node3, "--version"], { cwd: dirname9(node3), env: childEnv, signal, timeoutMs: DOCTOR_GIT_VERSION_TIMEOUT_MS });
+  const out = r.stdout.toString("utf8").trim();
+  return { node: host.node, bun: host.bun, pathNode: r.exitCode === 0 && out !== "" ? out : null };
+}
+function environmentLine(ctx, adapter, env, version4, rt) {
   const sha = BUNDLE_SHA === void 0 ? "dev build" : BUNDLE_SHA.slice(0, 7);
   const client = ctx.clientInfo;
   const agent = client === void 0 ? adapter.id : client.name === adapter.id ? `${adapter.id} ${client.version}` : `${adapter.id} ${client.version} (client ${client.name})`;
   const shell = env.SHELL ?? env.ComSpec ?? "sh";
-  return `${DOCTOR_ENV_PREFIX}context-mode ${version4 ?? "source checkout"} (${sha}), agent ${agent}
-${DOCTOR_ENV_PREFIX}${process.platform}-${process.arch}, Node ${process.version}, shell ${shell}`;
+  const what = `${DOCTOR_ENV_PREFIX}context-mode ${version4 ?? "source checkout"} (${sha}), agent ${agent}
+`;
+  const os = `${DOCTOR_ENV_PREFIX}${process.platform}-${process.arch}`;
+  if (rt.bun === void 0) return what + `${os}, Node ${rt.node}, shell ${shell}`;
+  const pathNode = rt.pathNode === null || rt.pathNode === void 0 ? "ctx_execute node: none on PATH" : `ctx_execute node ${rt.pathNode} (PATH)`;
+  return what + `${os}, host runtime Bun ${rt.bun} (node-compat ${rt.node})
+${DOCTOR_ENV_PREFIX}${pathNode}, shell ${shell}`;
 }
 function gitVersion(env) {
   const r = spawnSync3("git", ["--version"], { env, encoding: "utf8", timeout: DOCTOR_GIT_VERSION_TIMEOUT_MS, windowsHide: true });
@@ -52781,11 +52808,12 @@ function reportEnv(env) {
 }
 async function doctorReply(ctx, host) {
   const adapter = getAdapter(ctx.project.agent);
+  const runtime = runtimeInfo(host.env, ctx.signal);
   const rows = await runDoctorChecks(ctx, adapter, host);
   const failed = rows.some((r) => r.status === "FAIL");
   const command = adapter.id === "pi" ? failed ? NATIVE_INSTALL.pi[0] : PI_LIST_COMMAND : `context-mode ${failed ? "setup" : "doctor"} --agents ${adapter.id}`;
   const input = { agent: adapter.id, rows, env: reportEnv(host.env), command };
-  const envLine2 = environmentLine(ctx, adapter, host.env, bundleVersion(host.bundleDir));
+  const envLine2 = environmentLine(ctx, adapter, host.env, bundleVersion(host.bundleDir), await runtime);
   const table3 = buildReport(input);
   let notes = [];
   if (failed) {
@@ -52824,7 +52852,7 @@ var ctxDoctor = Object.freeze({
 // src/core/tools/execute.ts
 import { existsSync as existsSync18, mkdtempSync as mkdtempSync2, rmSync as rmSync6, writeFileSync as writeFileSync5 } from "node:fs";
 import { tmpdir as tmpdir3 } from "node:os";
-import { dirname as dirname10, join as join18, parse as parse5, resolve as resolve8 } from "node:path";
+import { dirname as dirname11, join as join18, parse as parse5, resolve as resolve8 } from "node:path";
 
 // src/core/index/select.ts
 var READ_CHUNKS = "SELECT ord, body FROM chunks WHERE source_id = ?";
@@ -52946,7 +52974,7 @@ function schemaLine(issue4) {
 }
 function fileError(given, abs, root) {
   let dir = abs;
-  while (!existsSync18(dir) && dirname10(dir) !== dir) dir = dirname10(dir);
+  while (!existsSync18(dir) && dirname11(dir) !== dir) dir = dirname11(dir);
   if (isInside(root, dir)) return null;
   return new CtxError("OUTSIDE_ROOT", { p: given, root }).toLine();
 }
@@ -53065,7 +53093,7 @@ var ctxExecute = {
 
 // src/core/tools/index.ts
 import { existsSync as existsSync19, readFileSync as readFileSync15, statSync as statSync7 } from "node:fs";
-import { dirname as dirname11, extname as extname3, join as join20, relative as relative3, resolve as resolve9 } from "node:path";
+import { dirname as dirname12, extname as extname3, join as join20, relative as relative3, resolve as resolve9 } from "node:path";
 
 // src/core/index/walk.ts
 import { readdirSync as readdirSync9, readFileSync as readFileSync14, realpathSync as realpathSync10, statSync as statSync6 } from "node:fs";
@@ -57265,7 +57293,7 @@ function readUtf8(absPath) {
 }
 function missingOrOutside(given, abs, root) {
   let dir = abs;
-  while (!existsSync19(dir) && dirname11(dir) !== dir) dir = dirname11(dir);
+  while (!existsSync19(dir) && dirname12(dir) !== dir) dir = dirname12(dir);
   if (dir !== abs && isInside(root, dir)) return new CtxError("INVALID_ARGS", { field: "path", action: "pass an existing file or folder" });
   return new CtxError("OUTSIDE_ROOT", { p: given, root });
 }
@@ -58077,7 +58105,7 @@ var ctxStats = Object.freeze({
 
 // src/core/ops/host-write.ts
 import { copyFileSync, existsSync as existsSync20, mkdirSync as mkdirSync8, writeFileSync as writeFileSync6 } from "node:fs";
-import { dirname as dirname12, join as join21 } from "node:path";
+import { dirname as dirname13, join as join21 } from "node:path";
 function defaultWrite(file2, text) {
   writeFileSync6(file2, text, "utf8");
 }
@@ -58109,7 +58137,7 @@ function writeWithRollback(file2, text, write, atomic) {
   const trash = file2 + UPGRADE_TRASH_SUFFIX;
   const tmp = `${file2}${HOST_CONFIG_TMP_SUFFIX}.${process.pid}`;
   const had = existsSync20(file2);
-  mkdirSync8(dirname12(file2), { recursive: true });
+  mkdirSync8(dirname13(file2), { recursive: true });
   if (had) copyFileSync(file2, trash);
   try {
     write(tmp, text);
@@ -58643,7 +58671,7 @@ function workspaceCwdOf(meta3, spawnCwd, script) {
   const fromHost = workspaceFromMeta(meta3);
   if (fromHost !== void 0) return fromHost;
   if (script === void 0 || script === "") return spawnCwd;
-  return realOrSame(spawnCwd) === realOrSame(dirname13(script)) ? "" : spawnCwd;
+  return realOrSame(spawnCwd) === realOrSame(dirname14(script)) ? "" : spawnCwd;
 }
 function errorReply(err) {
   if (err instanceof CtxError) return { text: err.toLine(), isError: true, sandboxBytes: 0 };
