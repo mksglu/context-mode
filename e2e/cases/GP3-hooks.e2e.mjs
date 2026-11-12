@@ -592,6 +592,19 @@ process.on("exit", () => {
     assert.ok(out.length < 18892, "replaced, not a passthrough");
     assert.ok(out.includes("ctx_search({queries:["), out);
   });
+
+  test("[M3] GP3/subagent-pointer-callable: tools: with the context-mode server wildcard gets the ctx_search pointer (#1374)", (t) => {
+    const f = fixture(t);
+    const agents = path.join(f.repo, ".claude", "agents");
+    mkdirSync(agents, { recursive: true });
+    // The reporter's frontmatter: Claude Code expands mcp__<server>__* to every tool of that server.
+    writeFileSync(path.join(agents, "wild.md"), "---\nname: wild\ntools: Read, Bash, Write, ToolSearch, mcp__plugin_context-mode_context-mode__*\n---\nwild\n");
+    const r = f.hook(subBash(f.repo, "gp3-sub-3", "wild", 3));
+    assert.equal(r.status, 0, r.stderr);
+    const out = JSON.stringify(JSON.parse(r.stdout).hookSpecificOutput.updatedToolOutput);
+    assert.ok(out.length < 18892, "replaced, not a passthrough");
+    assert.ok(out.includes("mcp__plugin_context-mode_context-mode__ctx_search({queries:["), out);
+  });
 }
 
 // GP3: hook on a Node below 24.15 (#1370, D-1370-OLDNODE-ALLOW-1)

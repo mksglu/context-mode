@@ -131,6 +131,26 @@ describe("ADR-0016: subagent policy cases", { concurrency: CONC }, () => {
     } finally { f.done(); }
   });
 
+  test("tools: server wildcard or bare server grants the ctx tools -> case A, as Claude Code expands it (#1374)", () => {
+    const f = fixture();
+    try {
+      const server = CC.slice(0, -2); // "mcp__plugin_context-mode_context-mode"
+      f.put(f.project, "wild", "tools: Read, Bash, Write, ToolSearch, " + server + "__*\n");
+      f.put(f.project, "bare", "tools: Read, " + server + "\n");
+      f.put(f.project, "noshell", "tools: mcp__other__*, " + server + "__*\n");
+      f.put(f.project, "other", "tools: Bash, mcp__other__*\n");
+      f.put(f.project, "minus", "tools: Bash, " + server + "__*\ndisallowedTools: " + server + "\n");
+      const s = { projectDir: f.project, env: f.env };
+      const pick = (type) => pickSubagentCase(sub("claude-code", type), toolSetForAgentType(sub("claude-code", type), s));
+      assert.equal(pick("wild"), "A");
+      assert.equal(pick("bare"), "A");
+      assert.equal(pick("noshell"), "A");
+      assert.ok(toolSetForAgentType(sub("claude-code", "wild"), s).includes(CC + "ctx_search"));
+      assert.equal(pick("other"), "B", "another server's wildcard grants no ctx tool");
+      assert.equal(pick("minus"), "B", "disallowedTools still removes what the wildcard granted");
+    } finally { f.done(); }
+  });
+
   test("source order: project wins over user, no merge; user used when project lacks it", () => {
     const f = fixture();
     try {
