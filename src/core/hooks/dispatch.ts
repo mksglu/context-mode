@@ -40,7 +40,7 @@ import { askedWords } from "./handle-query.ts";
 import { answerDecisions, askOptionLabels, optionEchoDecision, type DecisionPart } from "./decision.ts";
 import { shouldHint } from "./throttle.ts";
 import { CtxError } from "../contracts/errors.ts";
-import { failureOutput, fault, logHookError, nodeTooOld } from "./fallback.ts";
+import { allowOutput, failureOutput, fault, logHookError, nodeTooOld } from "./fallback.ts";
 
 export { failureOutput, logHookError } from "./fallback.ts"; // D-HNE-GUARD-1: the entry's last-resort catch
 export { readStdin, writeOut } from "./io.ts"; // D-M7-HP-1: entry I/O without process.stdin/stdout streams
@@ -69,12 +69,23 @@ export async function handleHook(agent: AgentId, raw: unknown, env: NodeJS.Proce
   }
   const row = getAdapter(agent);
   // D-HNE-GUARD-1: every failure below ends in failureOutput (exit 0, this host's shape, tool table only) and a log line.
-  const fail = (stage: string, err: unknown, line?: string): HookOutput => {
+  const report = (stage: string, err: unknown, line?: string): void => {
     logHookError(env, agent, stage, err);
     process.stderr.write(line ?? "hooks: " + stage + " failed: " + message(err) + "\n");
+  };
+  const fail = (stage: string, err: unknown, line?: string): HookOutput => {
+    report(stage, err, line);
     return failureOutput(agent, raw, err);
   };
-  if (nodeTooOld(process.version)) return fail("node", new CtxError("NODE_TOO_OLD", { v: process.version }));
+  if (nodeTooOld(process.version)) {
+    // D-1370-OLDNODE-ALLOW-1 (#1370): the MCP server runs on this same node and is degraded (PRD §13: ctx_doctor only), so a
+    // redirect to ctx_execute would block the host. Allow, and keep the stderr and log lines (D5). An in-process host
+    // (Pi, OpenCode) registers its ctx_* tools itself, so its redirect target exists and the D-HNE-GUARD-1 deny stays.
+    const err = new CtxError("NODE_TOO_OLD", { v: process.version });
+    if (row.installMode === "in-process") return fail("node", err);
+    report("node", err);
+    return allowOutput(agent);
+  }
   let ev: CanonicalHookEvent;
   try {
     fault(env, "decode");

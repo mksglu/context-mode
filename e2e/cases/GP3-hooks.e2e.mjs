@@ -575,3 +575,44 @@ process.on("exit", () => {
     assert.ok(out.includes("ctx_search({queries:["), out);
   });
 }
+
+// GP3: hook on a Node below 24.15 (#1370, D-1370-OLDNODE-ALLOW-1)
+{
+  // Black box (GS4): release-out/hook.mjs and release-out/server.mjs run under a real old Node, the way a host whose PATH
+  // has Node 18 runs them. The server is degraded there (PRD §13: ctx_doctor only), so the hook must not redirect a native
+  // tool to ctx_execute. No old Node on the machine (CM_E2E_OLD_NODE or ~/.nvm/versions/node/v18*) skips the case.
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const OUT = path.join(path.resolve(__dirname, "..", ".."), "release-out");
+  function oldNode() {
+    if (process.env.CM_E2E_OLD_NODE) return existsSync(process.env.CM_E2E_OLD_NODE) ? process.env.CM_E2E_OLD_NODE : undefined;
+    const dir = path.join(homedir(), ".nvm", "versions", "node");
+    const v18 = existsSync(dir) ? readdirSync(dir).filter((d) => d.startsWith("v18.")).sort().pop() : undefined;
+    const bin = v18 === undefined ? "" : path.join(dir, v18, "bin", "node");
+    return v18 !== undefined && existsSync(bin) ? bin : undefined;
+  }
+  const NODE18 = oldNode();
+
+  test("[R54] GP3/old-node-hook-allows: on Node 18 the hook allows Bash and the server lists ctx_doctor only (#1370)", { skip: NODE18 === undefined ? "no Node 18 on this machine" : false }, (t) => {
+    const home = mkdtempSync(path.join(tmpdir(), "cm-gp3-1370-"));
+    t.after(() => rmSync(home, { recursive: true, force: true }));
+    const env = { PATH: process.env.PATH, HOME: home, USERPROFILE: home, CLAUDE_PLUGIN_ROOT: OUT };
+    // The reporter's exact payload.
+    const payload = { session_id: "t", hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "cat /etc/hosts | grep local" }, cwd: tmpdir() };
+    const r = spawnSync(NODE18, [path.join(OUT, "hook.mjs"), "--agent", "claude-code"], { input: JSON.stringify(payload), env, encoding: "utf8", timeout: 20000 });
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(!r.stdout.includes("\"deny\""), "no deny while the server cannot serve ctx_execute: " + r.stdout.slice(0, 300));
+    assert.ok(r.stderr.includes("needs Node 24.15.0"), "stderr still names the error: " + r.stderr.slice(0, 200));
+    const log = readFileSync(path.join(home, ".context-mode", "hook-errors.log"), "utf8");
+    assert.ok(log.includes("\"stage\":\"node\""), "hook-errors.log keeps the line D5 shows");
+    // The pairing: the same Node runs the server, which serves ctx_doctor only.
+    const lines = [
+      { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "gp3", version: "1" } } },
+      { jsonrpc: "2.0", method: "notifications/initialized" },
+      { jsonrpc: "2.0", id: 2, method: "tools/list" },
+    ].map((m) => JSON.stringify(m)).join("\n") + "\n";
+    const s = spawnSync(NODE18, [path.join(OUT, "server.mjs"), "--agent", "claude-code"], { input: lines, env, encoding: "utf8", timeout: 20000 });
+    const reply = s.stdout.split("\n").filter((l) => l.includes("\"id\":2")).map((l) => JSON.parse(l))[0];
+    assert.ok(reply !== undefined, "tools/list reply: " + s.stdout.slice(0, 300) + s.stderr.slice(0, 300));
+    assert.deepEqual(reply.result.tools.map((x) => x.name), ["ctx_doctor"]);
+  });
+}

@@ -160,13 +160,22 @@ function bigRead(agent: AgentId, input: Rec, cwd: string): boolean {
     && !isMediaRead(agent, resolve(cwd, p)) && !isOwnFile(agent, cwd, p));
 }
 
+/** This host's allow reply, in its own shape (a valid document for every host). Never throws. */
+export function allowOutput(agent: AgentId): HookOutput {
+  try {
+    return getAdapter(agent).encode({ event: "PreToolUse", agent, sessionId: "", cwd: "", turn: 0 }, { kind: "allow" });
+  } catch {
+    return { stdout: "", exitCode: 0 };
+  }
+}
+
 /**
  * The host-shaped answer to a hook that failed. `raw` is the parsed stdin (any shape). Never throws.
  * A PreToolUse call that could flood the context is denied; everything else is this host's allow shape.
  */
 export function failureOutput(agent: AgentId, raw: unknown, err: unknown, cwdFallback = ""): HookOutput {
   const row = getAdapter(agent);
-  const allow = (): HookOutput => row.encode({ event: "PreToolUse", agent, sessionId: "", cwd: "", turn: 0 }, { kind: "allow" });
+  const allow = (): HookOutput => allowOutput(agent);
   try {
     if (!isRec(raw)) return allow();
     if (!isPreTool(row, firstString(raw, HOOK_FAIL_EVENT_KEYS))) return allow();
