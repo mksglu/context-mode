@@ -1094,11 +1094,14 @@ describe("ADR-0010 doctor D1, D2, D6, D7: version, node, mcp, mode, project", { 
     });
   });
 
+  // D-R55-D1-TIMEOUT-1: one limit covers the registry read and git (DOCTOR_GIT_TIMEOUT_MS). 300 ms let the local registry
+  // read itself time out on a loaded macOS runner (CI 43188103173: "npm registry timed out after 300 ms"). 3000 ms keeps the
+  // registry answer inside the limit; git sleeps 30 s, so only git can hit it.
   test("[M5] doctor-env/D1-git-timeout-names-the-limit", { skip: !posix }, async (t) => {
-    const row = await run(fakeGit(t, "sleep 5"), SHA_A, { timeoutMs: 300, registryUrl: await registry(t, 200, { latest: "1.0.168" }) });
+    const row = await run(fakeGit(t, "sleep 30"), SHA_A, { timeoutMs: 3000, registryUrl: await registry(t, 200, { latest: "1.0.168" }) });
     assert.deepEqual(row, {
       id: "D1", label: "version", status: "UNKNOWN",
-      detail: `${HEAD}latest unknown, npm registry answered no next version; git timed out after 300 ms`, fixCommand: GIT_FIX,
+      detail: `${HEAD}latest unknown, npm registry answered no next version; git timed out after 3000 ms`, fixCommand: GIT_FIX,
     });
   });
 
