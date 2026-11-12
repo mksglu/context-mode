@@ -511,6 +511,42 @@ describe("ADR-0020 Windows hook shell command", { concurrency: CONC }, () => {
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
+  // #1375 D-1375-COPILOT-WIN-1: the GitHub Copilot app (rust hooks runner) runs the `command` field as
+  // `pwsh -NoProfile -Command <command>` and does not read the `powershell` field. A quoted node path first is a
+  // ParserError there, so on Windows the copilot-cli and vscode `command` starts with bare node, like codex and qwen.
+  test("#1375 D-1375-COPILOT-WIN-1: on Windows the copilot-cli and vscode hook command starts with bare node", () => {
+    const reg = buildRegistry({ home: WIN_HOME, pkgDir: WIN_PKG, env: {}, platform: "win32" });
+    for (const id of ["copilot-cli", "vscode"]) {
+      const row = reg.find((r) => r.id === id);
+      assert.equal(row.hookCommand[0], "node", id + ": the written line uses bare node");
+      assert.equal(row.hookRunCommand[0], SETUP_NODE, id + ": the doctor still runs the absolute node");
+      for (const e of hookEntries(row)) {
+        assert.ok(e.command.startsWith('node "'), id + ": " + e.command);
+        assert.equal(e.powershell, "& " + e.command, id + ": the powershell field is the same line with the call operator");
+      }
+    }
+    const posix = buildRegistry({ home: "/home/jane", pkgDir: "/opt/context mode", env: {}, platform: "linux" });
+    for (const id of ["copilot-cli", "vscode"]) assert.equal(posix.find((r) => r.id === id).hookCommand[0], SETUP_NODE, id + " off Windows: absolute node");
+  });
+
+  // Real PowerShell parser (pwsh runs on every OS; GitHub runners ship it): the line the Copilot app runs must parse and run.
+  const PWSH = ["pwsh", ...(process.platform === "win32" ? ["powershell.exe"] : [])].find((b) => spawnSync(b, ["-NoProfile", "-Command", "exit 0"], { windowsHide: true }).status === 0);
+  test("#1375 D-1375-COPILOT-WIN-1: pwsh -NoProfile -Command runs the copilot-cli and vscode command field", { skip: !PWSH && "pwsh not on PATH" }, () => {
+    const root = mkdtempSync(path.join(tmpdir(), "cm 1375 "));
+    try {
+      const dir = path.join(root, "pkg dir");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path.join(dir, "hook.mjs"), "process.stdout.write('ran:' + process.argv.slice(2).join(' '));\n");
+      const reg = buildRegistry({ home: root, pkgDir: dir, env: {}, platform: "win32" });
+      for (const id of ["copilot-cli", "vscode"]) {
+        const entry = hookEntries(reg.find((r) => r.id === id))[0];
+        const run = spawnSync(PWSH, ["-NoProfile", "-Command", entry.command], { encoding: "utf8", windowsHide: true, env: { ...process.env, PATH: path.dirname(process.execPath) + path.delimiter + process.env.PATH } });
+        assert.equal(run.status, 0, id + ": " + run.stderr);
+        assert.equal(run.stdout.trim(), "ran:--agent " + id);
+      }
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   // W-CODEX-5: Codex (codex-rs/hooks/src/engine/command_runner.rs build_command) runs a hook as
   // `%COMSPEC% /C` (fallback cmd.exe) with raw_arg(`"<command_line>"`), never PowerShell. cmd.exe /C drops the outer
   // pair of quotes when the line has more than two quotes, so the quoted node path is valid. This test calls cmd.exe the
