@@ -14,7 +14,7 @@ import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { createServer } from "node:http";
 import { unsupportedHostOf, unsupportedHostByName } from "../src/core/ops/unsupported-host.ts";
-import { environmentLine, issueTitle, summaryOf } from "../src/core/ops/doctor-issue.ts";
+import { environmentLine, issueTitle, runtimeInfo, summaryOf } from "../src/core/ops/doctor-issue.ts";
 import { checkDoubleFire, checkHostConfig, checkV1Leftovers, composeMatcher } from "../src/core/ops/doctor-config.ts";
 import { bundleDirOf, ownBundleDir } from "../src/core/ops/bundle-dir.ts";
 import { hostUpdateCommand } from "../src/core/project/config-dir.ts";
@@ -2870,22 +2870,44 @@ describe("ADR-0010 ctx_doctor agent issue path (D-DOCTOR-ISSUE-1)", { concurrenc
     assert.equal(d3.fixCommand, "context-mode setup --agents codex");
   });
 
-  // #1350 (emngny): under OpenCode 2 the line said "Node v26.3.0" (Bun 1.4.4's node-compat version) while the hooks ran
-  // PATH node v24.22.2. Under Bun the line names the host runtime and, on a line of its own, the node that runs hooks.
-  test("[#1350] the environment line names the host's embedded Bun and the node that runs the hooks", (t) => {
+  // #1350 (emngny): under OpenCode 2 the line said "Node v26.3.0" (Bun 1.4.4's node-compat version). Under Bun the line
+  // names the host runtime and, on a line of its own, the PATH node. A Bun host (OpenCode 2, Pi) runs every hook in the host
+  // process (handleHook), so the PATH node runs ctx_execute javascript, not hooks: the line names it for ctx_execute.
+  test("[#1350] the environment line names the host's embedded Bun and the PATH node that ctx_execute runs", (t) => {
     const h = home(t);
     const env = { SHELL: "/bin/sh" };
     const lines = (rt) => environmentLine(ctxOf(h, "opencode"), getAdapter("opencode"), env, "2.1.9", rt).split("\n");
     const os = `${process.platform}-${process.arch}`;
-    assert.deepEqual(lines({ node: "v26.3.0", bun: "1.4.4", hookNode: "v24.22.2" }).slice(1), [
+    assert.deepEqual(lines({ node: "v26.3.0", bun: "1.4.4", pathNode: "v24.22.2" }).slice(1), [
       `Environment: ${os}, host runtime Bun 1.4.4 (node-compat v26.3.0)`,
-      "Environment: hook node v24.22.2 (PATH), shell /bin/sh",
+      "Environment: ctx_execute node v24.22.2 (PATH), shell /bin/sh",
     ]);
-    assert.equal(lines({ node: "v26.3.0", bun: "1.4.4", hookNode: null })[2], "Environment: hooks run on host Bun, shell /bin/sh");
+    // execute.ts: findRuntime("javascript") null is NO_RUNTIME, so with no PATH node the line says that, not "host Bun".
+    assert.equal(lines({ node: "v26.3.0", bun: "1.4.4", pathNode: null })[2], "Environment: ctx_execute node: none on PATH, shell /bin/sh");
+    for (const l of lines({ node: "v26.3.0", bun: "1.4.4", pathNode: "v24.22.2" })) assert.ok(!l.includes("hook"), l);
     // D-DOCTOR-FIX-1: each line fits 80 columns, also with the Windows shell path.
-    const win = environmentLine(ctxOf(h, "opencode"), getAdapter("opencode"), { ComSpec: "C:\\WINDOWS\\system32\\cmd.exe" }, "2.1.9", { node: "v26.3.0", bun: "1.4.4", hookNode: "v24.22.2" });
-    for (const l of win.split("\n").slice(1)) assert.ok([...l].length <= 80, l);
+    for (const pathNode of ["v24.22.2", null]) {
+      const win = environmentLine(ctxOf(h, "opencode"), getAdapter("opencode"), { ComSpec: "C:\\WINDOWS\\system32\\cmd.exe" }, "2.1.9", { node: "v26.3.0", bun: "1.4.4", pathNode });
+      for (const l of win.split("\n").slice(1)) assert.ok([...l].length <= 80, l);
+    }
     assert.deepEqual(lines({ node: "v24.15.0" }).slice(1), [`Environment: ${os}, Node v24.15.0, shell /bin/sh`]);
+  });
+
+  // #1350 profile: a sync `node --version` under Bun added one node start (~600-750 ms on the reporter's machine) to each
+  // ctx_doctor reply. runtimeInfo is async (runProcess), so doctorReply starts it beside the checks.
+  test("[#1350] runtimeInfo reads the PATH node under a Bun host and starts nothing under Node", { skip: process.platform === "win32" && "fake node is an sh script" }, async (t) => {
+    const h = home(t);
+    const bin = path.join(h, "bin");
+    mkdirSync(bin);
+    writeFileSync(path.join(bin, "node"), "#!/bin/sh\necho v24.22.2\n");
+    chmodSync(path.join(bin, "node"), 0o755);
+    const signal = new AbortController().signal;
+    const bunHost = { bun: "1.4.4", node: "v26.3.0" };
+    const pending = runtimeInfo({ PATH: bin }, signal, bunHost);
+    assert.ok(pending instanceof Promise);
+    assert.deepEqual(await pending, { node: "v26.3.0", bun: "1.4.4", pathNode: "v24.22.2" });
+    assert.deepEqual(await runtimeInfo({ PATH: path.join(h, "empty") }, signal, bunHost), { node: "v26.3.0", bun: "1.4.4", pathNode: null });
+    assert.deepEqual(await runtimeInfo({ PATH: bin }, signal, { bun: undefined, node: "v24.15.0" }), { node: "v24.15.0" });
   });
 
   test("[M5] doctor-issue/every-UNKNOWN-row-names-its-cause", async (t) => {

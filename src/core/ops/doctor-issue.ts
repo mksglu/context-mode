@@ -6,7 +6,7 @@
 // Home paths show as ~, secret values are masked, journal bodies stay out. Never throws: a fact it cannot read is a line.
 import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, writeFileSync } from "node:fs";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import {
   type UnsupportedHost, BUNDLE_SHA, CONFIG_TOML_FILE, DOCTOR_CONFIG_LINES, DOCTOR_ENV_NAMES, DOCTOR_ENV_PREFIX, DOCTOR_GH_LINE, DOCTOR_GH_NEXT,
   DOCTOR_GIT_VERSION_TIMEOUT_MS, DOCTOR_HOOK_LOG_LINES, DOCTOR_JOURNAL_ROWS, DOCTOR_LOG_TAIL_BYTES, DOCTOR_MASK,
@@ -17,6 +17,7 @@ import type { AdapterRow, DoctorRow, ToolContext } from "../contracts/types.ts";
 import { hookLogPath } from "../hooks/fallback.ts";
 import { envValue } from "../sandbox/path-entries.ts";
 import { findRuntime } from "../sandbox/runtimes.ts";
+import { runProcess } from "../sandbox/spawn.ts";
 import { claudeDirOf, codexDirOf, homeDirOf, resolveConfigDir } from "../project/config-dir.ts";
 import { closeDb, openDb } from "../store/db.ts";
 import { configPaths } from "./doctor-config.ts";
@@ -49,21 +50,27 @@ export function maskLine(line: string): string {
 }
 
 /** One line above the table: context-mode version and sha, agent and version, OS-arch, Node, shell. */
-/** The runtime the server runs on and, under Bun, the node that runs the hooks (null: none on PATH, the host's Bun runs them). */
-export interface RuntimeInfo { node: string; bun?: string; hookNode?: string | null; }
+/** The runtime the server runs on and, under Bun, the PATH node that ctx_execute javascript runs (null: none on PATH). */
+export interface RuntimeInfo { node: string; bun?: string; pathNode?: string | null; }
 
-// #1350: under a Bun-compiled host (OpenCode 2) process.version is Bun's node-compat version, not the node that runs hooks.
-function runtimeInfo(env: NodeJS.ProcessEnv): RuntimeInfo {
-  const bun = process.versions.bun;
-  if (bun === undefined) return { node: process.version };
+// #1350: under a Bun-compiled host (OpenCode 2, Pi) process.version is Bun's node-compat version. Those hosts run every hook
+// in the host process (handleHook), so the PATH node is the one ctx_execute javascript runs (execute.ts findRuntime).
+// Async (runProcess): doctorReply starts it beside the checks, so a slow node start (#1350: ~600-750 ms) does not add to
+// the reply. Under Bun, D5 times nothing (in-process hosts), so this run does not touch a D5 timing.
+export async function runtimeInfo(env: NodeJS.ProcessEnv, signal: AbortSignal,
+  host: { bun: string | undefined; node: string } = { bun: process.versions.bun, node: process.version }): Promise<RuntimeInfo> {
+  if (host.bun === undefined) return { node: host.node };
   const node = findRuntime("javascript", env);
-  if (node === null) return { node: process.version, bun, hookNode: null };
-  const r = spawnSync(node, ["--version"], { env, encoding: "utf8", timeout: DOCTOR_GIT_VERSION_TIMEOUT_MS, windowsHide: true });
-  return { node: process.version, bun, hookNode: r.status === 0 ? `${r.stdout}`.trim() : null };
+  if (node === null) return { node: host.node, bun: host.bun, pathNode: null };
+  const childEnv: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) if (v !== undefined) childEnv[k] = v;
+  const r = await runProcess([node, "--version"], { cwd: dirname(node), env: childEnv, signal, timeoutMs: DOCTOR_GIT_VERSION_TIMEOUT_MS });
+  const out = r.stdout.toString("utf8").trim();
+  return { node: host.node, bun: host.bun, pathNode: r.exitCode === 0 && out !== "" ? out : null };
 }
 
 export function environmentLine(ctx: ToolContext, adapter: AdapterRow, env: NodeJS.ProcessEnv, version: string | undefined,
-  rt: RuntimeInfo = runtimeInfo(env)): string {
+  rt: RuntimeInfo): string {
   const sha = BUNDLE_SHA === undefined ? "dev build" : BUNDLE_SHA.slice(0, 7);
   const client = ctx.clientInfo;
   const agent = client === undefined ? adapter.id
@@ -73,8 +80,8 @@ export function environmentLine(ctx: ToolContext, adapter: AdapterRow, env: Node
   const what = `${DOCTOR_ENV_PREFIX}context-mode ${version ?? "source checkout"} (${sha}), agent ${agent}\n`;
   const os = `${DOCTOR_ENV_PREFIX}${process.platform}-${process.arch}`;
   if (rt.bun === undefined) return what + `${os}, Node ${rt.node}, shell ${shell}`;
-  const hooks = rt.hookNode === null || rt.hookNode === undefined ? "hooks run on host Bun" : `hook node ${rt.hookNode} (PATH)`;
-  return what + `${os}, host runtime Bun ${rt.bun} (node-compat ${rt.node})\n${DOCTOR_ENV_PREFIX}${hooks}, shell ${shell}`;
+  const pathNode = rt.pathNode === null || rt.pathNode === undefined ? "ctx_execute node: none on PATH" : `ctx_execute node ${rt.pathNode} (PATH)`;
+  return what + `${os}, host runtime Bun ${rt.bun} (node-compat ${rt.node})\n${DOCTOR_ENV_PREFIX}${pathNode}, shell ${shell}`;
 }
 
 function gitVersion(env: NodeJS.ProcessEnv): string {

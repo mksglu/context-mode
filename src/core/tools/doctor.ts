@@ -27,7 +27,7 @@ import { unsupportedHostOf } from "../ops/unsupported-host.ts";
 import type { UnsupportedHost } from "../contracts/constants.ts";
 import type { AgentId } from "../contracts/agents.ts";
 import { UNSUPPORTED_HOST_LINE } from "../ops/unsupported-host.ts";
-import { environmentLine, writeIssueReport } from "../ops/doctor-issue.ts";
+import { environmentLine, runtimeInfo, writeIssueReport } from "../ops/doctor-issue.ts";
 import { claudeDirOf, hostUpdateCommand, codexDirOf, codexRunDirOf, homeDirOf, copilotDirOf, geminiDirOf, kiroDirOf, opencodeDirOf, piAgentDirOf, requireHomeDir, resolveConfigDir } from "../project/config-dir.ts";
 import { indexText } from "../index/text.ts";
 import { buildChildEnv } from "../sandbox/env.ts";
@@ -176,6 +176,7 @@ function reportEnv(env: NodeJS.ProcessEnv): Record<string, string> {
  */
 export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<ToolReply> {
   const adapter = getAdapter(ctx.project.agent); // step 1
+  const runtime = runtimeInfo(host.env, ctx.signal); // #1350: under Bun one PATH node start, beside the checks
   const rows = await runDoctorChecks(ctx, adapter, host); // step 2
   const failed = rows.some((r) => r.status === "FAIL");
   // ADR-0019 D7: name the CLI command; setup when a row failed (it repairs and verifies), else doctor.
@@ -183,7 +184,7 @@ export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<T
   const command = adapter.id === "pi" ? (failed ? NATIVE_INSTALL.pi[0] : PI_LIST_COMMAND)
     : `context-mode ${failed ? "setup" : "doctor"} --agents ${adapter.id}`;
   const input = { agent: adapter.id, rows, env: reportEnv(host.env), command };
-  const envLine = environmentLine(ctx, adapter, host.env, bundleVersion(host.bundleDir));
+  const envLine = environmentLine(ctx, adapter, host.env, bundleVersion(host.bundleDir), await runtime);
   const table = buildReport(input); // step 3
   let notes: string[] = [];
   if (failed) {
