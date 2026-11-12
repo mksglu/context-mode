@@ -79,7 +79,7 @@ Absolute path to the interpreter binary, or `null` if none is found on PATH.
    - `"javascript"` / `"typescript"` → `["node", "node.exe"]`.
    - `"python"` → on Windows: `["python.exe", "py.exe"]`. On POSIX: `["python3", "python"]`.
    - any other `lang` → `[lang, lang + ".exe"]` on Windows, `[lang]` on POSIX.
-2. Read `PATH` from `process.env.PATH` (the parent's PATH — PRD §9: "PATH = the parent's PATH"). Split on `path.delimiter` (`:` POSIX, `;` Windows).
+2. Read `PATH` from `process.env.PATH` (the parent's PATH — PRD §9: "PATH = the parent's PATH"). Split on `path.delimiter` (`:` POSIX, `;` Windows). On Windows the `PATH` and `PATHEXT` keys are read without case (`Path` from PowerShell or cmd under a Bun host, #1371, DEVIATIONS D-1371-PATH-CASE-1); POSIX reads the exact key.
 3. On Windows, also split `process.env.PATHEXT` (fallback `.COM;.EXE;.BAT;.CMD`) for the case where a candidate name in step 1 has no extension; try each `candidate + ext` in `PATHEXT` order inside each PATH directory before moving to the next PATH directory.
 4. For each PATH directory, for each candidate name (in the step-1 order), build the full path and check existence with a sync stat call. Do this **lazily**: only when `findRuntime` is actually called for that `lang` — never at server boot (PRD §9: "found by PATH lookup … lazily on first use, never at boot"; 00 rule list P5: "no boot probes").
 5. On POSIX, a file found in step 4 must also pass an executable-bit check (`fs.accessSync(p, fs.constants.X_OK)`) before being accepted; a `#!/bin/sh`-shim script with the exec bit set is accepted as-is (PRD §9: "including `#!/bin/sh` shims") — do not read or parse the shebang line, the OS exec call handles it.
