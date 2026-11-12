@@ -4,7 +4,7 @@ import { accessSync, constants as fsConstants, statSync } from "node:fs";
 import path from "node:path";
 import { GIT_BASH_RELATIVE, GIT_BIN, PATHEXT_DEFAULT, WIN_SHELL_LANGS } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
-import { pathEntries } from "./path-entries.ts";
+import { envValue, pathEntries } from "./path-entries.ts";
 
 const PATHEXT_SEPARATOR = ";";
 // DEVIATIONS D-M2-R3-2: the only files Windows CreateProcess starts with shell:false. Node refuses
@@ -68,9 +68,10 @@ function isRunnable(full: string): boolean {
 export function findRuntime(lang: string, env: NodeJS.ProcessEnv = process.env): string | null {
   if (isWin() && WIN_SHELL_LANGS.includes(lang)) return findGitBash(env);
   // W-CODEX-6: a Windows PATH entry may be wrapped in double quotes; the shared helper cuts them off.
-  const dirs = pathEntries(env.PATH ?? "", process.platform, path.delimiter);
+  // D-1371-PATH-CASE-1: on Windows the key is read without case (a Bun host spells it `Path`).
+  const dirs = pathEntries(envValue(env, "PATH") ?? "", process.platform, path.delimiter);
   const pathExt = isWin()
-    ? (env.PATHEXT ?? PATHEXT_DEFAULT).split(PATHEXT_SEPARATOR).filter((e) => e !== "")
+    ? (envValue(env, "PATHEXT") ?? PATHEXT_DEFAULT).split(PATHEXT_SEPARATOR).filter((e) => e !== "")
     : [];
   const names = candidates(lang);
   let shim: string | null = null;

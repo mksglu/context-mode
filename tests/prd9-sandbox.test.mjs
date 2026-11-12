@@ -1400,13 +1400,13 @@ describe("PRD-v2 section 9: Windows Git Bash lookup (D-VT-WINBASH-1)", () => {
     const l = layout();
     const nodeDir = join(l.top, "nodejs");
     mkdirSync(nodeDir);
-    writeFileSync(join(nodeDir, "node.exe"), "");
+    writeFileSync(join(nodeDir, "node.EXE"), ""); // the first PATHEXT name, so case-insensitive and case-sensitive disks agree
     try {
       for (const key of ["Path", "path", "pAtH"]) {
         const env = { [key]: [nodeDir, l.apps, join(l.git, "cmd")].join(sep), PATHEXT };
         const got = await asWindows({}, () => ({ js: findRuntime("javascript", env), git: findRuntime("git", env), shell: findRuntime("shell", env), d11: checkShell(env) }));
-        assert.equal(got.js, join(nodeDir, "node.exe"), key);
-        assert.equal(got.git, join(l.git, "cmd", "git.exe"), key);
+        assert.equal(got.js, join(nodeDir, "node.EXE"), key);
+        assert.equal(got.git?.toLowerCase(), join(l.git, "cmd", "git.exe").toLowerCase(), key); // PATHEXT case of the name tried first
         assert.equal(got.shell, l.bash, key);
         assert.deepEqual(got.d11, { id: "D11", label: "shell", status: "PASS", detail: "Git Bash: " + l.bash }, key);
       }

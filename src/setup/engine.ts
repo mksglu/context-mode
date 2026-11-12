@@ -27,7 +27,7 @@ import { editHostConfigText, hostConfigValueAt, parseHostConfig } from "../core/
 import { hostLayout, hostText, withLayout } from "../core/ops/host-text.ts";
 import { AGENT_FLAG, BACKUP_DIR, COMMAND_SKILLS, HOOK_BUNDLE, LOCK_FILE, SKILL_FILE, assertWritable, buildRegistry, configEdits, hookCommandString, renderSkill } from "./registry.ts";
 import type { CheckRow, HookFile, HookInstall, NativePlugin, SetupContext } from "./registry.ts";
-import { pathEntries, spawnForm, spawnShim, whichBin, winCmdLine } from "./spawn-bin.ts";
+import { envValue, pathEntries, spawnForm, spawnShim, whichBin, winCmdLine } from "./spawn-bin.ts";
 export { spawnForm, spawnShim, whichBin, winCmdLine };
 import { SAMPLE_FILE, hookSample, sampleText, sampleVerdict } from "./hook-sample.ts";
 
@@ -108,7 +108,7 @@ function owningPackage(dir: string): string | undefined {
 export function hostBin(bin: string, env: SetupContext["env"], platform: NodeJS.Platform = process.platform): { file: string | undefined; shims: string[] } {
   const real = REAL_HOST[bin];
   if (!real) return { file: which(bin, env, platform), shims: [] };
-  const get = (k: string): string | undefined => env[Object.keys(env).find((x) => x.toUpperCase() === k) ?? k];
+  const get = (k: string): string | undefined => envValue(env, k, "win32");
   const shims: string[] = [];
   for (const dir of pathEntries(get("PATH") ?? "", platform)) {
     const own = which(bin, { PATH: dir, ...(get("PATHEXT") ? { PATHEXT: get("PATHEXT") } : {}) }, platform);

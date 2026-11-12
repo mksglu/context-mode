@@ -15,6 +15,7 @@ import {
 } from "../contracts/constants.ts";
 import type { AdapterRow, DoctorRow, ToolContext } from "../contracts/types.ts";
 import { hookLogPath } from "../hooks/fallback.ts";
+import { envValue } from "../sandbox/path-entries.ts";
 import { claudeDirOf, codexDirOf, homeDirOf, resolveConfigDir } from "../project/config-dir.ts";
 import { closeDb, openDb } from "../store/db.ts";
 import { configPaths } from "./doctor-config.ts";
@@ -67,7 +68,7 @@ function gitVersion(env: NodeJS.ProcessEnv): string {
 function onPath(env: NodeJS.ProcessEnv, tool: string): string[] {
   const names = process.platform === "win32" ? [tool + EXE_SUFFIX, tool + ".cmd", tool] : [tool];
   const out: string[] = [];
-  for (const dir of (env.PATH ?? env.Path ?? "").split(delimiter)) {
+  for (const dir of (envValue(env, "PATH") ?? "").split(delimiter)) {
     if (dir === "") continue;
     for (const n of names) if (existsSync(join(dir, n))) { out.push(join(dir, n)); break; }
   }

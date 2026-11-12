@@ -3,18 +3,19 @@
 import { spawnSync, type SpawnSyncOptions, type SpawnSyncReturns } from "node:child_process";
 import { accessSync, constants as fsc, statSync } from "node:fs";
 import path from "node:path";
-import { pathEntries } from "../core/sandbox/path-entries.ts";
+import { envValue, pathEntries } from "../core/sandbox/path-entries.ts";
 
-export { pathEntries };
+export { envValue, pathEntries };
 
 type Env = Record<string, string | undefined>;
 const WIN_EXT = ".COM;.EXE;.BAT;.CMD";
 const WIN_SHIM_EXTS: readonly string[] = Object.freeze([".cmd", ".bat"]);
 const DEFAULT_COMSPEC = "cmd.exe";
 
-/** Env value by key, matched without case (Windows spells PATH as `Path`, ComSpec as `COMSPEC`). */
+/** Env value by key, matched without case (Windows spells PATH as `Path`, ComSpec as `COMSPEC`). Setup reads the host
+ *  env the same way on every OS (D-CI-WIN-4), so the win32 rule of envValue applies here always. */
 function envGet(env: Env, k: string): string | undefined {
-  return env[Object.keys(env).find((x) => x.toUpperCase() === k) ?? k];
+  return envValue(env, k, "win32");
 }
 
 /** PATH lookup the way the host shell does it. On Windows, npm installs an agent CLI as `<bin>.cmd` (next to an
