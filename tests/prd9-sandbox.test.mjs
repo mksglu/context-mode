@@ -1393,4 +1393,49 @@ describe("PRD-v2 section 9: Windows Git Bash lookup (D-VT-WINBASH-1)", () => {
       assert.equal(await asWindows({ PATH: `"${join(l.git, "bin")}"`, PATHEXT: ".exe;.cmd" }, () => findRuntime("git")), join(l.git, "bin", "git.exe"), "any runtime in a quoted entry");
     } finally { rmSync(l.top, { recursive: true, force: true }); }
   });
+
+  // #1371: OpenCode 2 runs the plugin in-process under Bun. Bun's process.env is case-sensitive on Windows, and a process
+  // started from PowerShell or cmd spells the variable `Path`, so env.PATH is undefined there. Windows env names ignore case.
+  test("[#1371] findRuntime on Windows reads the PATH key in any case: a Path-only env finds node, git and Git Bash; D11 PASS", async () => {
+    const l = layout();
+    const nodeDir = join(l.top, "nodejs");
+    mkdirSync(nodeDir);
+    writeFileSync(join(nodeDir, "node.exe"), "");
+    try {
+      for (const key of ["Path", "path", "pAtH"]) {
+        const env = { [key]: [nodeDir, l.apps, join(l.git, "cmd")].join(sep), PATHEXT };
+        const got = await asWindows({}, () => ({ js: findRuntime("javascript", env), git: findRuntime("git", env), shell: findRuntime("shell", env), d11: checkShell(env) }));
+        assert.equal(got.js, join(nodeDir, "node.exe"), key);
+        assert.equal(got.git, join(l.git, "cmd", "git.exe"), key);
+        assert.equal(got.shell, l.bash, key);
+        assert.deepEqual(got.d11, { id: "D11", label: "shell", status: "PASS", detail: "Git Bash: " + l.bash }, key);
+      }
+    } finally { rmSync(l.top, { recursive: true, force: true }); }
+  });
+
+  test("[#1371] findRuntime() with no env argument reads process.env's Path on Windows (the ctx_execute call under Bun)", async () => {
+    if (process.platform === "win32") return; // the real Windows process.env already ignores case
+    const l = layout();
+    const saved = process.env.PATH;
+    try {
+      const found = await asWindows({}, () => {
+        delete process.env.PATH;
+        process.env.Path = [l.apps, join(l.git, "cmd")].join(sep);
+        try { return findRuntime("shell"); } finally { delete process.env.Path; process.env.PATH = saved; }
+      });
+      assert.equal(found, l.bash);
+    } finally { process.env.PATH = saved; rmSync(l.top, { recursive: true, force: true }); }
+  });
+
+  test("[#1371] on POSIX env names keep their case: a Path key is not PATH", () => {
+    if (process.platform === "win32") return;
+    const dir = mkdtempSync(join(tmpdir(), "cm-1371-posix-"));
+    const bin = join(dir, "only-here-1371");
+    writeFileSync(bin, "#!/bin/sh\nexit 0\n");
+    chmodSync(bin, 0o755);
+    try {
+      assert.equal(findRuntime("only-here-1371", { Path: dir }), null);
+      assert.equal(findRuntime("only-here-1371", { PATH: dir }), bin);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
 });
