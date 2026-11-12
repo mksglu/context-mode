@@ -11179,6 +11179,15 @@ function REPLACE_HANDLE_LINE(intent, handle, bytes5, prefix = "", asked = "") {
   const queries = asked === "" ? [intent] : [intent, asked];
   return prefix + "ctx_search({queries:[" + queries.map((q) => JSON.stringify(q)).join(",") + "], source:" + JSON.stringify(handle) + "}) searches the whole output (" + bytes5 + " B).";
 }
+function SUBAGENT_HANDLE_LINE(handle, bytes5, read3) {
+  return "The full output (" + bytes5 + " B) is stored as " + handle + "; above is the best-matching part." + (read3 ? " Read the file with offset and limit for other lines." : "");
+}
+function SEARCH_TWIN_LINE(searchPath, handle, terms, projectDir) {
+  return " Or run: node " + shellWord(searchPath) + " " + handle + " " + shellWord(terms) + " " + shellWord(projectDir);
+}
+function shellWord(s) {
+  return "'" + s.split("'").join("'\\''") + "'";
+}
 var HANDLE_PROMPT_WORDS = 3;
 var MAX_CHUNK_BYTES = 4096;
 var SEARCH_PAGE_SIZE = 20;
@@ -11368,6 +11377,8 @@ var CANCELLED_LINE = "Cancelled.";
 var BACKGROUND_REPLY_PREFIX = "started in background, pid ";
 var PLAIN_OUTPUT_ENV = Object.freeze({ NO_COLOR: "1", FORCE_COLOR: "0" });
 var RUN_LABEL_PREFIX = "run.mjs:";
+var SEARCH_WRAPPER_FILE = "search.mjs";
+var RUN_WRAPPER_AGENT = "claude-code";
 var RUN_SESSION_PREFIX = "mcp:";
 var HOST_SESSION_ENV = Object.freeze({ "claude-code": "CLAUDE_CODE_SESSION_ID" });
 var NODE_MIN = "24.15.0";
@@ -11378,6 +11389,7 @@ var REQUIRE_SECURITY_ENV = "CONTEXT_MODE_REQUIRE_SECURITY";
 var HOST_CONFIG_DIR_NAME = ".claude";
 var AGENTS_DIR_NAME = "agents";
 var AGENT_FILE_EXT = ".md";
+var SYNCED_PLUGINS_DIR_NAME = "synced";
 var HOST_PLUGINS_DIR_NAME = "plugins";
 var INSTALLED_PLUGINS_FILE = "installed_plugins.json";
 var PLUGIN_AGENT_SEPARATOR = ":";
@@ -11613,7 +11625,7 @@ var DECISION_ANSWERS_KEY = "answers";
 var DECISION_OPTION_KEY = "option";
 var DECISION_LABEL_JOIN = " | ";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
-var BUNDLE_SHA = true ? "92c1ad26d57b45e786a3dc9149549c416badca09" : void 0;
+var BUNDLE_SHA = true ? "9c0c8a6d580cf4a310ff2d3138ad3c24f6a1dcde" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10", "D11"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -14826,7 +14838,15 @@ function resolveConfigDir(env) {
 }
 
 // src/core/policy/subagent.ts
-var { readFileSync: readFileSync2 } = process.getBuiltinModule("node:fs");
+var { readFileSync: readFileSync2, readdirSync: readdirSync2 } = process.getBuiltinModule("node:fs");
+var CC_READ_ONLY_DENY = Object.freeze(["Agent", "Artifact", "ArtifactComments", "ArtifactData", "ArtifactCheck", "ExitPlanMode", "Edit", "Write", "NotebookEdit"]);
+var CLAUDE_CODE_BUILT_INS = Object.freeze({
+  "general-purpose": { tools: null, disallowed: [] },
+  fork: { tools: null, disallowed: [] },
+  Explore: { tools: null, disallowed: [...CC_READ_ONLY_DENY] },
+  Plan: { tools: null, disallowed: [...CC_READ_ONLY_DENY] }
+});
+var BUILT_IN_AGENT = "claude-code";
 function isSubagentCall(ev) {
   return ev.agentId !== void 0 && ev.agentId !== "";
 }
@@ -14843,7 +14863,7 @@ function toolSetForAgentType(ev, src) {
   const row5 = getAdapter(ev.agent);
   if (src.manifestTools !== void 0) return unique(src.manifestTools.map((n) => norm(row5, n)));
   const type = ev.agentType ?? "";
-  const def = findDef(type, src);
+  const def = findDef(type, src) ?? builtIn(ev.agent, type);
   if (def === null) return null;
   const tools = (def.tools ?? allKnownToolNames(row5)).map((n) => norm(row5, n));
   const deny2 = def.disallowed.map((n) => norm(row5, n));
@@ -14871,6 +14891,11 @@ function findDef(type, src) {
   }
   return null;
 }
+function builtIn(agent, type) {
+  if (agent !== BUILT_IN_AGENT || !Object.prototype.hasOwnProperty.call(CLAUDE_CODE_BUILT_INS, type)) return null;
+  const d = CLAUDE_CODE_BUILT_INS[type];
+  return { tools: d.tools, disallowed: [...d.disallowed] };
+}
 function safeType(type) {
   if (type === "" || type === "." || type === "..") return false;
   if (type.indexOf("/") >= 0 || type.indexOf("\\") >= 0) return false;
@@ -14885,6 +14910,9 @@ function readPluginAgent(claudeDir, type) {
   const plugin = type.slice(0, cut);
   const agent = type.slice(cut + PLUGIN_AGENT_SEPARATOR.length);
   if (agent.indexOf(PLUGIN_AGENT_SEPARATOR) >= 0) return null;
+  return installedPluginAgent(claudeDir, plugin, agent) ?? syncedPluginAgent(claudeDir, plugin, agent);
+}
+function installedPluginAgent(claudeDir, plugin, agent) {
   let parsed;
   try {
     parsed = JSON.parse(hostText(readFileSync2(join2(claudeDir, HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE), "utf8")));
@@ -14904,6 +14932,21 @@ function readPluginAgent(claudeDir, type) {
       const d = readAgentFile(join2(dir, AGENTS_DIR_NAME, agent + AGENT_FILE_EXT));
       if (d !== null) return d;
     }
+  }
+  return null;
+}
+function syncedPluginAgent(claudeDir, plugin, agent) {
+  const root = join2(claudeDir, HOST_PLUGINS_DIR_NAME, SYNCED_PLUGINS_DIR_NAME);
+  let ids;
+  try {
+    ids = readdirSync2(root).sort();
+  } catch {
+    return null;
+  }
+  for (const id of ids) {
+    if (id.startsWith(".")) continue;
+    const d = readAgentFile(join2(root, id, plugin, AGENTS_DIR_NAME, agent + AGENT_FILE_EXT));
+    if (d !== null) return d;
   }
   return null;
 }
@@ -20144,18 +20187,24 @@ function bigRead(agent, input, cwd) {
   const many = Array.isArray(input[READ_PATH_LIST_KEY]) ? input[READ_PATH_LIST_KEY].filter((x) => typeof x === "string") : [];
   return [firstString(input, READ_PATH_KEYS), ...many].some((p) => p !== "" && bigFile(resolve7(cwd, p)) && !isMediaRead(agent, resolve7(cwd, p)) && !isOwnFile(agent, cwd, p));
 }
+function allowOutput(agent) {
+  try {
+    return getAdapter(agent).encode({ event: "PreToolUse", agent, sessionId: "", cwd: "", turn: 0 }, { kind: "allow" });
+  } catch {
+    return { stdout: "", exitCode: 0 };
+  }
+}
 function failureOutput(agent, raw, err, cwdFallback = "") {
   const row5 = getAdapter(agent);
-  const allow = () => row5.encode({ event: "PreToolUse", agent, sessionId: "", cwd: "", turn: 0 }, { kind: "allow" });
   try {
-    if (!isRec(raw)) return allow();
-    if (!isPreTool(row5, firstString(raw, HOOK_FAIL_EVENT_KEYS))) return allow();
+    if (!isRec(raw)) return allowOutput(agent);
+    if (!isPreTool(row5, firstString(raw, HOOK_FAIL_EVENT_KEYS))) return allowOutput(agent);
     const name = firstString(raw, HOOK_FAIL_TOOL_KEYS);
-    if (name === "" || name.includes(OWN_TOOL_PREFIX)) return allow();
+    if (name === "" || name.includes(OWN_TOOL_PREFIX)) return allowOutput(agent);
     const kind = kindOf(row5, name);
-    if (kind === null) return allow();
+    if (kind === null) return allowOutput(agent);
     const cwd = firstString(raw, HOOK_FAIL_CWD_KEYS) || cwdFallback;
-    if (kind === "read" && !bigRead(agent, inputOf(raw), cwd)) return allow();
+    if (kind === "read" && !bigRead(agent, inputOf(raw), cwd)) return allowOutput(agent);
     const redirect = kind === "read" ? HOOK_FAIL_REDIRECT.read : HOOK_FAIL_REDIRECT[kind];
     const reason = prefixToolNames(redirect, row5.toolNamePrefix) + "\n" + HOOK_FAIL_LINE(errorLabel(err), row5.toolNamePrefix);
     return row5.encode({ event: "PreToolUse", agent, sessionId: "", cwd, turn: 0 }, { kind: "deny", reason });
@@ -20187,12 +20236,20 @@ async function handleHook(agent, raw, env) {
     return EMPTY5;
   }
   const row5 = getAdapter(agent);
-  const fail7 = (stage, err, line) => {
+  const report2 = (stage, err, line) => {
     logHookError(env, agent, stage, err);
     process.stderr.write(line ?? "hooks: " + stage + " failed: " + message(err) + "\n");
+  };
+  const fail7 = (stage, err, line) => {
+    report2(stage, err, line);
     return failureOutput(agent, raw, err);
   };
-  if (nodeTooOld(process.version)) return fail7("node", new CtxError("NODE_TOO_OLD", { v: process.version }));
+  if (nodeTooOld(process.version)) {
+    const err = new CtxError("NODE_TOO_OLD", { v: process.version });
+    if (row5.installMode === "in-process") return fail7("node", err);
+    report2("node", err);
+    return allowOutput(agent);
+  }
   let ev;
   try {
     fault(env, "decode");
@@ -20523,14 +20580,21 @@ async function postReplace(ev, row5, project, env, tool, result, text) {
   if (result.keep === true) return ALLOW2;
   if (!hasReplace(row5)) return ALLOW2;
   let label2;
+  let caller = { ctx: true, shell: true, read: false };
   if (isSubagentCall(ev)) {
-    const subCase = pickSubagentCase(ev, toolSetForAgentType(ev, toolSetSources(ev, project, env)));
-    if (subCase === "A") return ALLOW2;
-    label2 = SUBAGENT_SOURCE_PREFIX + tool.canonicalName + ":" + String(ev.turn ?? 0);
+    const set3 = toolSetForAgentType(ev, toolSetSources(ev, project, env));
+    const subCase = pickSubagentCase(ev, set3);
+    const has3 = (names) => set3 !== null && names.some((n) => set3.includes(n));
+    caller = {
+      ctx: subCase === "A",
+      shell: has3(row5.nativeTools.shell),
+      read: RANGE_READ_TOOLS.includes(tool.canonicalName) && has3(row5.nativeTools.read ?? [])
+    };
+    label2 = SUBAGENT_SOURCE_PREFIX + tool.canonicalName + ":" + (tool.callId ?? String(ev.turn ?? 0));
   } else {
     label2 = mainLabel(tool, ev);
   }
-  const intent = [tool.input.description, tool.input.command, tool.input.file_path, tool.input.pattern, tool.input.url].map(str2).find((v) => v.trim() !== "") ?? "";
+  const intent = [tool.input.description, tool.input.command, tool.input.file_path, tool.input.pattern, tool.input.url, tool.name].map(str2).find((v) => v.trim() !== "") ?? tool.canonicalName;
   const chunks = chunkText(text, "text", REPLACE_CHUNK_BYTES);
   const db = await openDb(project);
   let sourceId;
@@ -20544,12 +20608,17 @@ async function postReplace(ev, row5, project, env, tool, result, text) {
   const handle = sourceHandle(sourceId);
   const prompt = await lastPrompt(project, ev.sessionId);
   const rankQuery = prompt.trim() === "" ? void 0 : intent + " " + prompt;
-  const handleLine = REPLACE_HANDLE_LINE(intent, handle, result.bytes, row5.toolNamePrefix, askedWords(intent, prompt, text));
+  const handleLine = caller.ctx ? REPLACE_HANDLE_LINE(intent, handle, result.bytes, row5.toolNamePrefix, askedWords(intent, prompt, text)) : SUBAGENT_HANDLE_LINE(handle, result.bytes, caller.read);
   const budget = replaceBudget(handleLine, moreLine2(intent, label2));
+  const pointer = handleLine + (caller.shell && ev.agent === RUN_WRAPPER_AGENT ? searchTwin(handle, intent, project) : "");
   const digest = shapeDigest(text, rankQuery ?? intent, SHAPE_RETURN_BYTES);
-  if (digest !== null) return { kind: "replace", output: replaceOutput(digest, handleLine) };
+  if (digest !== null) return { kind: "replace", output: replaceOutput(digest, pointer) };
   const selected = selectChunksInMemory(chunks, intent, budget, label2, rankQuery);
-  return { kind: "replace", output: selected.more !== null ? replaceOutput(selected.text, handleLine) : selected.text };
+  return { kind: "replace", output: selected.more !== null ? replaceOutput(selected.text, pointer) : selected.text };
+}
+function searchTwin(handle, intent, project) {
+  const terms = Buffer.byteLength(intent, "utf8") > ECHO_MAX_BYTES ? "" : intent;
+  return SEARCH_TWIN_LINE(join8(dirname4(process.argv[1] ?? ""), SEARCH_WRAPPER_FILE), handle, terms, project.worktree);
 }
 function boundedRead(tool) {
   return RANGE_READ_TOOLS.includes(tool.canonicalName) && READ_RANGE_KEYS.some((k) => tool.input[k] !== void 0 && tool.input[k] !== null);
@@ -20696,6 +20765,13 @@ function pathEntries(value, platform = process.platform, delimiter2 = platform =
   const win = platform === "win32";
   return value.split(delimiter2).map((e) => win && e.length >= 2 && e.startsWith('"') && e.endsWith('"') ? e.slice(1, -1) : e).filter(Boolean);
 }
+function envValue(env, name, platform = process.platform) {
+  const exact = env[name];
+  if (exact !== void 0 || platform !== "win32") return exact;
+  const upper = name.toUpperCase();
+  const key = Object.keys(env).find((k) => k.toUpperCase() === upper);
+  return key === void 0 ? void 0 : env[key];
+}
 
 // src/core/sandbox/runtimes.ts
 var PATHEXT_SEPARATOR = ";";
@@ -20739,8 +20815,8 @@ function isRunnable(full) {
 }
 function findRuntime(lang, env = process.env) {
   if (isWin() && WIN_SHELL_LANGS.includes(lang)) return findGitBash(env);
-  const dirs = pathEntries(env.PATH ?? "", process.platform, path.delimiter);
-  const pathExt = isWin() ? (env.PATHEXT ?? PATHEXT_DEFAULT).split(PATHEXT_SEPARATOR).filter((e) => e !== "") : [];
+  const dirs = pathEntries(envValue(env, "PATH") ?? "", process.platform, path.delimiter);
+  const pathExt = isWin() ? (envValue(env, "PATHEXT") ?? PATHEXT_DEFAULT).split(PATHEXT_SEPARATOR).filter((e) => e !== "") : [];
   const names = candidates(lang);
   let shim = null;
   for (const dir of dirs) {
@@ -20901,7 +20977,7 @@ function runProcess(argv, o) {
 }
 
 // src/core/index/auto-memory.ts
-import { readdirSync as readdirSync2, readFileSync as readFileSync6, statSync as statSync4 } from "node:fs";
+import { readdirSync as readdirSync3, readFileSync as readFileSync6, statSync as statSync4 } from "node:fs";
 import { join as join9 } from "node:path";
 var MEMORY_FILES = Object.freeze([
   Object.freeze(["CLAUDE.md"]),
@@ -20916,7 +20992,7 @@ var KIRO_STEERING = Object.freeze([".kiro", "steering"]);
 var MD = ".md";
 function steeringFiles(worktree) {
   try {
-    return readdirSync2(join9(worktree, ...KIRO_STEERING)).filter((n) => n.endsWith(MD)).sort().map((n) => [...KIRO_STEERING, n]);
+    return readdirSync3(join9(worktree, ...KIRO_STEERING)).filter((n) => n.endsWith(MD)).sort().map((n) => [...KIRO_STEERING, n]);
   } catch {
     return [];
   }
@@ -21510,7 +21586,7 @@ var ctxBatch = Object.freeze({
 });
 
 // src/core/tools/doctor.ts
-import { readdirSync as readdirSync7, readFileSync as readFileSync16, existsSync as existsSync16 } from "node:fs";
+import { readdirSync as readdirSync8, readFileSync as readFileSync16, existsSync as existsSync16 } from "node:fs";
 import { basename as basename5, join as join19 } from "node:path";
 
 // src/core/ops/bundle-dir.ts
@@ -21536,11 +21612,11 @@ function ownBundleDir() {
 }
 
 // src/core/ops/doctor-config.ts
-import { existsSync as existsSync9, readdirSync as readdirSync5, readFileSync as readFileSync11 } from "node:fs";
+import { existsSync as existsSync9, readdirSync as readdirSync6, readFileSync as readFileSync11 } from "node:fs";
 import { dirname as dirname8, isAbsolute as isAbsolute4, join as join14, resolve as resolve9 } from "node:path";
 
 // src/core/ops/detect-v1.ts
-import { existsSync as existsSync6, opendirSync, readdirSync as readdirSync3, readFileSync as readFileSync8 } from "node:fs";
+import { existsSync as existsSync6, opendirSync, readdirSync as readdirSync4, readFileSync as readFileSync8 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join as join12 } from "node:path";
 
@@ -24277,7 +24353,7 @@ function scanVscode(agentHome, project, out) {
 }
 function jsonFiles(dir) {
   try {
-    return readdirSync3(dir).filter((name) => name.endsWith(KIRO_AGENT_FILE_EXT)).sort();
+    return readdirSync4(dir).filter((name) => name.endsWith(KIRO_AGENT_FILE_EXT)).sort();
   } catch {
     return [];
   }
@@ -24410,7 +24486,7 @@ function detectV1(agent, home, scope = {}) {
 }
 
 // src/core/ops/plugin-root.ts
-import { existsSync as existsSync7, readdirSync as readdirSync4, readFileSync as readFileSync9, realpathSync as realpathSync4 } from "node:fs";
+import { existsSync as existsSync7, readdirSync as readdirSync5, readFileSync as readFileSync9, realpathSync as realpathSync4 } from "node:fs";
 import { dirname as dirname7, isAbsolute as isAbsolute3, join as join13, sep as sep4 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 function missing(agent, path8) {
@@ -24510,7 +24586,7 @@ function marketplaceRoot(adapter, env, worktree) {
   if (ownReal !== null && cacheReal !== null && ownReal.startsWith(cacheReal + sep4) && existsSync7(join13(ownReal, SERVER_ENTRY_FILE))) return ownReal;
   const pattern = join13(cache, "*", PLUGIN_NAME);
   if (!existsSync7(cache)) throw missing(adapter.id, pattern);
-  const found = readdirSync4(cache).sort().map((marketplace) => join13(cache, marketplace, PLUGIN_NAME)).filter((dir) => existsSync7(dir));
+  const found = readdirSync5(cache).sort().map((marketplace) => join13(cache, marketplace, PLUGIN_NAME)).filter((dir) => existsSync7(dir));
   if (found.length !== 1) throw missing(adapter.id, found.length === 0 ? pattern : found.join(", "));
   return found[0];
 }
@@ -24722,10 +24798,10 @@ function codexNativeDir(env, home) {
   const cache = join14(codexDir, "plugins", PLUGIN_CACHE_DIR_NAME);
   if (!existsSync9(cache)) return null;
   const found = [];
-  for (const market of readdirSync5(cache)) {
+  for (const market of readdirSync6(cache)) {
     const plugin = join14(cache, market, SERVER_KEY);
     if (!existsSync9(plugin)) continue;
-    for (const version4 of readdirSync5(plugin).sort()) {
+    for (const version4 of readdirSync6(plugin).sort()) {
       const dir = join14(plugin, version4, CODEX_PLUGIN_SUBDIR);
       if (existsSync9(join14(dir, CODEX_PLUGIN_MCP_FILE))) found.push(dir);
     }
@@ -24828,7 +24904,7 @@ function opencodeDirPlugins(dirs) {
     const pdir = join14(dir, OPENCODE_PLUGINS_DIR);
     let names;
     try {
-      names = readdirSync5(pdir);
+      names = readdirSync6(pdir);
     } catch {
       continue;
     }
@@ -27131,7 +27207,7 @@ var WIN_EXT = ".COM;.EXE;.BAT;.CMD";
 var WIN_SHIM_EXTS = Object.freeze([".cmd", ".bat"]);
 var DEFAULT_COMSPEC = "cmd.exe";
 function envGet(env, k) {
-  return env[Object.keys(env).find((x) => x.toUpperCase() === k) ?? k];
+  return envValue(env, k, "win32");
 }
 function whichBin(bin, env, platform = process.platform) {
   const get = (k) => envGet(env, k);
@@ -27616,7 +27692,7 @@ import { existsSync as existsSync14, mkdirSync as mkdirSync6, rmSync as rmSync4 
 import { basename as basename4, dirname as dirname9, join as join17 } from "node:path";
 
 // src/core/store/owners.ts
-import { mkdirSync as mkdirSync5, readdirSync as readdirSync6, readFileSync as readFileSync14, rmSync as rmSync3, writeFileSync as writeFileSync3 } from "node:fs";
+import { mkdirSync as mkdirSync5, readdirSync as readdirSync7, readFileSync as readFileSync14, rmSync as rmSync3, writeFileSync as writeFileSync3 } from "node:fs";
 import { basename as basename3, join as join16 } from "node:path";
 function ownersDir(configDir, projectKey) {
   return join16(configDir, PROJECTS_DIR_NAME, projectKey, OWNERS_DIR_NAME);
@@ -27649,7 +27725,7 @@ function listLiveOwners(configDir, projectKey) {
   const dir = ownersDir(configDir, projectKey);
   let names;
   try {
-    names = readdirSync6(dir);
+    names = readdirSync7(dir);
   } catch (err) {
     if (errCode2(err) === "ENOENT") return [];
     throw err;
@@ -27884,7 +27960,7 @@ function gitVersion(env) {
 function onPath(env, tool) {
   const names = process.platform === "win32" ? [tool + EXE_SUFFIX, tool + ".cmd", tool] : [tool];
   const out = [];
-  for (const dir of (env.PATH ?? env.Path ?? "").split(delimiter)) {
+  for (const dir of (envValue(env, "PATH") ?? "").split(delimiter)) {
     if (dir === "") continue;
     for (const n of names) if (existsSync15(join18(dir, n))) {
       out.push(join18(dir, n));
@@ -28085,7 +28161,7 @@ async function hookRow(ctx, adapter, host) {
 function ownServerId(configDir, projectKey) {
   const dir = join19(configDir, PROJECTS_DIR_NAME, projectKey, OWNERS_DIR_NAME);
   if (!existsSync16(dir)) return "";
-  for (const name of readdirSync7(dir)) {
+  for (const name of readdirSync8(dir)) {
     if (!name.endsWith(OWNER_PID_EXT)) continue;
     if (readFileSync16(join19(dir, name), "utf8").trim() === String(process.pid)) return basename5(name, OWNER_PID_EXT);
   }
@@ -28392,7 +28468,7 @@ import { existsSync as existsSync18, readFileSync as readFileSync18, statSync as
 import { dirname as dirname12, extname as extname3, join as join22, relative as relative5, resolve as resolve12 } from "node:path";
 
 // src/core/index/walk.ts
-import { readdirSync as readdirSync8, readFileSync as readFileSync17, realpathSync as realpathSync10, statSync as statSync7 } from "node:fs";
+import { readdirSync as readdirSync9, readFileSync as readFileSync17, realpathSync as realpathSync10, statSync as statSync7 } from "node:fs";
 import { join as join21 } from "node:path";
 var GITIGNORE = ".gitignore";
 var GIT_DIR = ".git";
@@ -28407,7 +28483,7 @@ function walkDir(root, containmentRoot) {
 function visit(abs, rel, parent, contain, seen, found) {
   let entries;
   try {
-    entries = readdirSync8(abs, { withFileTypes: true });
+    entries = readdirSync9(abs, { withFileTypes: true });
   } catch {
     return;
   }
@@ -28600,15 +28676,15 @@ function parseUrl(raw) {
   if (u.protocol !== "http:" && u.protocol !== "https:") throw fail6("ERR_INVALID_PROTOCOL");
   return u;
 }
-function envValue(upper) {
+function envValue2(upper) {
   const v = process.env[upper] ?? process.env[upper.toLowerCase()];
   return v === void 0 || v.trim() === "" ? void 0 : v.trim();
 }
 function pickProxy(u) {
-  const raw = envValue(u.protocol === "https:" ? "HTTPS_PROXY" : "HTTP_PROXY");
+  const raw = envValue2(u.protocol === "https:" ? "HTTPS_PROXY" : "HTTP_PROXY");
   if (raw === void 0) return void 0;
   const host = bare(u.hostname).toLowerCase();
-  for (const item of (envValue("NO_PROXY") ?? "").split(",")) {
+  for (const item of (envValue2("NO_PROXY") ?? "").split(",")) {
     let entry = item.trim().toLowerCase();
     if (entry.startsWith(".")) entry = entry.slice(1);
     if (entry !== "" && (host === entry || host.endsWith("." + entry))) return void 0;
@@ -33210,7 +33286,7 @@ function regenerateHostConfig(row5, home, opts = {}) {
 }
 
 // src/core/ops/uninstall.ts
-import { existsSync as existsSync20, readdirSync as readdirSync9, rmSync as rmSync6, writeFileSync as writeFileSync7 } from "node:fs";
+import { existsSync as existsSync20, readdirSync as readdirSync10, rmSync as rmSync6, writeFileSync as writeFileSync7 } from "node:fs";
 import { join as join24 } from "node:path";
 function row2(area, before, after) {
   return { area, before, after };
@@ -33326,7 +33402,7 @@ function removeProjectData(configDir, projectKey) {
   const dir = join24(projects, projectKey);
   if (!existsSync20(dir)) return row2(UPGRADE_DATA_AREA, "", UPGRADE_NOT_FOUND);
   if (dir === projects || !isInside(projects, dir)) throw new CtxError("OUTSIDE_ROOT", { p: dir, root: projects });
-  for (const name of readdirSync9(dir)) {
+  for (const name of readdirSync10(dir)) {
     if (name !== OWNERS_DIR_NAME) rmSync6(join24(dir, name), { recursive: true, force: true });
   }
   return row2(UPGRADE_DATA_AREA, dir, UPGRADE_DATA_DELETED);
@@ -61667,7 +61743,7 @@ function installExitGuard(opts) {
 }
 
 // src/core/store/cleanup.ts
-import { existsSync as existsSync22, readdirSync as readdirSync10, rmSync as rmSync8 } from "node:fs";
+import { existsSync as existsSync22, readdirSync as readdirSync11, rmSync as rmSync8 } from "node:fs";
 import { join as join25 } from "node:path";
 function deleteSource(raw, id) {
   raw.prepare("DELETE FROM sources WHERE id = ?").run(id);
@@ -61738,7 +61814,7 @@ function sweepOne(configDir, projectKey, cutoff) {
 function sweepDeadProjects(configDir) {
   let entries;
   try {
-    entries = readdirSync10(join25(configDir, PROJECTS_DIR_NAME), { withFileTypes: true });
+    entries = readdirSync11(join25(configDir, PROJECTS_DIR_NAME), { withFileTypes: true });
   } catch (err) {
     if (err.code === "ENOENT") return [];
     throw err;

@@ -24,6 +24,9 @@ function readReplaceTrigger(raw) {
 var REPLACE_TRIGGER_BYTES = readReplaceTrigger(process.env[REPLACE_TRIGGER_ENV]);
 var RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
 var READ_RANGE_KEYS = Object.freeze(["offset", "limit", "view_range"]);
+function shellWord(s) {
+  return "'" + s.split("'").join("'\\''") + "'";
+}
 var MAX_CHUNK_BYTES = 4096;
 var WEIGHT = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
 var DECAY_X1000 = Object.freeze([
@@ -156,6 +159,7 @@ var DECAY_X1000 = Object.freeze([
   250,
   250
 ]);
+var SOURCE_HANDLE_MAX_DIGITS = 10;
 var EXEC_TIMEOUT_MS = 6e5;
 var KILL_GRACE_MS = 1e3;
 var PIPE_EOF_GRACE_MS = 250;
@@ -185,7 +189,7 @@ var PATHEXT_DEFAULT = ".COM;.EXE;.BAT;.CMD";
 var SOURCE_LABEL_MAX_CHARS = 80;
 var PLAIN_OUTPUT_ENV = Object.freeze({ NO_COLOR: "1", FORCE_COLOR: "0" });
 var RUN_USAGE_LINE = "Usage: run.mjs <base64>";
-var SEARCH_USAGE_LINE = "Usage: search.mjs <source-id> <terms>";
+var SEARCH_USAGE_LINE = "Usage: search.mjs <source-id> <terms> [project-dir]";
 var RUN_FAIL_EXIT = 1;
 var RUN_TIMEOUT_EXIT = 124;
 var RUN_LABEL_PREFIX = "run.mjs:";
@@ -3751,6 +3755,21 @@ function rankTexts(texts, q, mode = "all") {
     mem.close();
   }
 }
+var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
+var SOURCE_ID_PREFIX = "s";
+function sourceHandle(id) {
+  return SOURCE_ID_PREFIX + id.toString(36);
+}
+function parseSourceHandle(s) {
+  if (!s.startsWith(SOURCE_ID_PREFIX) || s.length <= SOURCE_ID_PREFIX.length || s.length > SOURCE_ID_PREFIX.length + SOURCE_HANDLE_MAX_DIGITS) return null;
+  let n = 0;
+  for (const ch of s.slice(SOURCE_ID_PREFIX.length)) {
+    const d = BASE36.indexOf(ch);
+    if (d < 0) return null;
+    n = n * 36 + d;
+  }
+  return n > 0 && sourceHandle(n) === s ? n : null;
+}
 
 // src/core/index/select.ts
 var READ_CHUNKS = "SELECT ord, body FROM chunks WHERE source_id = ?";
@@ -5167,7 +5186,14 @@ function resolveConfigDir(env) {
 }
 
 // src/core/policy/subagent.ts
-var { readFileSync: readFileSync2 } = process.getBuiltinModule("node:fs");
+var { readFileSync: readFileSync2, readdirSync: readdirSync2 } = process.getBuiltinModule("node:fs");
+var CC_READ_ONLY_DENY = Object.freeze(["Agent", "Artifact", "ArtifactComments", "ArtifactData", "ArtifactCheck", "ExitPlanMode", "Edit", "Write", "NotebookEdit"]);
+var CLAUDE_CODE_BUILT_INS = Object.freeze({
+  "general-purpose": { tools: null, disallowed: [] },
+  fork: { tools: null, disallowed: [] },
+  Explore: { tools: null, disallowed: [...CC_READ_ONLY_DENY] },
+  Plan: { tools: null, disallowed: [...CC_READ_ONLY_DENY] }
+});
 function isSubagentCall(ev) {
   return ev.agentId !== void 0 && ev.agentId !== "";
 }
@@ -6173,6 +6199,13 @@ function pathEntries(value, platform = process.platform, delimiter = platform ==
   const win = platform === "win32";
   return value.split(delimiter).map((e) => win && e.length >= 2 && e.startsWith('"') && e.endsWith('"') ? e.slice(1, -1) : e).filter(Boolean);
 }
+function envValue(env, name, platform = process.platform) {
+  const exact = env[name];
+  if (exact !== void 0 || platform !== "win32") return exact;
+  const upper = name.toUpperCase();
+  const key = Object.keys(env).find((k) => k.toUpperCase() === upper);
+  return key === void 0 ? void 0 : env[key];
+}
 
 // src/core/sandbox/runtimes.ts
 var PATHEXT_SEPARATOR = ";";
@@ -6216,8 +6249,8 @@ function isRunnable(full) {
 }
 function findRuntime(lang, env = process.env) {
   if (isWin() && WIN_SHELL_LANGS.includes(lang)) return findGitBash(env);
-  const dirs = pathEntries(env.PATH ?? "", process.platform, path.delimiter);
-  const pathExt = isWin() ? (env.PATHEXT ?? PATHEXT_DEFAULT).split(PATHEXT_SEPARATOR).filter((e) => e !== "") : [];
+  const dirs = pathEntries(envValue(env, "PATH") ?? "", process.platform, path.delimiter);
+  const pathExt = isWin() ? (envValue(env, "PATHEXT") ?? PATHEXT_DEFAULT).split(PATHEXT_SEPARATOR).filter((e) => e !== "") : [];
   const names = candidates(lang);
   let shim = null;
   for (const dir of dirs) {
@@ -6762,7 +6795,7 @@ function sourceLabel(command) {
   return Array.from(RUN_LABEL_PREFIX + first).slice(0, SOURCE_LABEL_MAX_CHARS).join("");
 }
 function moreLine2(bundleDir, sourceId, terms) {
-  return RUN_MORE_PREFIX + JSON.stringify(join7(bundleDir, SEARCH_WRAPPER_FILE)) + " " + sourceId + " " + JSON.stringify(terms);
+  return RUN_MORE_PREFIX + shellWord(join7(bundleDir, SEARCH_WRAPPER_FILE)) + " " + sourceId + " " + shellWord(terms);
 }
 function bytes(s) {
   return Buffer.byteLength(s, "utf8");
@@ -6818,13 +6851,15 @@ async function runWrapperMain(argv, env) {
   }
 }
 async function searchWrapperMain(argv, _env) {
-  const id = Number(argv[2] ?? "");
+  const raw = argv[2] ?? "";
+  const id = raw.startsWith(SOURCE_ID_PREFIX) ? parseSourceHandle(raw) ?? -1 : Number(raw);
   const terms = argv[3] ?? "";
-  if (argv[2] === void 0 || argv[2] === "" || !Number.isSafeInteger(id) || id < 0) {
+  const dir = argv[4] ?? "";
+  if (raw === "" || !Number.isSafeInteger(id) || id < 0) {
     return exit(RUN_FAIL_EXIT, "", SEARCH_USAGE_LINE + "\n");
   }
   try {
-    const db = await openDb(projectOf(argv, process.cwd()));
+    const db = await openDb(projectOf(argv, dir !== "" ? dir : process.cwd()));
     let text;
     try {
       text = selectChunks(db, id, terms, OUTPUT_CAP).text;

@@ -28446,7 +28446,7 @@ function PURGE_SUMMARY(rows, scope) {
 var DECISION_SOURCE = "decision";
 var DECISION_USER_LABEL = "decision (user)";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
-var BUNDLE_SHA = true ? "92c1ad26d57b45e786a3dc9149549c416badca09" : void 0;
+var BUNDLE_SHA = true ? "9c0c8a6d580cf4a310ff2d3138ad3c24f6a1dcde" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10", "D11"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -44209,6 +44209,13 @@ function pathEntries(value, platform = process.platform, delimiter2 = platform =
   const win = platform === "win32";
   return value.split(delimiter2).map((e) => win && e.length >= 2 && e.startsWith('"') && e.endsWith('"') ? e.slice(1, -1) : e).filter(Boolean);
 }
+function envValue(env, name, platform = process.platform) {
+  const exact = env[name];
+  if (exact !== void 0 || platform !== "win32") return exact;
+  const upper = name.toUpperCase();
+  const key = Object.keys(env).find((k) => k.toUpperCase() === upper);
+  return key === void 0 ? void 0 : env[key];
+}
 
 // src/core/sandbox/runtimes.ts
 var PATHEXT_SEPARATOR = ";";
@@ -44252,8 +44259,8 @@ function isRunnable(full) {
 }
 function findRuntime(lang, env = process.env) {
   if (isWin() && WIN_SHELL_LANGS.includes(lang)) return findGitBash(env);
-  const dirs = pathEntries(env.PATH ?? "", process.platform, path.delimiter);
-  const pathExt = isWin() ? (env.PATHEXT ?? PATHEXT_DEFAULT).split(PATHEXT_SEPARATOR).filter((e) => e !== "") : [];
+  const dirs = pathEntries(envValue(env, "PATH") ?? "", process.platform, path.delimiter);
+  const pathExt = isWin() ? (envValue(env, "PATHEXT") ?? PATHEXT_DEFAULT).split(PATHEXT_SEPARATOR).filter((e) => e !== "") : [];
   const names = candidates(lang);
   let shim = null;
   for (const dir of dirs) {
@@ -51753,7 +51760,7 @@ var WIN_EXT = ".COM;.EXE;.BAT;.CMD";
 var WIN_SHIM_EXTS = Object.freeze([".cmd", ".bat"]);
 var DEFAULT_COMSPEC = "cmd.exe";
 function envGet(env, k) {
-  return env[Object.keys(env).find((x) => x.toUpperCase() === k) ?? k];
+  return envValue(env, k, "win32");
 }
 function whichBin(bin, env, platform = process.platform) {
   const get = (k) => envGet(env, k);
@@ -52495,7 +52502,7 @@ function gitVersion(env) {
 function onPath(env, tool) {
   const names = process.platform === "win32" ? [tool + EXE_SUFFIX, tool + ".cmd", tool] : [tool];
   const out = [];
-  for (const dir of (env.PATH ?? env.Path ?? "").split(delimiter)) {
+  for (const dir of (envValue(env, "PATH") ?? "").split(delimiter)) {
     if (dir === "") continue;
     for (const n of names) if (existsSync16(join16(dir, n))) {
       out.push(join16(dir, n));
@@ -53269,15 +53276,15 @@ function parseUrl(raw) {
   if (u.protocol !== "http:" && u.protocol !== "https:") throw fail5("ERR_INVALID_PROTOCOL");
   return u;
 }
-function envValue(upper) {
+function envValue2(upper) {
   const v = process.env[upper] ?? process.env[upper.toLowerCase()];
   return v === void 0 || v.trim() === "" ? void 0 : v.trim();
 }
 function pickProxy(u) {
-  const raw = envValue(u.protocol === "https:" ? "HTTPS_PROXY" : "HTTP_PROXY");
+  const raw = envValue2(u.protocol === "https:" ? "HTTPS_PROXY" : "HTTP_PROXY");
   if (raw === void 0) return void 0;
   const host = bare(u.hostname).toLowerCase();
-  for (const item of (envValue("NO_PROXY") ?? "").split(",")) {
+  for (const item of (envValue2("NO_PROXY") ?? "").split(",")) {
     let entry = item.trim().toLowerCase();
     if (entry.startsWith(".")) entry = entry.slice(1);
     if (entry !== "" && (host === entry || host.endsWith("." + entry))) return void 0;

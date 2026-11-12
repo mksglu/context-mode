@@ -5079,6 +5079,19 @@ function nodeTooOld(version) {
   return false;
 }
 
+// src/core/sandbox/path-entries.ts
+function pathEntries(value, platform = process.platform, delimiter2 = platform === "win32" ? ";" : ":") {
+  const win = platform === "win32";
+  return value.split(delimiter2).map((e) => win && e.length >= 2 && e.startsWith('"') && e.endsWith('"') ? e.slice(1, -1) : e).filter(Boolean);
+}
+function envValue(env, name, platform = process.platform) {
+  const exact = env[name];
+  if (exact !== void 0 || platform !== "win32") return exact;
+  const upper = name.toUpperCase();
+  const key = Object.keys(env).find((k) => k.toUpperCase() === upper);
+  return key === void 0 ? void 0 : env[key];
+}
+
 // src/core/store/schema.ts
 var PRAGMAS = `
 PRAGMA busy_timeout = ${DB_TIMEOUT_MS};
@@ -8846,19 +8859,11 @@ import { spawn, spawnSync as spawnSync3 } from "node:child_process";
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { accessSync, constants as fsc, statSync } from "node:fs";
 import path9 from "node:path";
-
-// src/core/sandbox/path-entries.ts
-function pathEntries(value, platform = process.platform, delimiter2 = platform === "win32" ? ";" : ":") {
-  const win = platform === "win32";
-  return value.split(delimiter2).map((e) => win && e.length >= 2 && e.startsWith('"') && e.endsWith('"') ? e.slice(1, -1) : e).filter(Boolean);
-}
-
-// src/setup/spawn-bin.ts
 var WIN_EXT = ".COM;.EXE;.BAT;.CMD";
 var WIN_SHIM_EXTS = Object.freeze([".cmd", ".bat"]);
 var DEFAULT_COMSPEC = "cmd.exe";
 function envGet(env, k) {
-  return env[Object.keys(env).find((x2) => x2.toUpperCase() === k) ?? k];
+  return envValue(env, k, "win32");
 }
 function whichBin(bin, env, platform = process.platform) {
   const get = (k) => envGet(env, k);
@@ -9358,14 +9363,14 @@ function owningPackage(dir) {
 function hostBin(bin, env, platform = process.platform) {
   const real2 = REAL_HOST[bin];
   if (!real2) return { file: which(bin, env, platform), shims: [] };
-  const get = (k) => env[Object.keys(env).find((x2) => x2.toUpperCase() === k) ?? k];
+  const get = (k) => envValue(env, k, "win32");
   const shims = [];
   for (const dir of pathEntries(get("PATH") ?? "", platform)) {
     const own2 = which(bin, { PATH: dir, ...get("PATHEXT") ? { PATHEXT: get("PATHEXT") } : {} }, platform);
     for (const f2 of [own2, ...real2.extra.map((p3) => path12.join(dir, ...p3))]) {
       if (!f2 || !existsSync17(f2) || !statSync2(f2).isFile()) continue;
       const file = realpathSync9(f2);
-      if (isNativeBinary(file) || owningPackage(path12.dirname(file)) === real2.pkg) return { file, shims };
+      if (isNativeBinary(file) || owningPackage(path12.dirname(file)) === real2.pkg) return { file: f2, shims };
       shims.push(f2);
     }
   }
