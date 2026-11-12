@@ -62,7 +62,8 @@ export function toolSetForAgentType(ev: CanonicalHookEvent, src: ToolSetSources)
   const type = ev.agentType ?? "";
   const def = findDef(type, src) ?? builtIn(ev.agent, type);
   if (def === null) return null; // step 3
-  const tools = (def.tools ?? allKnownToolNames(row)).map((n) => norm(row, n));
+  const known = allKnownToolNames(row);
+  const tools = def.tools === null ? known : def.tools.map((n) => norm(row, n)).flatMap((n) => [n, ...known.filter((k) => grants(n, k))]);
   const deny = def.disallowed.map((n) => norm(row, n));
   return unique(tools.filter((n) => !deny.some((d) => denies(d, n))));
 }
@@ -242,6 +243,18 @@ function geminiValid(s: string): string {
     out += ok ? ch : "_";
   }
   return out;
+}
+
+// D-1374-WILDCARD-GRANT-1 (#1374): a tools: entry that names one whole MCP server, "mcp__<server>__*" or "mcp__<server>",
+// grants every tool of that server, as Claude Code expands it (2.1.322 binary: agent tools entry with a named
+// serverName and toolName undefined or "*"). Narrower than denies(): a grant too wide would make a case-A deny name a
+// tool the subagent cannot call, so "mcp__*", "mcp__*__*" and non-MCP prefixes grant nothing beyond their exact name.
+function grants(entry: string, name: string): boolean {
+  if (!entry.startsWith(MCP_SERVER_TOOL_PREFIX)) return false;
+  const wild = MCP_NAME_JOIN + "*";
+  const server = entry.slice(MCP_SERVER_TOOL_PREFIX.length, entry.endsWith(wild) ? -wild.length : entry.length);
+  if (server === "" || server.indexOf("*") >= 0 || server.indexOf(MCP_NAME_JOIN) >= 0) return false;
+  return name.startsWith(MCP_SERVER_TOOL_PREFIX + server + MCP_NAME_JOIN);
 }
 
 // A disallowedTools entry removes: a trailing-"*" prefix, a whole MCP server ("mcp__<server>"), or one exact name.

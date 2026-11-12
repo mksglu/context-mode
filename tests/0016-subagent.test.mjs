@@ -140,6 +140,7 @@ describe("ADR-0016: subagent policy cases", { concurrency: CONC }, () => {
       f.put(f.project, "noshell", "tools: mcp__other__*, " + server + "__*\n");
       f.put(f.project, "other", "tools: Bash, mcp__other__*\n");
       f.put(f.project, "minus", "tools: Bash, " + server + "__*\ndisallowedTools: " + server + "\n");
+      f.put(f.project, "allmcp", "tools: Bash, mcp__*\n");
       const s = { projectDir: f.project, env: f.env };
       const pick = (type) => pickSubagentCase(sub("claude-code", type), toolSetForAgentType(sub("claude-code", type), s));
       assert.equal(pick("wild"), "A");
@@ -148,6 +149,7 @@ describe("ADR-0016: subagent policy cases", { concurrency: CONC }, () => {
       assert.ok(toolSetForAgentType(sub("claude-code", "wild"), s).includes(CC + "ctx_search"));
       assert.equal(pick("other"), "B", "another server's wildcard grants no ctx tool");
       assert.equal(pick("minus"), "B", "disallowedTools still removes what the wildcard granted");
+      assert.equal(pick("allmcp"), "B", "a grant names one server; mcp__* stays its exact name (never a case-A deny on a guess)");
     } finally { f.done(); }
   });
 
