@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync, existsSync, readFileSync, realpathSync, writeFileS
 import { tmpdir } from "node:os";
 import { join, dirname, delimiter } from "node:path";
 import { test, describe, mock } from "node:test";
+import dc from "node:diagnostics_channel";
 import fs from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { CONC } from "./_lib/concurrency.mjs";
@@ -779,6 +780,31 @@ describe("PRD-v2 section 9: runProcess settles on exit (D-1337-EXIT-SETTLE-1, #1
     const lines = r.stdout.toString("utf8").trim().split("\n");
     assert.equal(lines.length, 400000);
     assert.equal(lines[399999], "400000");
+  });
+
+  // D-R59-D5-DRAIN-1 (CI flake of "[M5] doctor-hook/D5-codex-without-hooks-file-runs-round-trip", ubuntu legs): a loop stall
+  // longer than PIPE_EOF_GRACE_MS right after "exit" made the grace timer fire before the poll phase read the pipes, so the
+  // bytes already in the pipe were dropped (stdout "", held: true) and D5 saw an empty, "native" reply. The stall is injected
+  // here: an "exit" listener (added after runProcess's own) busy-waits until the output is in the pipe and the grace is over.
+  test("a loop stall after exit does not drop output the pipes already hold", async () => {
+    if (process.platform === "win32") return;
+    const dir = mkdtempSync(join(tmpdir(), "cm-r59-stall-"));
+    const marker = join(dir, "written");
+    const ch = dc.channel("child_process");
+    const stall = ({ process: c }) => queueMicrotask(() => c.once("exit", () => {
+      const t0 = Date.now();
+      while (!existsSync(marker) || Date.now() - t0 < 2 * C.PIPE_EOF_GRACE_MS) { /* the loop is busy: no poll phase */ }
+    }));
+    ch.subscribe(stall);
+    let r;
+    try {
+      r = await run(`(sleep 0.05; printf garbage; : > '${marker}') & exit 0`);
+    } finally {
+      ch.unsubscribe(stall);
+      rmSync(dir, { recursive: true, force: true });
+    }
+    assert.equal(r.stdout.toString("utf8"), "garbage");
+    assert.equal(r.exitCode, 0);
   });
 
   test("the survivor is stopped with its process group", async () => {
