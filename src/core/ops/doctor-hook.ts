@@ -306,6 +306,7 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
   const hookWalls: number[] = [];
   const bareWalls: number[] = [];
   let ms = 0;
+  let fastBare = 0;
   let bound = HOOK_P95_MS;
   for (let n = 1; n <= (inProcess ? 1 : maxPairs); n++) {
     const start = now();
@@ -321,8 +322,9 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
     if (!isNativeShape(i.agent, r.stdout.toString("utf8"), r.exitCode, r.killed, fixture.event)) return row("FAIL", D5_SHAPE_DETAIL, D5_FIX);
     if (inProcess) return row("PASS", D5_IN_PROCESS_DETAIL);
     bareWalls.push(await bareMs());
-    ms = Math.max(0, Math.round(Math.min(...hookWalls) - Math.min(...bareWalls)));
-    bound = Math.max(HOOK_P95_MS, Math.round(D5_BARE_SHARE * Math.min(...bareWalls)));
+    fastBare = Math.round(Math.min(...bareWalls));
+    ms = Math.max(0, Math.round(Math.min(...hookWalls)) - fastBare);
+    bound = Math.max(HOOK_P95_MS, Math.round(D5_BARE_SHARE * fastBare)); // #1350: the bound grows with a slow node start
     if (n >= minPairs && ms <= bound) break;
   }
   if (ms > bound) return row("FAIL", D5_SLOW_DETAIL(ms, bound), D5_FIX);
@@ -330,6 +332,6 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
     : i.agent === "zcode" ? await mediaProbeDetail(i, timeoutMs)
     : i.agent === "codex" ? await codexStopDetail(i, timeoutMs) : null;
   if (readDetail !== null) return row("FAIL", readDetail, D5_FIX);
-  if (ms > HOOK_P95_MS) return row("PASS", D5_SLOW_START_DETAIL(ms, Math.round(Math.min(...bareWalls)), bound));
+  if (ms > HOOK_P95_MS) return row("PASS", D5_SLOW_START_DETAIL(ms, fastBare, bound));
   return row("PASS", DOCTOR_PASS_DETAIL);
 }

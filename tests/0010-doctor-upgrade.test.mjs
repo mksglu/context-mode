@@ -2881,7 +2881,10 @@ describe("ADR-0010 ctx_doctor agent issue path (D-DOCTOR-ISSUE-1)", { concurrenc
       `Environment: ${os}, host runtime Bun 1.4.4 (node-compat v26.3.0)`,
       "Environment: hook node v24.22.2 (PATH), shell /bin/sh",
     ]);
-    assert.equal(lines({ node: "v26.3.0", bun: "1.4.4", hookNode: null })[2], "Environment: hooks run on the host's Bun (no node on PATH), shell /bin/sh");
+    assert.equal(lines({ node: "v26.3.0", bun: "1.4.4", hookNode: null })[2], "Environment: hooks run on host Bun, shell /bin/sh");
+    // D-DOCTOR-FIX-1: each line fits 80 columns, also with the Windows shell path.
+    const win = environmentLine(ctxOf(h, "opencode"), getAdapter("opencode"), { ComSpec: "C:\\WINDOWS\\system32\\cmd.exe" }, "2.1.9", { node: "v26.3.0", bun: "1.4.4", hookNode: "v24.22.2" });
+    for (const l of win.split("\n").slice(1)) assert.ok([...l].length <= 80, l);
     assert.deepEqual(lines({ node: "v24.15.0" }).slice(1), [`Environment: ${os}, Node v24.15.0, shell /bin/sh`]);
   });
 

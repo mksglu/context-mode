@@ -73,7 +73,7 @@ export function environmentLine(ctx: ToolContext, adapter: AdapterRow, env: Node
   const what = `${DOCTOR_ENV_PREFIX}context-mode ${version ?? "source checkout"} (${sha}), agent ${agent}\n`;
   const os = `${DOCTOR_ENV_PREFIX}${process.platform}-${process.arch}`;
   if (rt.bun === undefined) return what + `${os}, Node ${rt.node}, shell ${shell}`;
-  const hooks = rt.hookNode === null || rt.hookNode === undefined ? "hooks run on the host's Bun (no node on PATH)" : `hook node ${rt.hookNode} (PATH)`;
+  const hooks = rt.hookNode === null || rt.hookNode === undefined ? "hooks run on host Bun" : `hook node ${rt.hookNode} (PATH)`;
   return what + `${os}, host runtime Bun ${rt.bun} (node-compat ${rt.node})\n${DOCTOR_ENV_PREFIX}${hooks}, shell ${shell}`;
 }
 
