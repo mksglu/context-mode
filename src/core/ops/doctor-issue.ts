@@ -16,6 +16,7 @@ import {
 import type { AdapterRow, DoctorRow, ToolContext } from "../contracts/types.ts";
 import { hookLogPath } from "../hooks/fallback.ts";
 import { envValue } from "../sandbox/path-entries.ts";
+import { findRuntime } from "../sandbox/runtimes.ts";
 import { claudeDirOf, codexDirOf, homeDirOf, resolveConfigDir } from "../project/config-dir.ts";
 import { closeDb, openDb } from "../store/db.ts";
 import { configPaths } from "./doctor-config.ts";
@@ -48,15 +49,32 @@ export function maskLine(line: string): string {
 }
 
 /** One line above the table: context-mode version and sha, agent and version, OS-arch, Node, shell. */
-export function environmentLine(ctx: ToolContext, adapter: AdapterRow, env: NodeJS.ProcessEnv, version: string | undefined): string {
+/** The runtime the server runs on and, under Bun, the node that runs the hooks (null: none on PATH, the host's Bun runs them). */
+export interface RuntimeInfo { node: string; bun?: string; hookNode?: string | null; }
+
+// #1350: under a Bun-compiled host (OpenCode 2) process.version is Bun's node-compat version, not the node that runs hooks.
+function runtimeInfo(env: NodeJS.ProcessEnv): RuntimeInfo {
+  const bun = process.versions.bun;
+  if (bun === undefined) return { node: process.version };
+  const node = findRuntime("javascript", env);
+  if (node === null) return { node: process.version, bun, hookNode: null };
+  const r = spawnSync(node, ["--version"], { env, encoding: "utf8", timeout: DOCTOR_GIT_VERSION_TIMEOUT_MS, windowsHide: true });
+  return { node: process.version, bun, hookNode: r.status === 0 ? `${r.stdout}`.trim() : null };
+}
+
+export function environmentLine(ctx: ToolContext, adapter: AdapterRow, env: NodeJS.ProcessEnv, version: string | undefined,
+  rt: RuntimeInfo = runtimeInfo(env)): string {
   const sha = BUNDLE_SHA === undefined ? "dev build" : BUNDLE_SHA.slice(0, 7);
   const client = ctx.clientInfo;
   const agent = client === undefined ? adapter.id
     : client.name === adapter.id ? `${adapter.id} ${client.version}` : `${adapter.id} ${client.version} (client ${client.name})`;
   const shell = env.SHELL ?? env.ComSpec ?? "sh";
   // D-DOCTOR-FIX-1: two lines, so each fits 80 columns: what runs, then where it runs.
-  return `${DOCTOR_ENV_PREFIX}context-mode ${version ?? "source checkout"} (${sha}), agent ${agent}\n` +
-    `${DOCTOR_ENV_PREFIX}${process.platform}-${process.arch}, Node ${process.version}, shell ${shell}`;
+  const what = `${DOCTOR_ENV_PREFIX}context-mode ${version ?? "source checkout"} (${sha}), agent ${agent}\n`;
+  const os = `${DOCTOR_ENV_PREFIX}${process.platform}-${process.arch}`;
+  if (rt.bun === undefined) return what + `${os}, Node ${rt.node}, shell ${shell}`;
+  const hooks = rt.hookNode === null || rt.hookNode === undefined ? "hooks run on the host's Bun (no node on PATH)" : `hook node ${rt.hookNode} (PATH)`;
+  return what + `${os}, host runtime Bun ${rt.bun} (node-compat ${rt.node})\n${DOCTOR_ENV_PREFIX}${hooks}, shell ${shell}`;
 }
 
 function gitVersion(env: NodeJS.ProcessEnv): string {

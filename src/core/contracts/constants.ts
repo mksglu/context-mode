@@ -781,7 +781,15 @@ export const D5_READ_RANGE_DETAIL = "PostToolUse Read with offset/limit over the
 export const D5_READ_OWN_DETAIL = "PreToolUse Read of a skill file over the one-read limit under the agent's own config dir came back denied: skill and rule files must reach the model whole (#1326)";
 export const D5_READ_MEDIA_DETAIL = "PreToolUse Read of a PNG over the one-read limit came back denied: an image Read must reach the model as an image block (#1321)";
 export const D5_READ_SHAPE_DETAIL = "PostToolUse Read replace is not Read's output shape {type:\"text\", file:{filePath, content, numLines, startLine, totalLines}}: Claude Code drops it and shows a hook warning";
-export function D5_SLOW_DETAIL(ms: number): string { return `hook round trip took ${ms} ms over bare node, over ${HOOK_P95_MS} ms`; }
+// #1350: the hook-cost bound is max(HOOK_P95_MS, D5_BARE_SHARE x the fastest bare node start). HOOK_P95_MS was set where node
+// starts in ~40 ms (GS6); on a machine where node starts in 600 ms the same hook costs more ms, not a larger share.
+export const D5_BARE_SHARE = 0.5;
+export function D5_SLOW_DETAIL(ms: number, bound: number = HOOK_P95_MS): string { return `hook round trip took ${ms} ms over bare node, over ${bound} ms`; }
+export function D5_SLOW_START_DETAIL(ms: number, bare: number, bound: number): string {
+  return `hook adds ${ms} ms to a ${bare} ms node start, inside ${bound} ms (half a start): node starts slowly on this machine`;
+}
+// #1350: OpenCode and Pi run hooks inside the host process; D5 checks the shape, a tool call pays no node start.
+export const D5_IN_PROCESS_DETAIL = "native shape ok; hooks run inside the host process, so a tool call pays no node start";
 // D-1323-CODEX-STOP-1 (#1323): the Codex Stop probe (rust-v0.166.0 stop.command.input) failed or wrote a hook-errors.log line.
 export const D5_STOP_DETAIL = "Codex Stop event: the hook did not give an empty or Codex Stop reply, or it logged a hook error";
 export const D5_FIX = "run ctx_upgrade"; // a broken hook entry is a broken install

@@ -11,13 +11,14 @@ import path from "node:path";
 import { hostText } from "./host-text.ts";
 import { replyErrors } from "./hook-shape.ts";
 import {
-  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_READ_MEDIA_DETAIL, D5_READ_OWN_DETAIL, D5_READ_RANGE_DETAIL, OUTPUT_CAP, D5_READ_SHAPE_DETAIL, REPLACE_TRIGGER_BYTES, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL, D5_STOP_DETAIL, DATA_DIR_ENV, HOOK_ERROR_LOG_FILE,
+  AGENT_ARG, D5_CODEX_UNTRUSTED_DETAIL, D5_FIX, D5_READ_MEDIA_DETAIL, D5_READ_OWN_DETAIL, D5_READ_RANGE_DETAIL, OUTPUT_CAP, D5_READ_SHAPE_DETAIL, REPLACE_TRIGGER_BYTES, D5_NO_FIXTURE_DETAIL, D5_SHAPE_DETAIL, D5_FIXTURE_FILE_ABSENT, D5_FIXTURE_PARSE, D5_FIXTURE_AGENT_ABSENT, D5_SLOW_DETAIL, D5_SLOW_START_DETAIL, D5_IN_PROCESS_DETAIL, D5_BARE_SHARE, D5_STOP_DETAIL, DATA_DIR_ENV, HOOK_ERROR_LOG_FILE,
   DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_ENTRY_FILE, HOOK_FIXTURE_DIR, HOOK_FIXTURE_FILE, HOOK_P95_MS,
   HOOK_TIMEOUT_MS, HOOKS_JSON_FILE,
 } from "../contracts/constants.ts";
 import type { AgentId } from "../contracts/agents.ts";
 import type { DbHandle, DoctorRow } from "../contracts/types.ts";
 import { runProcess } from "../sandbox/spawn.ts";
+import { getAdapter } from "../../adapters/table.ts";
 import { nodeLaunch } from "../sandbox/host-node.ts";
 import { CODEX_PLUGIN_ID, askPluginHooks, sameDir, untrustedPluginHooksDetail } from "../../setup/codex-trust.ts";
 import { codexPluginHomeOf } from "../project/config-dir.ts";
@@ -300,10 +301,13 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
     await runProcess([node.file, "-e", ""], { cwd: i.bundleDir, env: node.env, signal: i.signal, timeoutMs });
     return performance.now() - t;
   });
+  // #1350: an in-process host (OpenCode, Pi) never spawns node for a hook, so one run checks the shape and nothing is timed.
+  const inProcess = getAdapter(i.agent).installMode === "in-process";
   const hookWalls: number[] = [];
   const bareWalls: number[] = [];
   let ms = 0;
-  for (let n = 1; n <= maxPairs; n++) {
+  let bound = HOOK_P95_MS;
+  for (let n = 1; n <= (inProcess ? 1 : maxPairs); n++) {
     const start = now();
     const node = nodeLaunch(i.env);
     const r = await runProcess([node.file, path.join(i.bundleDir, HOOK_ENTRY_FILE), AGENT_ARG, i.agent], {
@@ -315,14 +319,17 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
     });
     hookWalls.push(now() - start);
     if (!isNativeShape(i.agent, r.stdout.toString("utf8"), r.exitCode, r.killed, fixture.event)) return row("FAIL", D5_SHAPE_DETAIL, D5_FIX);
+    if (inProcess) return row("PASS", D5_IN_PROCESS_DETAIL);
     bareWalls.push(await bareMs());
     ms = Math.max(0, Math.round(Math.min(...hookWalls) - Math.min(...bareWalls)));
-    if (n >= minPairs && ms <= HOOK_P95_MS) break;
+    bound = Math.max(HOOK_P95_MS, Math.round(D5_BARE_SHARE * Math.min(...bareWalls)));
+    if (n >= minPairs && ms <= bound) break;
   }
-  if (ms > HOOK_P95_MS) return row("FAIL", D5_SLOW_DETAIL(ms), D5_FIX);
+  if (ms > bound) return row("FAIL", D5_SLOW_DETAIL(ms, bound), D5_FIX);
   const readDetail = i.agent === "claude-code" ? await readProbeDetail(i, timeoutMs)
     : i.agent === "zcode" ? await mediaProbeDetail(i, timeoutMs)
     : i.agent === "codex" ? await codexStopDetail(i, timeoutMs) : null;
   if (readDetail !== null) return row("FAIL", readDetail, D5_FIX);
+  if (ms > HOOK_P95_MS) return row("PASS", D5_SLOW_START_DETAIL(ms, Math.round(Math.min(...bareWalls)), bound));
   return row("PASS", DOCTOR_PASS_DETAIL);
 }
