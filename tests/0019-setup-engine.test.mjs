@@ -1221,6 +1221,28 @@ exit 0`;
     });
   }
 
+  // #1378 (D-NI-EXT-DOCTOR-1, ADR-0023 point 4): `gemini extensions install` left ~/.gemini/extensions/context-mode, but
+  // `gemini extensions list` answered with an auth error (402, exit 0) and no list. Doctor said "not set up" and named the
+  // install command again. Doctor tells the truth: it names the host's list answer, and setup links no second copy.
+  test("[D-NI-EXT-DOCTOR-1] doctor: a gemini extension on disk with a list that prints an auth error names that error (#1378)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = sandbox(t);
+    const log = path.join(s.root, "gemini.log");
+    const ext = path.join(s.home, ".gemini", "extensions", "context-mode");
+    mkdirSync(ext, { recursive: true });
+    cpSync(path.join(import.meta.dirname, "..", "gemini-extension.json"), path.join(ext, "gemini-extension.json"));
+    writeFileSync(path.join(s.home, ".gemini", "extensions", "extension-enablement.json"), JSON.stringify({ "context-mode": { overrides: [`${s.home}/*`] } }));
+    const err = `{"error":{"code":402,"message":"Billing required: no API key or auth configured","status":"PAYMENT_REQUIRED"}}`;
+    fakeBin(s.root, "gemini", `echo "$@" >> "${log}"\ncase "$1 $2" in\n  "extensions list") echo '${err}' >&2 ;;\n  "extensions link") exit 7 ;;\nesac\nexit 0`);
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["gemini"] });
+    const a = doc.agents[0];
+    const text = [a.reason ?? "", ...a.checks.map((c) => `${c.name}: ${c.detail ?? ""}`)].join("\n");
+    assert.ok(!text.includes(NOT_SET_UP_REASON), `an installed extension is not "not set up": ${JSON.stringify(a, null, 2)}`);
+    assert.ok(text.includes("gemini extensions list") && text.includes("402"), `doctor names the list answer: ${JSON.stringify(a, null, 2)}`);
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["gemini"], runId: "r" });
+    assert.ok(!readFileSync(log, "utf8").includes("extensions link"), `setup links no second copy: ${readFileSync(log, "utf8")}`);
+    assert.equal(existsSync(path.join(s.home, ".gemini", "settings.json")), false, `setup writes no second hook copy: ${JSON.stringify(res.agents[0], null, 2)}`);
+  });
+
   // D-R44-ZCODE-NATIVE-1 (host audit zcode-1/2): `zcode plugins install` lists as JSON; setup writes nothing, doctor passes.
   const ZC_LIST = (enabled, agent) => JSON.stringify([{ id: "context-mode@context-mode", enabled, hookDetails: [{ event: "PreToolUse", command: `node "\${CLAUDE_PLUGIN_ROOT}/hook.mjs" --agent ${agent}` }] }]);
   const ZC_FAKE = (json, log) => `echo "$@" >> "${log}"\ncase "$1 $2" in\n  "plugins list") printf '%s' '${json}' ;;\nesac\nexit 0`;
