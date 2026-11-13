@@ -11,7 +11,7 @@ import path from "node:path";
 import ts from "typescript";
 import { ADAPTERS } from "../src/adapters/table.ts";
 import { TOOL_ORDER } from "../src/core/contracts/constants.ts";
-import { OVERHEAD_P95_MS } from "../src/setup/engine.ts";
+import { NOT_SET_UP_REASON, OVERHEAD_P95_MS } from "../src/setup/engine.ts";
 import { hookCommandString, stableNodePath, SETUP_NODE } from "../src/setup/registry.ts";
 import { qwenHooksOff } from "../src/setup/qwen-gate.ts";
 import { hookHashOf, pluginTrustEntries } from "../src/setup/codex-trust.ts";
@@ -1088,6 +1088,75 @@ exit 0`);
     assert.equal(docAfter.agents[0].checks.find((c) => c.name === "hook-registered").detail, "codex lists 4 of 4 context-mode plugin hooks modified, so they do not run; run: context-mode setup");
     const again = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "u2" });
     assert.equal(again.agents[0].status, "PASS", JSON.stringify(again.agents[0], null, 2));
+  });
+
+  // #1376 (D-1376-CODEX-CACHE-PIN-1): `codex plugin add` puts the bundle in <codex home>/plugins/cache/context-mode/
+  // context-mode/<ver>/. With codex not on PATH, setup run from that dir wrote <ver>/server.mjs into config.toml and
+  // node <ver>/hook.mjs --agent codex into hooks.json (4 events). A plugin update replaces <ver>/, so the MCP server and
+  // every hook fail "Cannot find module", and the plugin's own ${PLUGIN_ROOT} hooks run a second copy (D-NI-CODEX-DOCTOR-1).
+  const CODEX_CACHE_EVENTS = ["PreToolUse", "PostToolUse", "SessionStart", "UserPromptSubmit"];
+  function codexCachePkg(s, ver) {
+    const dir = path.join(s.home, ".codex", "plugins", "cache", "context-mode", "context-mode", ver);
+    cpSync(s.pkgDir, dir, { recursive: true });
+    return dir;
+  }
+  const pinnedToml = (dir) => `[mcp_servers.context-mode]\ncommand = ${JSON.stringify(NODE)}\nargs = [${JSON.stringify(path.join(dir, "server.mjs"))}, "--agent", "codex"]\n`;
+  const pinnedHooks = (dir, user) => {
+    const hooks = structuredClone(user);
+    for (const ev of CODEX_CACHE_EVENTS) (hooks[ev] ??= []).push({ hooks: [{ type: "command", command: `"${NODE}" "${path.join(dir, "hook.mjs")}" --agent codex` }] });
+    return JSON.stringify({ hooks }, null, 2) + "\n";
+  };
+  const CACHE_USER_TOML = `model = "o3"\n\n[mcp_servers.other]\ncommand = "other-server"\n\n`;
+  const CACHE_USER_HOOKS = { PreToolUse: [{ hooks: [{ type: "command", command: "my-pre-hook" }] }], Stop: [{ hooks: [{ type: "command", command: "my-own-hook" }] }] };
+
+  test("[#1376] setup from the Codex plugin cache with codex not on PATH writes no version-pinned server.mjs or hook.mjs path", async (t) => {
+    const s = sandbox(t);
+    const ver = codexCachePkg(s, "2.1.10");
+    const res = await runSetup({ home: s.home, pkgDir: ver, env: s.env, agents: ["codex"], runId: "c1" });
+    for (const f of ["config.toml", "hooks.json"]) {
+      const file = path.join(s.home, ".codex", f);
+      const text = existsSync(file) ? readFileSync(file, "utf8") : "";
+      assert.ok(!text.includes(ver), `${f} pins ${ver}\n${text}\n${JSON.stringify(res.agents[0], null, 2)}`);
+    }
+  });
+
+  test("[#1376] setup from the Codex plugin cache removes our older pinned entries and keeps every user entry", async (t) => {
+    const s = sandbox(t);
+    const old = path.join(s.home, ".codex", "plugins", "cache", "context-mode", "context-mode", "2.1.8");
+    const ver = codexCachePkg(s, "2.1.10");
+    const toml = put(path.join(s.home, ".codex", "config.toml"), CACHE_USER_TOML + pinnedToml(old));
+    const hooks = put(path.join(s.home, ".codex", "hooks.json"), pinnedHooks(old, CACHE_USER_HOOKS));
+    const res = await runSetup({ home: s.home, pkgDir: ver, env: s.env, agents: ["codex"], runId: "c2" });
+    const detail = JSON.stringify(res.agents[0], null, 2);
+    assert.equal(readFileSync(toml, "utf8"), CACHE_USER_TOML, detail);
+    assert.deepEqual(JSON.parse(readFileSync(hooks, "utf8")).hooks, CACHE_USER_HOOKS, detail);
+  });
+
+  test("[#1376] doctor: hooks.json and config.toml that name a missing pinned file FAIL with that path and the fix context-mode setup", async (t) => {
+    const s = sandbox(t);
+    const old = path.join(s.home, ".codex", "plugins", "cache", "context-mode", "context-mode", "2.1.8");
+    const ver = codexCachePkg(s, "2.1.10");
+    put(path.join(s.home, ".codex", "config.toml"), CACHE_USER_TOML + pinnedToml(old));
+    put(path.join(s.home, ".codex", "hooks.json"), pinnedHooks(old, CACHE_USER_HOOKS));
+    const doc = await runDoctor({ home: s.home, pkgDir: ver, env: s.env, agents: ["codex"] });
+    const a = doc.agents[0];
+    const detail = JSON.stringify(a, null, 2);
+    assert.equal(a.status, "FAIL", detail);
+    assert.notEqual(a.reason, NOT_SET_UP_REASON, detail);
+    for (const missing of [path.join(old, "server.mjs"), path.join(old, "hook.mjs")]) {
+      const bad = a.checks.find((c) => !c.ok && c.detail.includes(missing));
+      assert.ok(bad, `no failing check names ${missing}\n${detail}`);
+      assert.ok(bad.detail.includes("context-mode setup"), `fix line: ${bad.detail}`);
+    }
+  });
+
+  test("[#1376] setup from the npm package dir (outside the Codex plugin cache) still writes absolute server.mjs and hook.mjs paths", async (t) => {
+    const s = sandbox(t);
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "n1" });
+    assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+    assert.ok(readFileSync(path.join(s.home, ".codex", "config.toml"), "utf8").includes(JSON.stringify(path.join(s.pkgDir, "server.mjs"))));
+    const hookText = readFileSync(path.join(s.home, ".codex", "hooks.json"), "utf8");
+    for (const ev of CODEX_CACHE_EVENTS) assert.ok(JSON.parse(hookText).hooks[ev]?.some((m) => m.hooks.some((h) => h.command.includes(path.join(s.pkgDir, "hook.mjs")))), `${ev}\n${hookText}`);
   });
 
   // D-NI-EXT-DOCTOR-1 (ADR-0023): `qwen extensions install <source>` (Qwen Code 0.26.1) and `gemini extensions install
