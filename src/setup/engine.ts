@@ -917,7 +917,7 @@ async function nativeResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run
   return res;
 }
 
-/** #1376 D-1376-CODEX-CACHE-PIN-1: the edits that drop our own entries from config.toml and hooks.json. `found` gets one
+/** #1376 D-1376-CODEX-PLUGIN-CACHE-1: the edits that drop our own entries from config.toml and hooks.json. `found` gets one
  *  line per own entry. User entries stay as they are. */
 function codexCacheEdits(row: CheckRow, found: string[]): FileEdit[] {
   const edits: FileEdit[] = [];
@@ -957,7 +957,7 @@ function codexCacheEdits(row: CheckRow, found: string[]): FileEdit[] {
   return edits;
 }
 
-/** #1376 D-1376-CODEX-CACHE-PIN-1: setup runs from <codex home>/plugins/cache/.../<version> and codex is not on PATH. The
+/** #1376 D-1376-CODEX-PLUGIN-CACHE-1: setup runs from <codex home>/plugins/cache/.../<version> and codex is not on PATH. The
  *  codex plugin ships the MCP server and the hooks (${PLUGIN_ROOT}); a Codex plugin update replaces <version>/, so a path
  *  into it goes missing. Setup writes no entry here and drops the pinned ones an earlier setup wrote. */
 async function codexCacheResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run; dryRun: boolean }): Promise<AgentResult> {

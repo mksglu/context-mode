@@ -1090,7 +1090,7 @@ exit 0`);
     assert.equal(again.agents[0].status, "PASS", JSON.stringify(again.agents[0], null, 2));
   });
 
-  // #1376 (D-1376-CODEX-CACHE-PIN-1): `codex plugin add` puts the bundle in <codex home>/plugins/cache/context-mode/
+  // #1376 (D-1376-CODEX-PLUGIN-CACHE-1): `codex plugin add` puts the bundle in <codex home>/plugins/cache/context-mode/
   // context-mode/<ver>/. With codex not on PATH, setup run from that dir wrote <ver>/server.mjs into config.toml and
   // node <ver>/hook.mjs --agent codex into hooks.json (4 events). A plugin update replaces <ver>/, so the MCP server and
   // every hook fail "Cannot find module", and the plugin's own ${PLUGIN_ROOT} hooks run a second copy (D-NI-CODEX-DOCTOR-1).
