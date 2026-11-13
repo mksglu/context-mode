@@ -276,7 +276,7 @@ Docs check:
 
 - T52 `build/check-install-docs.mjs`: red while `NATIVE_HOSTS` [cm `build/check-install-docs.mjs:160`] has `omp` and `docs/install/omp.md` is missing.
 
-Total: 52 tests (T1-T52) in 11 existing files, plus profile runs P1-P7.
+Total: 52 tests (T1-T52) in 15 existing files (10 under `tests/`, 4 GP files under `e2e/cases/`, `build/check-install-docs.mjs`), plus profile runs P1-P7.
 
 ## CI job (M7, `.github/workflows/ci.yml`, job `ci`, after the OpenCode steps [cm `.github/workflows/ci.yml:17-24,88-96`])
 
