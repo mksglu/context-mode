@@ -1301,6 +1301,10 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
     const native = await nativeResult(row, ctx);
     if (native) { agents.push(native); opts.onAgent?.(id, "done", native); continue; }
     const res = await setupRow(row, ctx, run, true);
+    // #1376 D-1376-CODEX-PLUGIN-CACHE-1: an entry of ours that names a server.mjs or hook.mjs that is gone (a Codex plugin
+    // update replaced the version dir it pointed into) fails with that path and the fix line.
+    const gone = row.id === "codex" ? missingPinnedChecks(row) : [];
+    if (gone.length) { res.status = "FAIL"; res.checks = [...gone, ...res.checks]; res.reason = gone.map((c) => `${c.name}: ${c.detail}`).join("; "); }
     if (res.status === "PASS") {
       // Report-only findings (shared temp file, user data dir) are never changed by setup, so they cannot be fixed by it.
       if (res.v1.some((f) => !UPGRADE_REPORT_ONLY_REASONS.includes(f.reason))) { res.status = "FAIL"; res.reason = V1_FORM_REASON; }
@@ -1315,6 +1319,41 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
     opts.onAgent?.(id, "done", res);
   }
   return { exitCode: agents.some((a) => a.status === "FAIL") ? 1 : 0, agents };
+}
+
+/** #1376 D-1376-CODEX-PLUGIN-CACHE-1: the server.mjs path in our MCP entry and the hook.mjs path in each own hook
+ *  command, when that file does not exist. String search only (no regex as a mechanism). */
+function missingPinnedChecks(row: CheckRow): Check[] {
+  const paths: string[] = [];
+  const c = row.config;
+  const text = c ? readOr(c.file) : undefined;
+  if (c && text !== undefined) {
+    let cur: unknown;
+    try { cur = hostConfigValueAt(parseHostConfig(row.id, c.file, text, c.format), c.key); } catch { cur = undefined; }
+    if (isObj(cur) && Array.isArray(cur.args)) for (const a of cur.args) if (typeof a === "string" && path.basename(a) === "server.mjs") paths.push(a);
+  }
+  const h = row.hookInstall;
+  const hooksText = h.kind === "file" ? readOr(h.file) : undefined;
+  if (hooksText !== undefined) {
+    let doc: unknown;
+    try { doc = JSON.parse(hooksText); } catch { doc = undefined; }
+    const walk = (v: unknown): void => {
+      if (typeof v === "string") { if (isOwnHookCommand(v, row.id)) paths.push(hookPathOf(v)); }
+      else if (Array.isArray(v)) v.forEach(walk);
+      else if (isObj(v)) Object.values(v).forEach(walk);
+    };
+    if (isObj(doc)) walk(doc.hooks);
+  }
+  return [...new Set(paths)].filter((f) => path.isAbsolute(f) && !existsSync(f))
+    .map((f) => ({ name: "missing-file", ok: false, detail: `${f} does not exist (a Codex plugin update replaces its version dir); run: context-mode setup` }));
+}
+
+/** The hook.mjs path in an own hook command: from the quote or space before it up to HOOK_BUNDLE. */
+function hookPathOf(cmd: string): string {
+  const at = cmd.lastIndexOf(HOOK_BUNDLE);
+  const end = at + HOOK_BUNDLE.length;
+  const start = cmd[end] === '"' ? cmd.lastIndexOf('"', at) + 1 : cmd.lastIndexOf(" ", at) + 1;
+  return cmd.slice(start, end);
 }
 
 /** D-OC2-NATIVE-CMD-1: doctor on OpenCode 2 with no plugin entry names the host's own command next to the setup fix. */

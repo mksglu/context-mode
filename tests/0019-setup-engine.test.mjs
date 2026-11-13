@@ -1150,6 +1150,22 @@ exit 0`);
     }
   });
 
+  test("[#1376] doctor from the npm package dir: config.toml and hooks.json that name a missing pinned file FAIL with that path and the fix context-mode setup", async (t) => {
+    const s = sandbox(t);
+    const old = path.join(s.home, ".codex", "plugins", "cache", "context-mode", "context-mode", "2.1.8");
+    put(path.join(s.home, ".codex", "config.toml"), CACHE_USER_TOML + pinnedToml(old));
+    put(path.join(s.home, ".codex", "hooks.json"), pinnedHooks(old, CACHE_USER_HOOKS));
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"] });
+    const a = doc.agents[0];
+    const detail = JSON.stringify({ reason: a.reason, checks: a.checks }, null, 2);
+    assert.equal(a.status, "FAIL", detail);
+    for (const missing of [path.join(old, "server.mjs"), path.join(old, "hook.mjs")]) {
+      const bad = a.checks.find((c) => !c.ok && c.detail.includes(missing));
+      assert.ok(bad, `no failing check names ${missing}\n${detail}`);
+      assert.ok(bad.detail.includes("context-mode setup"), `fix line: ${bad.detail}`);
+    }
+  });
+
   test("[#1376] setup from the npm package dir (outside the Codex plugin cache) still writes absolute server.mjs and hook.mjs paths", async (t) => {
     const s = sandbox(t);
     const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "n1" });
