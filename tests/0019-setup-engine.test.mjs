@@ -1243,6 +1243,73 @@ exit 0`;
     assert.equal(existsSync(path.join(s.home, ".gemini", "settings.json")), false, `setup writes no second hook copy: ${JSON.stringify(res.agents[0], null, 2)}`);
   });
 
+  // #1378 part 2 (ADR-0023 point 4, D-1378-GEMINI-DISK-1): the list printed an auth error, but the extension is on disk as
+  // `gemini extensions install` left it. Doctor reads extension-enablement.json (Gemini's rule: enabled by default, the last
+  // matching override wins, a leading ! disables, a trailing * covers subdirs) and runs the MCP, hook and skill checks from disk.
+  const GEMINI_402 = `{"error":{"code":402,"message":"Billing required: no API key or auth configured","status":"PAYMENT_REQUIRED"}}`;
+  function geminiDiskExt(s, enablement) {
+    const log = path.join(s.root, "gemini.log");
+    const ext = path.join(s.home, ".gemini", "extensions", "context-mode");
+    const repo = path.join(import.meta.dirname, "..");
+    mkdirSync(path.join(ext, "hooks"), { recursive: true });
+    mkdirSync(path.join(ext, "plugins", "claude-code"), { recursive: true });
+    cpSync(path.join(repo, "gemini-extension.json"), path.join(ext, "gemini-extension.json"));
+    cpSync(path.join(repo, "hooks", "hooks.json"), path.join(ext, "hooks", "hooks.json"));
+    cpSync(path.join(repo, "skills"), path.join(ext, "skills"), { recursive: true });
+    for (const f of ["server.mjs", "hook.mjs"]) cpSync(path.join(s.pkgDir, f), path.join(ext, "plugins", "claude-code", f));
+    if (enablement !== undefined) writeFileSync(path.join(s.home, ".gemini", "extensions", "extension-enablement.json"), enablement);
+    fakeBin(s.root, "gemini", `echo "$@" >> "${log}"\ncase "$1 $2" in\n  "extensions list") echo '${GEMINI_402}' >&2 ;;\n  "extensions link") exit 7 ;;\nesac\nexit 0`);
+    return { ext, log };
+  }
+  const geminiDiskSkip = { skip: process.platform === "win32" && "fake agent binaries are sh scripts" };
+  const CWD_RULE = `${process.cwd()}/*`;
+
+  test("[D-1378-GEMINI-DISK-1] doctor: an enabled gemini extension on disk passes its disk checks with a WARN that quotes the list error (#1378)", geminiDiskSkip, async (t) => {
+    const s = sandbox(t);
+    const { log } = geminiDiskExt(s, JSON.stringify({ "context-mode": { overrides: [`!${CWD_RULE}`, CWD_RULE] } }));
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["gemini"] });
+    const a = doc.agents[0];
+    assert.equal(a.status, "PASS", JSON.stringify(a, null, 2));
+    const ok = a.checks.filter((c) => c.ok).map((c) => c.name);
+    for (const n of ["mcp", "hook-registered", "hook-runs", "skills"]) assert.ok(ok.includes(n), `${n}: ${JSON.stringify(a.checks, null, 2)}`);
+    const warn = a.checks.find((c) => c.warn && `${c.detail}`.includes("gemini extensions list") && `${c.detail}`.includes("402"));
+    assert.ok(warn, `a WARN quotes the list answer: ${JSON.stringify(a.checks, null, 2)}`);
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["gemini"], runId: "r" });
+    assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+    assert.deepEqual(res.agents[0].changes, []);
+    assert.ok(!readFileSync(log, "utf8").includes("extensions link"), `setup links no second copy: ${readFileSync(log, "utf8")}`);
+    assert.equal(existsSync(path.join(s.home, ".gemini", "settings.json")), false, "setup writes no second hook copy");
+  });
+
+  test("[D-1378-GEMINI-DISK-1] doctor: a gemini extension on disk that extension-enablement.json disables fails and names the enable command (#1378)", geminiDiskSkip, async (t) => {
+    const s = sandbox(t);
+    geminiDiskExt(s, JSON.stringify({ "context-mode": { overrides: [CWD_RULE, `!${CWD_RULE}`] } }));
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["gemini"] });
+    const a = doc.agents[0];
+    assert.equal(a.status, "FAIL", JSON.stringify(a, null, 2));
+    assert.ok(a.reason.includes("disabled") && a.reason.includes("gemini extensions enable context-mode"), a.reason);
+  });
+
+  test("[D-1378-GEMINI-DISK-1] doctor: unreadable extension-enablement.json fails and names that file (#1378)", geminiDiskSkip, async (t) => {
+    const s = sandbox(t);
+    geminiDiskExt(s, "{ not json");
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["gemini"] });
+    const a = doc.agents[0];
+    assert.equal(a.status, "FAIL", JSON.stringify(a, null, 2));
+    assert.ok(a.reason.includes(path.join(s.home, ".gemini", "extensions", "extension-enablement.json")), a.reason);
+  });
+
+  test("[D-1378-GEMINI-DISK-1] doctor: a gemini extension on disk without its hook file fails on hook-registered (#1378)", geminiDiskSkip, async (t) => {
+    const s = sandbox(t);
+    const { ext } = geminiDiskExt(s, undefined); // no extension-enablement.json: Gemini's default is enabled
+    rmSync(path.join(ext, "hooks", "hooks.json"));
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["gemini"] });
+    const a = doc.agents[0];
+    assert.equal(a.status, "FAIL", JSON.stringify(a, null, 2));
+    const hr = a.checks.find((c) => c.name === "hook-registered");
+    assert.ok(hr && !hr.ok && `${hr.detail}`.includes(path.join("hooks", "hooks.json")), JSON.stringify(a.checks, null, 2));
+  });
+
   // D-R44-ZCODE-NATIVE-1 (host audit zcode-1/2): `zcode plugins install` lists as JSON; setup writes nothing, doctor passes.
   const ZC_LIST = (enabled, agent) => JSON.stringify([{ id: "context-mode@context-mode", enabled, hookDetails: [{ event: "PreToolUse", command: `node "\${CLAUDE_PLUGIN_ROOT}/hook.mjs" --agent ${agent}` }] }]);
   const ZC_FAKE = (json, log) => `echo "$@" >> "${log}"\ncase "$1 $2" in\n  "plugins list") printf '%s' '${json}' ;;\nesac\nexit 0`;
