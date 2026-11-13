@@ -14,7 +14,7 @@ import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, 
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { claudeDirOf, codexDirOf, copilotDirOf, dataRootOf, geminiDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
+import { claudeDirOf, codexDirOf, codexPluginHomeOf, copilotDirOf, dataRootOf, geminiDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
 import { AGENT_HOME_DIR, D2_NODE_DETAIL, D2_NODE_FIX, D2_SQLITE_DETAIL, D2_SQLITE_FIX, DB_FILE_NAME, MCP_ENV_FIELD, MCP_ENV_VARS_FIELD, MCP_TOOLS_FIELD, SETUP_MANIFEST_FILE, NATIVE_INSTALL, OPENCODE_CONFIG_FILES, OPENCODE_PLUGIN_KEY, OPENCODE_PLUGINS_KEY, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError, formatError } from "../core/contracts/errors.ts";
 import { nodeTooOld } from "../core/hooks/fallback.ts";
@@ -886,6 +886,7 @@ async function nativeResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run
   const { state, workspaceOff, hookGate, stopped } = nativeState(row, ctx.env);
   const bin = n ? hostBin(n.bin, ctx.env).file : undefined;
   if (stopped) return { id: row.id, status: "FAIL", v1: [], changes: [], checks: [], bin, reason: stopped };
+  if (n?.format === "codex-json" && !bin && codexPluginHomeOf(ctx.pkgDir) !== null) return codexCacheResult(row, ctx, apply);
   if (!n || state === undefined) return undefined;
   if (state === "disabled") {
     if (!n.enable) return undefined;
@@ -913,6 +914,77 @@ async function nativeResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run
     res.status = "FAIL"; res.reason = bad.map((c) => `${c.name}: ${c.detail}`).join("; ");
     if (apply && !apply.dryRun && res.changes.length) { apply.run.rollback(row.id, ctx.env); res.rolledBack = true; }
   }
+  return res;
+}
+
+/** #1376 D-1376-CODEX-CACHE-PIN-1: the edits that drop our own entries from config.toml and hooks.json. `found` gets one
+ *  line per own entry. User entries stay as they are. */
+function codexCacheEdits(row: CheckRow, found: string[]): FileEdit[] {
+  const edits: FileEdit[] = [];
+  const c = row.config;
+  const text = c ? readOr(c.file) : undefined;
+  if (c && text !== undefined) {
+    let cur: unknown;
+    try { cur = hostConfigValueAt(parseHostConfig(row.id, c.file, text, c.format), c.key); } catch { throw new Error(parseFail(row, c.file)); }
+    if (cur !== undefined) {
+      const res = editHostConfigText(row.id, c.file, text, c.format, [[c.key, undefined]]);
+      const run = isObj(cur) ? [cur.command, ...(Array.isArray(cur.args) ? cur.args : [])].filter((x) => typeof x === "string").join(" ") : "";
+      found.push(`${c.file}: [${c.key.join(".")}] runs ${run}`);
+      if (res.edits.length) edits.push({ file: c.file, before: text, after: res.text, changes: res.edits.map((e) => ({ file: c.file, ...e })) });
+    }
+  }
+  const h = row.hookInstall;
+  if (h.kind === "file") planJsonKeys(row, edits, h.file, "json", (doc) => {
+    if (!isObj(doc.hooks)) return [];
+    const own = (x: unknown): boolean => {
+      const hit = isObj(x) && isOwnHookCommand(x.command, row.id);
+      if (hit) found.push(`${h.file}: ${String((x as Json).command)}`);
+      return hit;
+    };
+    const hooks: Json = {};
+    for (const [ev, groups] of Object.entries(doc.hooks)) {
+      if (!Array.isArray(groups)) { hooks[ev] = groups; continue; }
+      const kept = groups.flatMap((g) => {
+        if (own(g)) return [];
+        if (!isObj(g) || !Array.isArray(g.hooks) || !g.hooks.length) return [g];
+        const inner = g.hooks.filter((x) => !own(x));
+        return inner.length ? [{ ...g, hooks: inner }] : [];
+      });
+      if (kept.length || !groups.length) hooks[ev] = kept;
+    }
+    return [[["hooks"], hooks]];
+  });
+  return edits;
+}
+
+/** #1376 D-1376-CODEX-CACHE-PIN-1: setup runs from <codex home>/plugins/cache/.../<version> and codex is not on PATH. The
+ *  codex plugin ships the MCP server and the hooks (${PLUGIN_ROOT}); a Codex plugin update replaces <version>/, so a path
+ *  into it goes missing. Setup writes no entry here and drops the pinned ones an earlier setup wrote. */
+async function codexCacheResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run; dryRun: boolean }): Promise<AgentResult> {
+  const res: AgentResult = { id: row.id, status: "PASS", v1: [], changes: [], checks: [] };
+  const found: string[] = [];
+  let edits: FileEdit[];
+  try { edits = codexCacheEdits(row, found); } catch (e) { return { ...res, status: "FAIL", reason: (e as Error).message }; }
+  res.changes = edits.flatMap((e) => e.changes);
+  const plugin = `the codex plugin in ${codexPluginHomeOf(ctx.pkgDir)} runs the MCP server and the hooks`;
+  if (!apply && found.length) {
+    res.checks = found.map((f) => ({ name: "pinned-entry", ok: false, detail: `${f}; ${plugin}, this entry runs a second copy and its path goes away on a plugin update; run: context-mode setup` }));
+    return { ...res, status: "FAIL", reason: res.checks.map((c) => `${c.name}: ${c.detail}`).join("; ") };
+  }
+  if (apply && !apply.dryRun) {
+    try {
+      for (const e of edits) {
+        assertWritable(row, e.file);
+        const raw = readRaw(e.file);
+        apply.run.record({ agent: row.id, file: e.file, existed: raw !== undefined }, raw);
+        atomicWrite(e.file, raw === undefined ? e.after : withLayout(e.after, hostLayout(raw)));
+      }
+    } catch (e) {
+      apply.run.rollback(row.id, ctx.env);
+      return { ...res, status: "FAIL", reason: (e as Error).message, rolledBack: true };
+    }
+  }
+  res.checks = [{ name: "hook-registered", ok: true, warn: true, detail: `${plugin}; codex is not on PATH, so check them with: codex plugin list` }];
   return res;
 }
 
