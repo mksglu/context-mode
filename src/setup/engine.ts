@@ -25,7 +25,7 @@ import { isNativeOpencodeEntry, OPENCODE_PACKAGE_DIR_HINT, opencodeDirPlugin, op
 import { atomicWriteFile, renameWithRetry, unlinkWithRetry } from "../core/ops/atomic-file.ts";
 import { editHostConfigText, hostConfigValueAt, parseHostConfig } from "../core/ops/host-config.ts";
 import { hostLayout, hostText, withLayout } from "../core/ops/host-text.ts";
-import { AGENT_FLAG, BACKUP_DIR, COMMAND_SKILLS, HOOK_BUNDLE, LOCK_FILE, SKILL_FILE, assertWritable, buildRegistry, configEdits, hookCommandString, renderSkill } from "./registry.ts";
+import { AGENT_FLAG, BACKUP_DIR, COMMAND_SKILLS, HOOK_BUNDLE, SERVER_BUNDLE, LOCK_FILE, SKILL_FILE, assertWritable, buildRegistry, configEdits, hookCommandString, renderSkill } from "./registry.ts";
 import type { CheckRow, HookFile, HookInstall, NativePlugin, SetupContext } from "./registry.ts";
 import { envValue, pathEntries, spawnForm, spawnShim, whichBin, winCmdLine } from "./spawn-bin.ts";
 export { spawnForm, spawnShim, whichBin, winCmdLine };
@@ -803,7 +803,9 @@ type NativeState = "enabled" | "disabled" | undefined;
 /** The extension list also shows the workspace scope: off there, gemini runs none of its hooks (D-NI-GEMINI-GATE-1). */
 /** stopped: the list command ended early (signal or spawn error) after it named the plugin (D-1322-LIST-SIZE-1), or a gemini
  *  extension on disk is missing from a list that answered with an error (D-1378-GEMINI-LIST-ERR-1). */
-interface NativeStatus { state: NativeState; workspaceOff: boolean; hookGate?: string; stopped?: string }
+/** disk: #1378 D-1378-GEMINI-DISK-1, the list did not answer but the extension is on disk; doctor checks it there. */
+interface NativeStatus { state: NativeState; workspaceOff: boolean; hookGate?: string; stopped?: string; disk?: DiskExtension }
+interface DiskExtension { dir: string; note: string; enablement: string }
 
 /** D-1322-LIST-SIZE-1, codex plugin list --json (codex-rs/cli/src/plugin_cmd.rs JsonPluginListOutput): { installed: [{ pluginId,
  *  enabled }], available: [] }. Without --available only installed plugins are listed, so the output stays small. */
@@ -857,13 +859,66 @@ function jsonState(n: NativePlugin, text: string): NativeStatus {
 
 /** #1378 D-1378-GEMINI-LIST-ERR-1: `gemini extensions install` left <gemini dir>/extensions/<plugin>/gemini-extension.json, but
  *  the list did not name it (an auth error such as 402, exit 0). The install is the host's; doctor quotes the list answer. */
-function unlistedExtension(n: NativePlugin, env: SetupContext["env"], home: string, out: string, status: number | null): string | undefined {
+function unlistedExtension(n: NativePlugin, env: SetupContext["env"], home: string, out: string, status: number | null): { dir: string; note: string } | undefined {
   if (n.bin !== "gemini") return undefined;
   const dir = path.join(geminiDirOf(env, home), "extensions", n.plugin);
   if (!existsSync(path.join(dir, "gemini-extension.json"))) return undefined;
   const cmd = [n.bin, ...n.args].join(" ");
   const first = out.split("\n").map((l) => l.trim()).find((l) => l.length)?.slice(0, 300) ?? `exit ${status}`;
-  return `context-mode is installed in ${dir}, and ${cmd} answered "${first}" in place of the extension list; run ${cmd} in a terminal and fix that answer (gemini auth)`;
+  return { dir, note: `context-mode is installed in ${dir}, and ${cmd} answered "${first}" in place of the extension list; run ${cmd} in a terminal and fix that answer (gemini auth)` };
+}
+
+const EXT_ENABLEMENT_FILE = "extension-enablement.json";
+/** gemini-cli ensureLeadingAndTrailingSlash: the path form its enablement rules match against. */
+function slashDir(p: string): string {
+  let r = p.split("\\").join("/");
+  if (!r.startsWith("/")) r = `/${r}`;
+  return r.endsWith("/") ? r : `${r}/`;
+}
+/** #1378 D-1378-GEMINI-DISK-1, gemini-cli ExtensionEnablementManager.isEnabled: enabled by default; each override that
+ *  matches the cwd sets the state, so the last match wins; a leading ! disables; a trailing * covers subdirs (a path
+ *  prefix), else the path must be the same. bad: the file is not JSON (gemini reports that file as an error). */
+function geminiEnablement(n: NativePlugin, env: SetupContext["env"], home: string, cwd: string): { file: string; on: boolean; bad?: true } {
+  const file = path.join(geminiDirOf(env, home), "extensions", EXT_ENABLEMENT_FILE);
+  const text = readOr(file);
+  if (text === undefined) return { file, on: true };
+  let doc: unknown;
+  try { doc = JSON.parse(text); } catch { return { file, on: false, bad: true }; }
+  const mine = isObj(doc) ? doc[n.plugin] : undefined;
+  const rules = isObj(mine) && Array.isArray(mine.overrides) ? mine.overrides : [];
+  const here = slashDir(cwd);
+  let on = true;
+  for (const rule of rules) {
+    if (typeof rule !== "string") continue;
+    const off = rule.startsWith("!");
+    let base = off ? rule.slice(1) : rule;
+    const subdirs = base.endsWith("*");
+    if (subdirs) base = base.slice(0, -1);
+    base = slashDir(base);
+    if (subdirs ? here.startsWith(base) : here === base) on = !off;
+  }
+  return { file, on };
+}
+
+/** #1378 D-1378-GEMINI-DISK-1: hook-registered from the extension on disk: its hooks/hooks.json holds the gemini hook. */
+function diskHookCheck(row: CheckRow, n: NativePlugin, dir: string): Check {
+  const name = "hook-registered";
+  const file = path.join(dir, n.hooksVia);
+  const text = readOr(file);
+  if (text === undefined) return { name, ok: false, detail: `${file} is missing; run: ${NATIVE_INSTALL.gemini[0]}` };
+  let doc: unknown;
+  try { doc = JSON.parse(text); } catch { return { name, ok: false, detail: `${file} is not valid JSON; run: ${NATIVE_INSTALL.gemini[0]}` }; }
+  return holdsOwn(doc, row.id) ? { name, ok: true } : { name, ok: false, detail: `${file} holds no ${AGENT_FLAG} ${row.id} hook; run: ${NATIVE_INSTALL.gemini[0]}` };
+}
+
+/** #1378 D-1378-GEMINI-DISK-1: the row as the extension on disk runs it (server and hook bundles under plugins/claude-code). */
+const EXT_BUNDLE_DIR = ["plugins", "claude-code"];
+function diskRow(row: CheckRow, n: NativePlugin, dir: string): CheckRow {
+  const bundle = (f: string): string => path.join(dir, ...EXT_BUNDLE_DIR, f);
+  return { ...nativeRow(row, n), listCommand: undefined,
+    serverCommand: [row.serverCommand[0], bundle(SERVER_BUNDLE), AGENT_FLAG, row.id],
+    hookRunCommand: [row.hookRunCommand[0], bundle(HOOK_BUNDLE), AGENT_FLAG, row.id],
+    ...(row.hookCommand ? { hookCommand: [row.hookRunCommand[0], bundle(HOOK_BUNDLE), AGENT_FLAG, row.id] } : {}) };
 }
 
 /** The host's own install as its list command shows it (undefined: not listed in that form, setup owns the agent). */
@@ -884,7 +939,10 @@ function nativeState(row: CheckRow, env: SetupContext["env"], home: string): Nat
     const st = r.status === 0 ? extensionState(n, out) : none;
     if (st.state !== undefined) return st;
     const unlisted = unlistedExtension(n, env, home, out, r.status);
-    return unlisted ? { ...none, stopped: unlisted } : st;
+    if (!unlisted) return st;
+    const en = geminiEnablement(n, env, home, process.cwd());
+    if (en.bad) return { ...none, stopped: `${en.file} is not valid JSON, so gemini cannot read which projects enable context-mode; fix that file. ${unlisted.note}` };
+    return { state: en.on ? "enabled" : "disabled", workspaceOff: false, disk: { ...unlisted, enablement: en.file } };
   }
   if (r.status !== 0) return none;
   if (n.format === "json") return jsonState(n, `${r.stdout}`);
@@ -901,13 +959,15 @@ function nativeRow(row: CheckRow, n: NativePlugin): CheckRow {
  *  disabled extension is a FAIL that names the host's enable command: setup cannot link over it (D-NI-EXT-DOCTOR-1). */
 async function nativeResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run; dryRun: boolean }): Promise<AgentResult | undefined> {
   const n = row.nativePlugin;
-  const { state, workspaceOff, hookGate, stopped } = nativeState(row, ctx.env, ctx.home);
+  const { state, workspaceOff, hookGate, stopped, disk } = nativeState(row, ctx.env, ctx.home);
   const bin = n ? hostBin(n.bin, ctx.env).file : undefined;
   if (stopped) return { id: row.id, status: "FAIL", v1: [], changes: [], checks: [], bin, reason: stopped };
   if (n?.format === "codex-json" && !bin && codexPluginHomeOf(ctx.pkgDir) !== null) return codexCacheResult(row, ctx, apply);
   if (!n || state === undefined) return undefined;
   if (state === "disabled") {
     if (!n.enable) return undefined;
+    if (disk) return { id: row.id, status: "FAIL", v1: [], changes: [], checks: [], bin,
+      reason: `context-mode is installed in ${disk.dir} but disabled for ${process.cwd()} in ${disk.enablement}, run ${n.bin} ${n.enable.join(" ")}` };
     return { id: row.id, status: "FAIL", v1: [], changes: [], checks: [], bin,
       reason: `context-mode is installed but disabled in ${n.bin}, run ${n.bin} ${n.enable.join(" ")}` };
   }
@@ -923,7 +983,11 @@ async function nativeResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run
       return { ...res, status: "FAIL", reason: (e as Error).message, rolledBack: true };
     }
   }
-  res.checks = await verifyRow(nativeRow(row, n), ctx);
+  if (disk) {
+    res.checks = (await verifyRow(diskRow(row, n, disk.dir), { ...ctx, pkgDir: disk.dir }))
+      .map((c) => c.name === "hook-registered" ? diskHookCheck(row, n, disk.dir) : c);
+    res.checks.push({ name: "list", ok: true, warn: true, detail: `${disk.note}; doctor checked the extension files on disk` });
+  } else res.checks = await verifyRow(nativeRow(row, n), ctx);
   if (n.hookTrust) res.checks = withHookTrust(res.checks, hooks, !!apply?.dryRun);
   if (n.format === "extension") res.checks = withHookGate(res.checks, geminiGate(n, ctx, workspaceOff));
   if (n.format === "json") res.checks = withHookGate(res.checks, hookGate);
