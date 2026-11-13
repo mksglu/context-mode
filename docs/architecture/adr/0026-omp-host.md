@@ -1,17 +1,34 @@
 # ADR-0026: OMP (oh-my-pi) as a supported host
 
 - Status: Proposed (2026-11-13).
-- Scope: one ADR (Part 1) and one PRD (Part 2) in a single file, as the owner asked ("tek bir md istiyorum ama senden adr pdr birlesik").
-- Keeps: ADR-0010 (doctor tells the truth), ADR-0019 (setup and npm channel), ADR-0020 (hooks and skills on every agent), ADR-0021 (prompt-cache safety, D-CACHE-PI-1), ADR-0023 (each agent's own native install), ADR-0024 (tests grouped by ADR).
-- Issue: [#1332](https://github.com/mksglu/context-mode/issues/1332) (closed 2026-11-12; the owner wrote on 2026-11-09 "Give me 1-2 weeks to support this", [comment](https://github.com/mksglu/context-mode/issues/1332#issuecomment-6729645399)).
+- Scope: one ADR (Part 1) and one PRD (Part 2) in one file, as the owner asked ("tek bir md istiyorum ama senden adr pdr birlesik").
+- Keeps: ADR-0010 (doctor tells the truth), ADR-0019 (setup), ADR-0020 (hooks and skills on every agent), ADR-0021 (prompt-cache safety, D-CACHE-PI-1), ADR-0023 (each agent's own native install), ADR-0024 (tests grouped by ADR).
+- Issue: [#1332](https://github.com/mksglu/context-mode/issues/1332).
 - Pinned evidence:
-  - OMP source: `can1357/oh-my-pi` at commit `aa5f045f98a90f5c7bbc6b091f1e97e42263194d` (2026-11-13). Paths `types.ts`, `runner.ts`, `shared-events.ts` are under `packages/coding-agent/src/extensibility/`.
-  - OMP npm: `@oh-my-pi/pi-coding-agent` 18.20.0 (`npm view @oh-my-pi/pi-coding-agent version` = 18.20.0).
-  - Live binary: `omp --version` = `omp/18.20.0`, macOS arm64, temp HOME only.
+  - OMP source: `can1357/oh-my-pi` at `aa5f045f98a90f5c7bbc6b091f1e97e42263194d`. A **[src]** path without a leading `packages/`, `scripts/` or `docs/` is under `packages/coding-agent/src/`.
+  - OMP npm and binary: `@oh-my-pi/pi-coding-agent` 18.20.0, `omp --version` = `omp/18.20.0`, macOS arm64, temp HOME only.
   - context-mode: `main` = `fea7780d`, npm 2.1.10.
-  - Pi for compare: `@earendil-works/pi-coding-agent` 1.4.0, `dist/core/extensions/types.d.ts:723,1128`.
-  - Hook proof: the run log `omp-hooks-proof.md` (r64 host research, owner workspace, outside this repo; "proof §N" below). Fake OpenAI-compatible model that makes one tool call, a probe extension that logs 18 events, and an RPC driver. Pi types for compare: `@earendil-works/pi-coding-agent` 1.5.2 `dist/core/extensions/types.d.ts`.
-- Labels in this file: **[src]** OMP source file:line at the commit above; **[doc]** OMP docs file at that commit; **[run]** live command in a temp HOME; **[issue]** #1332; **[cm]** context-mode file:line at `fea7780d`. A claim with no label is marked **unverified**.
+  - Pi for compare: real Pi CLI 1.4.0 (temp HOME), Pi package 1.5.2 `dist/core/extensions/types.d.ts` and `dist/core/pi-manifest.js`.
+  - Proof logs (r64/r65 host research, owner workspace, outside this repo): `omp-hooks-proof.md`, `omp-r64.md`, `omp-v2-fit.md`, `omp-r65-events.md`, `omp-r65-tools.md`, `omp-r65-config.md`, `omp-r65-platform.md`.
+- Labels: **[src]** OMP source file:line; **[doc]** OMP docs file:line; **[run]** live command in a temp HOME (proof log named); **[issue]** #1332; **[cm]** context-mode file:line at `fea7780d`; **[Pi]** Pi package file.
+
+## For reviewers
+
+What this document decides:
+
+1. OMP becomes the 11th agent, `omp`. It has its own thin entry `omp/index.js` (OMP reads the `omp` manifest key first) and shares the Pi code. Pi does not change by one byte.
+2. On OMP we add our text as one more system prompt block. OMP's base prompt, AGENTS.md and other extensions stay (fixes #1332).
+3. The 9 `ctx_*` tools register with `loadMode: "essential"`, so OMP lists them as normal tools. Pi sends the same bytes as today.
+4. Every OMP user step uses OMP's own commands: `omp plugin install context-mode`, `omp plugin upgrade context-mode`, `omp plugin uninstall context-mode`, `omp update`.
+5. Doctor and `ctx_upgrade` say `agent omp`, read `~/.omp`, and never write under `~/.pi`. OMP support reaches `main` as one whole change.
+
+Questions for OMP users (please answer in #1332):
+
+1. Which OMP version do you run? Is 14.7.0 or later a good minimum for you?
+2. Do you run OMP on Windows? Did `irm https://omp.sh/install.ps1 | iex` work for you?
+3. Do you use OMP mostly in the interactive TUI, in RPC mode (`omp --mode rpc`), or in print mode (`omp -p`)?
+4. Do you let OMP import MCP servers from Claude Code or other hosts (`enabledProviders` in `~/.omp/agent/config.yml`)?
+5. Do you call skills such as `/skill:ctx-doctor` in OMP?
 
 ---
 
@@ -19,114 +36,134 @@
 
 ## Context
 
-1. **What OMP is.** OMP is a fork of the Pi coding agent. Binary `omp`, package `@oh-my-pi/pi-coding-agent`, runtime Bun >= 1.4.4 [src `packages/coding-agent/package.json:2-3,27-28,563-564`]. It keeps Pi's extension factory (`export default function (pi) { pi.on(...) }`) and has a shim for the old Pi imports [src `extensibility/legacy-pi-coding-agent-shim.ts:4`, `extensibility/plugins/legacy-pi-compat.ts:2735,2849`, `extensibility/extensions/loader.ts:500`].
-2. **It loads our Pi bundle today.** OMP reads the manifest key `omp`, then `pi` [doc `docs/plugin-manager-installer-plumbing.md:91-95`, `docs/extension-loading.md:59,64`]. `omp plugin install context-mode` installed 2.1.10, and OMP ran our `pi/index.js` [run, lock file `~/.omp/plugins/omp-plugins.lock.json` = `{"plugins":{"context-mode":{"version":"2.1.10",...,"enabled":true}}}`].
-3. **One bug destroys the user's prompt (#1332).** On OMP, `before_agent_start` gets `systemPrompt: string[]` [src `types.ts:1210-1218`]. The result type is `systemPrompt?: string[]`, "Replace policy ... Extensions chain in order" [src `types.ts:1779-1783`]. The runner turns a string result into `[result]` and that replaces the whole array [src `runner.ts:2682-2686`]. Pi passes and takes a string [Pi `types.d.ts:723,1128`]. Our entry reads the prompt with `str(v)`, which gives `""` for a non-string [cm `src/entries/pi.ts:52-54`], so we return only our payload [cm `src/entries/pi.ts:171-172`, returns at `:179` and `:190`]. Result on OMP: the base prompt, `<project-context>` / AGENTS.md and other extensions' sections are gone.
-   - Live proof [run, OMP 18.20.0, fake OpenAI-compatible model, `omp -p --no-session --model fake/fake -e probe.ts "hi"`]: with a probe only, `before_agent_start` saw an array of 2 (`"RFC 2119 keywords: ..."`, `"<project-context>..."`) and the request held base, project context and AGENTS.md. With context-mode 2.1.10 installed, the array held 1 item (our payload) and the request held **no** base, **no** project context, **no** AGENTS.md. Measured system message [run proof §6d]: probe only 7921 chars (RFC 2119 rules and `<project-context>` present); context-mode 2.1.10 loaded 592 chars (both absent, our payload present).
-   - Users who confirm it [issue]: @tejasach06 (OMP 18.18.0, Windows x64, context-mode 2.1.5, sent a patch), @itsmylife44 (OMP 18.18.1, macOS arm64, "I use omp every day", [comment](https://github.com/mksglu/context-mode/issues/1332#issuecomment-6725664810)), @jeffscottward (context-mode 2.1.7, OMP 18.18.9, Linux and macOS, wrapper workaround that calls the Pi handler with `systemPrompt ""` and appends to OMP's array, [comment](https://github.com/mksglu/context-mode/issues/1332#issuecomment-6862022962)).
-4. **Our tools do not reach the model on OMP.** In the same run the model's tool list was the 11 OMP built-ins only, no `ctx_*` [run]. Cause, proven by a probe: OMP gives a new extension tool `loadMode: "discoverable"` by default [doc `docs/extensions.md:826`], and `tools.xdev` (default `true`) mounts such tools under `xd://` URLs, not as top-level schemas [doc `docs/settings.md:646`]. A probe with `loadMode: "essential"` put both a factory tool and a tool registered inside `before_agent_start` in the top-level list, with plain JSON Schema `parameters` [run, probe3]. Pi 1.4.0 has no `loadMode` field [Pi `types.d.ts`, grep: no hit].
-5. **Doctor lies about OMP today.** The doctor output in #1332 shows `agent pi` and a D3 FAIL on `~/.pi/agent/settings.json` while it runs inside OMP [issue body]. OMP is in `UNSUPPORTED_HOSTS` [cm `src/core/contracts/constants.ts:718-719`, D-UNSUPPORTED-HOSTS-1].
-6. **History (git archaeology).** v1 had an MCP-only OMP adapter that wrote `~/.omp/agent/mcp.json` and never used `before_agent_start` (v1.0.169 `src/adapters/omp/index.ts:4-19`). v1 counted `PI_CODING_AGENT_DIR` as an OMP signal (v1.0.169 `src/adapters/detect.ts:220-225`). v2 removed OMP with other agents [cm `docs/architecture/PRD.md:328`, `docs/architecture/TECH-SPEC.md:73`]; `c814ef3e` and `772c31e0` deleted the files and `build/check-removed.mjs:57,70` guards the dirs `configs/omp/` and `src/adapters/omp/`. `ee8c73ac` (2026-11-08) added the `UNSUPPORTED_HOSTS` row. No earlier v2 attempt exists.
-7. **Env vars do not tell OMP from Pi.** OMP reads `PI_CONFIG_DIR` (config root dirname, default `.omp`) and `PI_CODING_AGENT_DIR` (agent dir override) [doc `docs/environment-variables.md:599-600`]. Pi reads `PI_CODING_AGENT_DIR` too [cm `src/core/project/config-dir.ts:165-169`]. Owner rule: `PI_CODING_AGENT_DIR` is never an OMP signal [cm test `tests/0010-doctor-upgrade.test.mjs:695-703`].
-8. **Release speed.** OMP shipped 9 releases from 18.18.0 (2026-11-07) to 18.20.0 (2026-11-12) [src `CHANGELOG.md:84-548`]. No breaking-change section in that window touches the five events we use [src `CHANGELOG.md:90,195,394,437,511`].
+1. **What OMP is.** OMP is a fork of the Pi coding agent. Binary `omp`, package `@oh-my-pi/pi-coding-agent`, runtime Bun >= 1.4.4 [src `packages/coding-agent/package.json:2-3`; doc `README.md:100`]. It keeps Pi's extension factory (`export default function (pi) { pi.on(...) }`) and loads old Pi modules through a shim [src `extensibility/extensions/loader.ts:500`, `extensibility/plugins/legacy-pi-compat.ts:2735`].
+2. **It loads our Pi bundle today.** OMP reads the manifest key `omp`, and only when it is absent, `pi` (whole object, no merge) [src `extensibility/plugins/installer.ts:71,108`, `extensibility/plugins/loader.ts:194`; doc `docs/plugin-manager-installer-plumbing.md:91-95`]. Our package has only `pi` [cm `build/manifests.ts:253`], so OMP runs `pi/index.js`, and every row says `agent=pi` [run `omp-r65-config.md` "Data paths": `select agent,count(*) from events` -> `pi|4`].
+3. **One bug destroys the user's prompt (#1332).** On OMP >= 14.7.0, `before_agent_start` gets `systemPrompt: string[]` [src `extensibility/extensions/types.ts:1210-1218`]. The result type is `systemPrompt?: string[]` with a replace policy [src `extensibility/extensions/types.ts:1779-1783`]. The runner turns a string result into `[result]`, and that replaces the whole array [src `extensibility/extensions/runner.ts:2682-2686`]. Our entry reads the prompt with `str(v)`, which gives `""` for a non-string [cm `src/entries/pi.ts:52-54`], so we return only our payload [cm `src/entries/pi.ts:171-172`].
+   - [run `omp-hooks-proof.md` §6d]: system message 7921 chars with a probe only (RFC 2119 rules, `<project-context>`, AGENTS.md present); 592 chars with context-mode 2.1.10 (all gone, only our payload).
+   - [issue] @tejasach06 (OMP 18.18.0, Windows x64, sent a patch), @itsmylife44 (OMP 18.18.1, macOS arm64, daily user), @jeffscottward (OMP 18.18.9, Linux and macOS, runs a wrapper that appends to OMP's array).
+4. **Our tools do not reach the model as tools.** OMP gives a new extension tool `loadMode: "discoverable"` [doc `docs/extensions.md:826`], and `tools.xdev` (default on) mounts it under `xd://` [doc `docs/settings.md:646`; src `tools/essential-tools.ts:45-48`, `tools/xdev.ts:86-89`]. [run `omp-r65-tools.md` §2]: top-level tools = 11 OMP built-ins; `ctx_*` appear only as `xd://ctx_*` text. Our 592-char prompt never says `xd://`.
+5. **Doctor and upgrade do not tell the truth on OMP.** [run `omp-r65-tools.md` §6]: `ctx_doctor` prints `agent pi` and `D3 host config FAIL ... ~/.pi/agent/settings.json ... Fix: pi install npm:context-mode` while `~/.pi` does not exist. `ctx_upgrade` prints `host update | pi update --extensions`, a false `plugin root` row (`.../context-mode/pi` vs `.../context-mode`), and creates `~/.pi/agent/settings.json` (sha1 diff). Cause: OMP is in `UNSUPPORTED_HOSTS` [cm `src/core/contracts/constants.ts:718-719`] and the Pi branches [cm `src/core/tools/doctor.ts:184`, `src/core/ops/host-write.ts:33`].
+6. **History.** v1 had an MCP-only OMP adapter with no hooks (v1.0.169 `src/adapters/omp/index.ts:4-19`) and used `PI_CODING_AGENT_DIR` as an OMP signal (v1.0.169 `src/adapters/detect.ts:220-225`). v2 removed it [cm `docs/architecture/PRD.md:328`]; `build/check-removed.mjs:57,70` guards `configs/omp/` and `src/adapters/omp/` [cm]. `ee8c73ac` added the `UNSUPPORTED_HOSTS` row. Pi-Bolt is a Pi build, not an AgentId (`b7ff6a87`, `739e86ef`) [run `omp-r65-platform.md` §6].
+7. **Env vars do not tell OMP from Pi.** OMP reads `PI_CONFIG_DIR` and `PI_CODING_AGENT_DIR` [src `packages/utils/src/dirs.ts:4-5`; doc `docs/environment-variables.md:599-600`]; Pi reads `PI_CODING_AGENT_DIR` too [cm `src/core/project/config-dir.ts:167`].
+8. **Release speed.** OMP shipped 9 releases from 18.18.0 to 18.20.0 in 6 days [src `packages/coding-agent/CHANGELOG.md:84-548`]. 342 published versions use the array form [run `omp-r65-platform.md` §2].
 
 ### Hook events, live proof (OMP 18.20.0)
 
-context-mode 2.1.10 subscribes five events: `before_agent_start`, `input`, `tool_call`, `tool_result`, `session_compact` [cm `src/entries/pi.ts:166-224`]. Each one fires on OMP 18.20.0. Runs: temp HOME, fake model, `omp -p --no-session --model faketools/fake -e ../probe-hooks.ts "<prompt>" < /dev/null` for print mode, and `omp --mode rpc` driven by `rpc-drive.mjs` (prompt, then `{"type":"compact"}`) for `input` and compaction. "Our handler ran" means context-mode 2.1.10, installed with `omp plugin install context-mode`, loaded in the same run.
+context-mode 2.1.10 subscribes five events [cm `src/entries/pi.ts:167-225`]. Each one fires on OMP 18.20.0, and our handler runs. Runs: temp HOME, fake OpenAI-compatible model, `omp -p --no-session --model faketools/fake ... < /dev/null` (print), `omp --mode rpc` with a driver (RPC), and a pty driver (interactive).
 
-| Event | Fires live? | Payload keys | Our handler ran? | Difference vs Pi | Evidence |
-|---|---|---|---|---|---|
-| `tool_call` | yes, 3 ms before `tool_execution_start`; `{block, reason}` stops the tool (marker file not made on block, made on observe) | `type, toolName, toolCallId, input` | yes: a read of a 108,894 B file was denied; the model got the `ctx_execute` hint | same shape | [run] proof §1, §6a; [src] `extensions/wrapper.ts:322-324`, `extensions/runner.ts:2367-2368` |
-| `tool_result` | yes; a returned `content` reaches the model | `type, toolName, toolCallId, input, content, details, isError` | yes: `seq 1 40000` output replaced with tail + `ctx_search` hint; `events` row `2\|cmd\|Bash\|Bash:seq 1 40000\|5024\|5024\|147`; `sources` row `Bash:seq 1 40000#call_r64_1` | no `structuredContent`; OMP takes a returned `structuredContent` without error and drops it | [run] proof §2, §6b; [src] `extensions/runner.ts:2286-2297`, `shared-events.ts:412-418`; Pi 1.5.2 `types.d.ts:1017,1137` |
-| `input` | yes in RPC (`source: "rpc"`); no in `-p` print mode (0 events in 3 runs) | `type, text, images, source` | yes in RPC: `events` row `4\|prompt\|\|\|R64_RPC_INPUT read small.txt`; never in print mode | same type; print mode has no `emitInput` caller | [run] proof §3, §6c; [src] `modes/rpc/rpc-mode.ts:1909`, `modes/controllers/input-controller.ts:1089`; Pi 1.5.2 `types.d.ts:930-936` |
-| `session_compact` | yes, after an RPC compact (with `compaction.keepRecentTokens: 1`); `session_before_compact` fires first | `type, compactionEntry, fromExtension` | delivered with context-mode loaded; our handler reads no field [cm `src/entries/pi.ts:224-226`]; the next-turn SessionStart(compact) is not run (O2a) | no `reason` key (Pi: `manual`, `threshold`, `overflow`) | [run] proof §4; [src] `session/session-maintenance.ts:2711-2715`, `:1431`, `session/context-settings.ts:282-286`; Pi 1.5.2 `types.d.ts:633-638` |
-| `before_agent_start` | yes, in every run | `type, reason, prompt, images, systemPrompt` (array of 2 strings) | yes, and it wipes OMP's prompt: 7921 -> 592 chars (#1332, Decision 2) | `systemPrompt` is `string[]` in and out; Pi has `string` | [run] proof §5, §6d; [src] `extensions/runner.ts:2682-2685`; Pi 1.5.2 `types.d.ts:743,1148` |
-| `ctx_*` tools (not an event) | n/a | 9 tools appear only as `xd://ctx_*` text in a user `<system-notice>` | top-level `tools` = 11 OMP built-ins, no `ctx_*` | Pi has no `loadMode` | [run] proof §6e |
+| Event | Fires live | Our handler | Difference vs Pi | Evidence |
+|---|---|---|---|---|
+| `tool_call` | yes; `{block, reason}` stops the tool | read of a 108,894 B file denied; model got the `ctx_execute` hint | same shape | [run] `omp-hooks-proof.md` §1, §6a; [src] `extensibility/extensions/runner.ts:2367-2368` |
+| `tool_result` | yes; returned `content` reaches the model | `seq 1 40000` output replaced; `events` and `sources` rows written | no `structuredContent`; a returned one is dropped with no error | [run] `omp-hooks-proof.md` §2, §6b; [src] `extensibility/extensions/runner.ts:2286-2297`, `extensibility/shared-events.ts:412-418` |
+| `input` | RPC (`source: "rpc"`) and interactive (`source: "interactive"`); never in print mode | `prompt` row written (RPC and TUI) | print mode has no `emitInput` caller | [run] `omp-hooks-proof.md` §3, §6c; `omp-r65-events.md` O2b; [src] `modes/rpc/rpc-mode.ts:1909`, `modes/controllers/input-controller.ts:1089` |
+| `session_compact` | yes, after an RPC compact | sets the compact flag; next turn sends INSTRUCTIONS only, as on Pi | no `reason` key; no handler reads it | [run] `omp-r65-events.md` O2a; [src] `session/session-maintenance.ts:2711-2715` |
+| `before_agent_start` | yes, every prompt; twice on the first RPC prompt | runs; wipes OMP's prompt today (#1332) | `string[]` in and out; Pi has `string` | [run] `omp-hooks-proof.md` §5, §6d; `omp-r65-events.md` O2c; [src] `session/agent-session.ts:618,9413-9432` |
 
 ## Decision
 
-1. **OMP is the 11th `AgentId`, `omp`, with its own table row and the same bundle.** `src/adapters/table.ts` gets an `omp` row next to the Pi row [cm `table.ts:98-105`]: `installMode: "in-process"`, `projectSource: "pi:ctx.cwd"` (OMP `ctx.cwd: string` [src `types.ts:805-807`]), `hookChannel` = the same `pi/index.js`, `compactDelivery: "pi-flag"`. `build/build.mjs:63` keeps one bundle. No `src/adapters/omp/` dir (it stays blocked by `check-removed.mjs:70`); a file `src/adapters/omp.ts` is added only if decode or encode differ from `src/adapters/pi.ts`.
-2. **The shape of the prompt is the mechanism. Append, never replace.** One pure helper next to `str()` in `src/entries/pi.ts`:
-   - `systemPrompt` is a string (Pi, Pi-Bolt): today's bytes exactly, `base === "" ? payload : base + "\n\n" + payload`.
-   - `systemPrompt` is an array (OMP): return `[...systemPrompt, payload]`. Every entry stays, in order; our payload is the last item, once.
-   - Absent: `payload` (today's Pi path for `""`).
-   - The check is `typeof` and `Array.isArray`. No regex. On a throw before first delivery the handler returns `{}` on both hosts; OMP then keeps its own array (the runner replaces only when `systemPrompt` is set [src `runner.ts:2682-2686`]).
-   - Cache (ADR-0021, D-CACHE-PI-1): OMP rebuilds each turn from `basePreparation.systemPrompt` [src `session/agent-session.ts:9419`], and our result lives "until the next preparation" [src `types.ts:1781`]. So each turn we get the base array again, not our last return, and we append once per turn. The payload bytes stay fixed between compactions, as on Pi.
-3. **Host detection uses positive, sure signals only.**
-   - Inside the process (hooks): the first `before_agent_start` with an array `systemPrompt` sets the agent id to `omp`; a string keeps `pi`. Pi's type is `readonly systemPrompt: string` [Pi `types.d.ts:723`], so an array is never Pi. `src/entries/pi.ts:112,117` stop hard-coding `"pi"` and use this id.
-   - Outside the process (setup, doctor): the `omp` binary on PATH, the plugin store `~/.omp/plugins/omp-plugins.lock.json` [doc `docs/plugin-manager-installer-plumbing.md:23,46-57`], and MCP clientInfo `omp-coding-agent` [cm `src/core/contracts/client-map.ts:37-42`].
-   - `PI_CODING_AGENT_DIR` and `PI_CONFIG_DIR` are path inputs after OMP is known. They never select OMP. The wrong comment at `client-map.ts:40` is fixed.
-   - Pi-Bolt keeps `pi install npm:context-mode` and `~/.pi/agent/settings.json` [cm `docs/install/pi.md:17`]; nothing in the OMP path reads Pi-Bolt as OMP.
-4. **OMP's own native commands (ADR-0023).**
-   - Install: `omp plugin install context-mode` [doc `docs/cli-reference.md` row `install`; run: `✔ Installed context-mode@2.1.10`].
-   - Update context-mode: `omp plugin upgrade context-mode` [doc `docs/plugin-manager-installer-plumbing.md:126`, `docs/marketplace.md:73`].
-   - Update OMP itself: `omp update` [doc `docs/cli-reference.md` subcommand table].
-   - Install OMP: `curl -fsSL https://omp.sh/install | sh` (macOS, Linux) [doc `README.md:44`; run], `irm https://omp.sh/install.ps1 | iex` (Windows) [doc `README.md:91`].
+1. **OMP is the 11th `AgentId`, `omp`, with a thin own entry.**
+   - `src/core/contracts/agents.ts:2` gets `"omp"` after `"pi"`. `src/adapters/table.ts` gets an `omp` row next to the Pi row [cm `src/adapters/table.ts:98-106`]: `installMode: "in-process"`, `projectSource: "pi:ctx.cwd"` (OMP `ctx.cwd` is a string [src `extensibility/extensions/types.ts:805-807`]), `toolNamePrefix: ""`, `compactDelivery: "pi-flag"`, `hookChannel: { kind: "in-process", path: "omp/index.js" }`, `skillChannel: { kind: "package", path: "skills" }` (Decision 9).
+   - `package.json` gets `"omp": { "extensions": ["./omp/index.js"] }` next to `pi` [cm `build/manifests.ts:229-253`]. `omp/index.js` is a few lines: it imports the Pi factory and calls it with `agent: "omp"`. One bundle; the package grows by under 1 KB.
+   - [run, this ADR, copy of the r64 home]: package with both keys and the wrapper -> `omp -p ... < /dev/null` exit 0, wrapper log `loaded:omp-entry`, model saw the tool result. [Pi `dist/core/pi-manifest.js:10-20`]: Pi 1.5.2 reads only `pkg.pi`, so the `omp` key leaves Pi as it is.
+   - The agent id comes from the entry file the host loaded. This is a sure, positive signal: no shape sniffing, env, argv or regex.
+   - No `src/adapters/omp/` dir (blocked by `build/check-removed.mjs:70` [cm]). The `omp` row reuses `src/adapters/pi.ts` decode, encode and `checkPermission`.
+2. **Append, never replace (#1332).** One pure helper next to `str()` [cm `src/entries/pi.ts:52-54`]:
+   - Array (OMP >= 14.7.0): return `[...event.systemPrompt, payload]`. Every block stays, in order; our payload is the last block, once.
+   - String (Pi, Pi-Bolt, OMP < 14.7.0): today's bytes exactly, `base === "" ? payload : base + "\n\n" + payload`.
+   - Absent: `payload`. A throw before first delivery returns `{}`; OMP then keeps its own array [src `extensibility/extensions/runner.ts:2682-2686`].
+   - The helper uses `Array.isArray` and `typeof`. It runs on both entries, so the shape, not the entry, picks the return form.
+   - Rebuild from `event.systemPrompt` on every call. OMP re-runs the hook when the base changes after an override [src `session/agent-session.ts:9413-9432`]; a rebuild gives the right bytes on each run and never appends twice.
+   - Cache (ADR-0021): OMP rebuilds the base each turn [src `session/agent-session.ts:9419`]. Earlier blocks stay byte-equal; the payload bytes stay fixed between compactions, as on Pi.
+3. **Tools: `loadMode: "essential"` on every `ctx_*` tool, on both hosts (M3).** `piTool()` [cm `src/entries/pi.ts:146-153`] sets the field with no host check.
+   - [run `omp-r65-tools.md` §2, §3]: OMP top-level tools 11 -> 20; tools array 17,537 -> 25,714 B (+8,177 B, cached prefix). All 9 tools run: `ctx_execute` (shell, javascript, file), `ctx_batch`, `ctx_index` (content, path, URL), `ctx_search`, `ctx_resume`, `ctx_stats`, `ctx_doctor`, `ctx_purge`.
+   - [run `omp-r65-tools.md` §5a, §5c]: real Pi 1.4.0 raw request 14,014 B, byte-identical with and without the field, turns 1-3; no warning. OMP tools and system bytes stable on turns 1-3 and across runs.
+   - OMP adds a required intent field `i` to each schema and removes it before `execute()`; our zod schemas need no change [run `omp-r65-tools.md` §3].
+4. **One `before_agent_start` per prompt on OMP (O2c).** Cause: we register tools inside the first `before_agent_start` [cm `src/entries/pi.ts:156-163,170`]; that changes OMP's base, and OMP runs the hook again [src `session/agent-session.ts:618,9413-9432`]. Effect today: one extra SessionStart call, and `turn += 1` [cm `src/entries/pi.ts:169`] gives prompt 2 `turn=3` [run `omp-r65-events.md` O2c].
+   - The OMP entry registers the 9 tools at load. [run `omp-r65-events.md` O2c probe]: registration at load -> one call per prompt in RPC; [run `omp-r65-tools.md` §5c]: load-time registration with `essential` keeps tool bytes stable on turns 1-3.
+   - The Pi entry keeps registration where it is (no Pi change).
+   - The turn counter moves to the start of a new prompt (`event.prompt` seen for the first time in this agent run), so a re-run never counts twice on any host.
+5. **Host detection outside the process (setup, doctor CLI).** Sure signals only: the `omp` binary on PATH, the plugin store `~/.omp/plugins/omp-plugins.lock.json` [src `packages/utils/src/dirs.ts:714-718,733`], MCP clientInfo `omp-coding-agent` [cm `src/core/contracts/client-map.ts:42`]. `PI_CODING_AGENT_DIR` and `PI_CONFIG_DIR` never select OMP. The wrong comment at `src/core/contracts/client-map.ts:37-41` is fixed. Pi-Bolt stays `pi`.
+6. **OMP's own native commands (ADR-0023).** [run `omp-r65-platform.md` §7, `omp-r65-config.md` O11]:
+   - Install OMP: `curl -fsSL https://omp.sh/install | sh` (macOS, Linux), `irm https://omp.sh/install.ps1 | iex` (Windows) [doc `README.md:44,88-91`].
+   - Install: `omp plugin install context-mode` [run `✔ Installed context-mode@2.1.10`; doc `docs/marketplace.md:71`].
+   - Update: `omp plugin upgrade context-mode` [doc `docs/plugin-manager-installer-plumbing.md:126`]. OMP itself: `omp update` [doc `docs/cli-reference.md:309`].
+   - Remove: `omp plugin uninstall context-mode` [run `✔ Uninstalled context-mode`; lock becomes `{"plugins":{},"settings":{}}`; data root kept]. Pause: `omp plugin disable|enable context-mode` [run].
    - No `@next`, no `#release`, no `npm i -g` route for OMP users.
-5. **Tools come from the extension, not from MCP.** The in-process `registerTool` path stays (OMP `registerTool` has the same fields [src `types.ts:1014-1060,1963`]). On the OMP path only, each `ctx_*` tool gets `loadMode: "essential"`, so the model sees it top-level [run probe3]. The Pi path passes the same objects as today (no new field), so Pi bytes stay the same. No MCP entry is written to `~/.omp/agent/mcp.json` (v1's way, which had no hooks).
-6. **Doctor names OMP and reads OMP's store.** New rows:
-   - D1 host: "OMP (oh-my-pi) <version>", not "pi".
-   - D3 install: context-mode in `~/.omp/plugins/omp-plugins.lock.json` with `enabled: true`. Fix line: `omp plugin install context-mode`.
-   - D4 version: lock `version` vs npm latest. Fix line: `omp plugin upgrade context-mode`.
-   - D-OMP-PROMPT: the bundle has the array path (build stamp). Fix line: `omp plugin upgrade context-mode`.
-   - Host limits from the matrix below are named as "info" lines with what to do, in positive words.
-7. **`UNSUPPORTED_HOSTS` loses the OMP row** [cm `constants.ts:718-719`]. `setup --agents omp` and `context-mode doctor` treat OMP as supported.
+7. **Doctor names OMP (ADR-0010).** Inside OMP, `ctx_doctor` prints `agent omp`. New D3 check: context-mode in `~/.omp/plugins/omp-plugins.lock.json` with `"enabled": true` and in `~/.omp/plugins/package.json`. Fix lines:
+   - not installed: `omp plugin install context-mode`;
+   - disabled: `omp plugin enable context-mode`;
+   - old version: `omp plugin upgrade context-mode`;
+   - OMP below 14.7.0: info `OMP <v> is older than the tested floor 14.7.0. Update it with: omp update`.
+   - The pass line names Pi's list form for Pi and `omp plugin list` for OMP [cm `src/core/tools/doctor.ts:184-185`].
+   - D2 node: OMP 18.20.0 reports `v26.3.0` under Bun 1.4.4, which passes `NODE_MIN` 24.15.0 [run `omp-r65-platform.md` §5b]. An older OMP whose Bun reports less gets the D2 fix `omp update`.
+8. **`ctx_upgrade` on OMP writes nothing under `~/.pi`.** `hostConfigPath("omp")` returns `null` (OMP has no MCP entry from us) [cm `src/core/ops/host-write.ts:28-38`], so `regenerateHostConfig` returns no rows [cm `:75-87`]. `hostUpdateCommand("omp")` gives `omp plugin upgrade context-mode` [cm `src/core/project/config-dir.ts:147`]. The plugin root of an in-process row is the package dir (the dir of `package.json`), not the entry dir, so `<pkg>/omp` and `<pkg>` are one install [cm `src/core/ops/plugin-root.ts:186-187,193`, `src/core/tools/upgrade.ts:49-59`].
+9. **Skills (O7).** OMP has no `skills` manifest field [src `extensibility/plugins/types.ts:27-49`]. It scans `<pluginRoot>/skills/*/SKILL.md` [src `discovery/omp-plugins.ts:65-80`]. [run `omp-r65-config.md` O7]: `omp skill list --json` lists our 3 skills from root `skills/`, which name the Claude tools today. The `omp` row's `skillChannel` is `skills` with prefix `""`, so the build renders root `skills/` with the bare `ctx_*` name too, through the existing joined-names rule [cm `build/build.mjs:252-264`, `src/setup/registry.ts:85-91`]. Pi keeps `pi/skills`.
+10. **Tool filter (O10).** OMP has no `getSettings` [src `extensibility/extensions/types.ts:1856`]. OMP documents `pi.pi` (package exports) on the extension API [doc `docs/extensions.md:308-313`]. On OMP, `excludedTools` reads `contextMode.excludeTools` from `api.pi.settings` global settings, merged with project settings, per call [run `omp-r65-config.md` O10: `cm:{"excludeTools":["read"]}` read from `~/.omp/agent/config.yml`]. The user key is the same as on Pi. A missing or bad value gives `[]`, as on Pi [cm `src/entries/pi.ts:70-80`].
+11. **MCP import from other hosts (O4).** Default OMP 18.20.0 does not import `~/.claude.json` MCP servers: no spawn, no second set [run `omp-r65-config.md` O4]. User sources are opt-in through `enabledProviders` or `CLAUDE_CONFIG_DIR` [src `capability/index.ts:51-60,419-429`, `discovery/claude.ts:65-69,86-99`]. With opt-in, OMP spawned our server and the model saw 9 more `xd://mcp__context_mode_ctx_*` tools [run].
+    - Doctor reads these JSON keys. When OMP would import a `context-mode` server and `~/.omp/agent/mcp.json` `disabledServers` lacks it, doctor prints info: `OMP also imports context-mode from <file>. Add "context-mode" to disabledServers in ~/.omp/agent/mcp.json.`
+    - `context-mode setup --agents omp` adds that entry (merge, keep other keys) only in that case; uninstall removes only our name [doc `docs/mcp-config.md:96,433-448`; run: `disabledServers` -> no spawn].
+12. **Data paths and Pi + OMP on one machine.** Data root stays `~/.context-mode` with `CONTEXT_MODE_DATA_DIR` [cm `src/core/contracts/constants.ts:192`]; one `context.db` per project for all agents [run `omp-r65-config.md` "Data paths"]. Rows from OMP carry `agent=omp`, so stats, resume and doctor tell OMP from Pi. Pi reads `~/.pi`, OMP reads `~/.omp`; each in-process doctor checks only its own host; the CLI doctor lists each host it finds.
+13. **Input modes (O2b).** `input` fires in RPC and interactive mode; print mode makes no prompt row (host limit, docs line). The first-turn payload is the same in all three modes [run `omp-r65-events.md` "First-turn session payload"].
+14. **Compaction (O2a).** The Pi `pi-flag` path runs unchanged on OMP [cm `src/core/hooks/dispatch.ts:162-177`, `src/adapters/table.ts:102`]: after `session_compact`, the next turn sends OMP's base + INSTRUCTIONS, no resume hint; OMP's own `<summary>` is in a user message [run `omp-r65-events.md` O2a].
+15. **Minimum OMP version (O5): 14.7.0** (2026-05-05, first `systemPrompt: string[]`) [run `omp-r65-platform.md` §2, npm tarballs 14.6.6 `string`, 14.7.0 `string[]`; doc `packages/coding-agent/CHANGELOG.md` 14.7.0 Breaking Changes]. Tests pin 18.20.0.
+16. **Windows (O6).** Same code on all OS: home `%USERPROFILE%\.omp` [src `packages/utils/src/dirs.ts:29,115-117`], install script with SHA-256 check [src `scripts/install.ps1:18-21,36,318-345`]. The CI job (Part 2) proves it on `windows-latest`.
+17. **`UNSUPPORTED_HOSTS` loses the OMP row** [cm `src/core/contracts/constants.ts:718-719`].
 
-## Support matrix (OMP 18.20.0, context-mode with this ADR)
+## Support matrix (OMP >= 14.7.0, tested on 18.20.0, with this ADR)
 
-| # | context-mode feature | OMP status | Source |
+| # | Feature | Status | Evidence |
 |---|---|---|---|
-| 1 | `ctx_*` tools reach the model | differs: needs `loadMode: "essential"` | [run] run3 (no `ctx_*`), probe3 (top-level), proof §6e (9 tools only as `xd://ctx_*` text, top-level = 11 built-ins); [doc] `docs/extensions.md:826`, `docs/settings.md:646` |
-| 2 | Stats (`ctx_stats`, a `ctx_*` tool) | differs: same cause as row 1 | as row 1 |
-| 3 | System prompt (SessionStart payload, `before_agent_start`) | differs: `string[]` in and out; 2.1.10 wipes it (7921 -> 592 chars) | [src] `types.ts:1210-1218,1779-1783`, `runner.ts:2682-2686`; [run] run2/run3, proof §5, §6d; [issue] |
-| 4 | PreToolUse routing (`tool_call`, `{ block, reason }`) | supported: same shape (OMP adds `input` replace and `additionalContext`); fires before the tool, block stops it, our deny reaches the model | [src] `shared-events.ts:339-343`, `types.ts:1951`, `extensions/wrapper.ts:322-324`; [run] proof §1, §6a |
-| 5 | PostToolUse capture (`tool_result`) | differs: result has `content`, `details`, `isError`, `additionalContext`; no `structuredContent` (a returned one is dropped, no error); our replace and index run | [src] `types.ts:1597-1611`, `shared-events.ts:412-426`, `runner.ts:2286-2297`; [run] proof §2, §6b |
-| 6 | UserPromptSubmit (`input`, reads `text`) | differs: fires in RPC (run) and interactive (src); never in `omp -p` print mode | [src] `types.ts:1421-1426,1945`, `runner.ts:2461`, `modes/rpc/rpc-mode.ts:1909`, `modes/controllers/input-controller.ts:1089`; [run] proof §3 (0 events in 3 print runs), §6c (RPC `prompt` row) |
-| 7 | Session start (first `before_agent_start`) | supported | [run] fired in run2 and run3, proof §5, §6c |
-| 8 | Compaction (`session_compact`) | supported: same name, fires live; payload has no `reason` (our handler reads none) | [src] `shared-events.ts:97-102`, `session/session-maintenance.ts:2711-2715,4819`; [run] proof §4; next-turn SessionStart(compact) open (O2a) |
-| 9 | Resume after compaction, stable prompt bytes | supported: base rebuilt each turn | [src] `types.ts:1781`, `session/agent-session.ts:9419` |
-| 10 | Session id and project dir (`ctx.sessionManager.getSessionId()`, `ctx.cwd`) | supported | [src] `types.ts:805-807`, `session/session-manager.ts:3257` |
-| 11 | Native install of context-mode | supported: `omp plugin install context-mode` | [run] `✔ Installed context-mode@2.1.10`; [doc] `docs/cli-reference.md` |
-| 12 | Native update | supported: `omp plugin upgrade context-mode`, OMP `omp update` | [doc] `docs/plugin-manager-installer-plumbing.md:126`, `docs/cli-reference.md` |
-| 13 | Runtime (`node:sqlite` under Bun) | supported | [issue] doctor D2 "running under Bun 1.4.4" inside OMP |
-| 14 | Doctor | missing: reports OMP as Pi | [issue] body; [cm] `constants.ts:718-719` |
-| 15 | Setup (`context-mode setup --agents omp`) | missing: OMP is unsupported | [cm] `constants.ts:718-719` |
-| 16 | Host detection | missing: no `omp` AgentId | [cm] `src/core/contracts/agents.ts:2` |
-| 17 | Tool filter from host settings (`pi.getSettings`, `excludedTools`) | missing: no `getSettings` in OMP's API | [src] grep `getSettings` in `extensions/types.ts`: no hit |
-| 18 | Skills (`pi.skills` key in our manifest) | unverified | `docs/skills.md` not read (O7) |
-| 19 | No double tools (OMP imports MCP from `~/.claude.json` and other hosts) | unverified | [doc] `docs/mcp-config.md:35-44`; not run (O4) |
-| 20 | Windows install and run | unverified | [doc] `README.md:91`; not run (O6) |
+| 1 | System prompt kept, our payload appended once | supported (M1) | [run] `omp-hooks-proof.md` §6d; [src] `extensibility/extensions/runner.ts:2682-2686` |
+| 2 | `ctx_*` as top-level tools | supported (M3) | [run] `omp-r65-tools.md` §2 |
+| 3 | All 9 `ctx_*` calls run | supported (M3) | [run] `omp-r65-tools.md` §3 |
+| 4 | Tools and prompt bytes stable turn to turn | supported (M3) | [run] `omp-r65-tools.md` §5c |
+| 5 | One `before_agent_start` per prompt, right turn numbers | supported (M2) | [run] `omp-r65-events.md` O2c |
+| 6 | Own agent id `omp` in rows, stats, resume | supported (M2) | [run] this ADR, wrapper load |
+| 7 | PreToolUse routing (`tool_call` block) | supported (M7) | [run] `omp-hooks-proof.md` §1, §6a |
+| 8 | PostToolUse capture (`tool_result` replace, index) | supported (M7) | [run] `omp-hooks-proof.md` §2, §6b |
+| 9 | `structuredContent` in tool results | host limit: OMP keeps `content` only; doctor info "OMP keeps tool output in content; context-mode writes its notes there." User does nothing | [src] `extensibility/extensions/runner.ts:2286-2297` |
+| 10 | Prompt capture (`input`) in RPC and interactive | supported (M7) | [run] `omp-r65-events.md` O2b |
+| 11 | Prompt capture in print mode (`omp -p`) | host limit: no event; docs line "Print mode sends no prompt event. Use omp or omp --mode rpc to keep prompts." | [src] `modes/rpc/rpc-mode.ts:1909`, `modes/controllers/input-controller.ts:1089` |
+| 12 | Session start and resume hint | supported (M1) | [run] `omp-r65-events.md` first-turn payload |
+| 13 | Compaction, next-turn payload | supported (M7) | [run] `omp-r65-events.md` O2a |
+| 14 | Session id and project dir | supported (M2) | [src] `extensibility/extensions/types.ts:805-807`, `session/session-manager.ts:3257` |
+| 15 | Install with `omp plugin install context-mode` | supported (M5) | [run] `omp-r64.md` install log |
+| 16 | Update: `omp plugin upgrade context-mode`, `omp update` | supported (M6) | [doc] `docs/plugin-manager-installer-plumbing.md:126`, `docs/cli-reference.md:309` |
+| 17 | Remove, disable, enable with `omp plugin` verbs | supported (M5) | [run] `omp-r65-config.md` O11 |
+| 18 | `context-mode setup --agents omp` | supported (M5) | [cm] `src/setup/registry.ts:247` |
+| 19 | Doctor names OMP, reads `~/.omp`, OMP fix lines | supported (M6) | [run] `omp-r65-tools.md` §6 |
+| 20 | `ctx_upgrade` text, no write under `~/.pi` | supported (M6) | [run] `omp-r65-tools.md` §6 |
+| 21 | Tool filter `contextMode.excludeTools` | supported (M2) | [run] `omp-r65-config.md` O10 |
+| 22 | Skills with OMP tool names | supported (M4) | [run] `omp-r65-config.md` O7 |
+| 23 | No double tools from MCP import | supported (M6) | [run] `omp-r65-config.md` O4 |
+| 24 | Runtime: `node:sqlite` and `NODE_MIN` under Bun | supported (M6) | [run] `omp-r65-platform.md` §5b; [issue] D2 |
+| 25 | OMP below 14.7.0 | host limit: doctor info "OMP <v> is older than the tested floor 14.7.0. Update it with: omp update" | [run] `omp-r65-platform.md` §2 |
+| 26 | Windows install and run | supported (M7, CI `windows-latest`) | [src] `scripts/install.ps1:18-21`; [doc] `README.md:88-91` |
+| 27 | Pi and OMP on one machine | supported (M4) | [run] `omp-r65-config.md` "Data paths" |
+| 28 | Scripts with `omp -p` | host limit: OMP reads stdin; docs line "Add < /dev/null in scripts." | [run] `omp-r64.md` run4 (140 s wait) |
 
-Counts: supported 8, differs 5, missing 4, unverified 3 (20 rows). Change from the source-only count (9, 4, 4, 3): row 6 moves from supported to differs, because the live run shows no `input` event in print mode.
+Counts: 28 rows; supported 24, host limit 4, unverified 0.
 
 ## Consequences
 
-- OMP users keep the base prompt, AGENTS.md and other extensions' sections. They get our payload as one more section.
-- Pi and Pi-Bolt keep the same bytes, the same tool objects and the same install. A string-path golden test pins this.
-- One bundle serves both hosts. The build stays one entry; the bundle grows by one helper and one branch.
-- Doctor stops sending OMP users to `pi install` and to `~/.pi/agent/settings.json`.
-- About 20 places pin "10 agents" or the unsupported list. They change in the same commit (Part 2, files touched).
-- OMP ships fast. A live fire test on each OMP minor guards the five event shapes; we do not follow OMP patch releases by hand.
+- OMP users keep the base prompt, AGENTS.md and other extensions' sections, and get our payload as one more block.
+- OMP users see `ctx_*` as normal tools; each request carries +8,177 B of tool schema (cached prefix).
+- Pi and Pi-Bolt send the same bytes and install the same way. Golden tests pin this.
+- One bundle serves both hosts; `omp/index.js` is a wrapper.
+- About 20 places pin "10 agents" or the unsupported list; they change in M4.
+- A live OMP fire test in CI on 3 OS guards the event shapes on each OMP pin bump.
 
 ## Alternatives rejected
 
-1. **Treat OMP as Pi (no new AgentId).** Doctor keeps lying (ADR-0010) and setup cannot use OMP's own command (ADR-0023).
-2. **A second bundle `omp/index.js`.** Two builds of the same code. OMP already reads `package.json.pi` [doc `docs/plugin-manager-installer-plumbing.md:91-95`].
-3. **MCP-only, like v1 (`~/.omp/agent/mcp.json`).** No routing, no capture, no compaction payload. v1 named hooks "future work" (v1.0.169 `src/adapters/omp/index.ts:4-19`).
-4. **Detect OMP with `PI_CODING_AGENT_DIR`, `process.versions.bun`, argv text or a regex.** Pi reads the same env var; Bun is not OMP-only (unverified for Pi-Bolt); argv text needs a pattern match. Owner rules forbid each one.
-5. **Always add `loadMode: "essential"`.** Pi has no such field; that Pi ignores it is unverified. Adding it only on the array path keeps Pi bytes unchanged.
-6. **Replace OMP's array with one joined string.** OMP turns a string into `[result]` and drops the rest [src `runner.ts:2682-2686`]. That is the #1332 bug.
-7. **A new MCP tool for OMP.** Owner rule: no new MCP tool.
-
-## Gaps as host limits (doctor names each one with a fix line)
-
-| Gap | Doctor line (info) | Fix line |
-|---|---|---|
-| No `structuredContent` in OMP `tool_result` (row 5) | "OMP keeps tool output in `content`; context-mode writes its notes there." | none needed: OMP drops a returned `structuredContent` without error and only `content` reaches the model [run proof §2; src `runner.ts:2286-2297`] |
-| No `getSettings` (row 17) | "OMP has no extension settings API; context-mode reads no tool filter on OMP." | use OMP's own tool settings (exact key unverified, O10) |
-| `input` does not fire in `omp -p` (row 6) | "In print mode OMP sends no prompt event; prompts are captured in interactive and RPC mode." | run `omp` (interactive) or `omp --mode rpc` [run proof §3: RPC fires, print 0 events; src `emitInput` callers `rpc-mode.ts:1909`, `input-controller.ts:1089` only] |
-| Context-mode MCP server imported from another host's config (row 19) | names the file OMP imported it from | set after O4 |
-| Headless run waits for stdin [run, run4] | not a doctor line; docs note: add `< /dev/null` in scripts | `omp -p ... < /dev/null` |
+1. **OMP as Pi (no new AgentId).** Rows say `pi`, doctor lies (ADR-0010), setup cannot use OMP's verbs (ADR-0023).
+2. **A full second bundle `omp/index.js`.** +2.2 MB for the same code. The wrapper gives the same signal for under 1 KB.
+3. **Agent id from the prompt shape alone.** OMP < 14.7.0 sends a string and would be counted as Pi; the entry file is sure on every version.
+4. **MCP only, like v1 (`~/.omp/agent/mcp.json`).** No routing, no capture, no compaction payload.
+5. **Detect OMP with `PI_CODING_AGENT_DIR`, `process.versions.bun`, argv or a regex.** Owner rules forbid each one.
+6. **`loadMode` on the OMP path only.** A branch and a test per Pi release; Pi ignores the field byte for byte (Decision 3).
+7. **Ask the model to call `write xd://ctx_*`.** A new prompt text that a fake model cannot prove; top-level tools need no text.
+8. **Write `disabledServers` on every OMP install.** A file write most users never need; doctor names the case when it is real.
+9. **A new MCP tool for OMP.** Owner rule: no new MCP tool.
 
 ---
 
@@ -134,172 +171,206 @@ Counts: supported 8, differs 5, missing 4, unverified 3 (20 rows). Change from t
 
 ## Goal
 
-OMP users run context-mode with OMP's own install command, keep every system prompt section, see the `ctx_*` tools, and get a doctor that names OMP. Pi and Pi-Bolt do not change by one byte.
+OMP users install context-mode with OMP's own command, keep every system prompt block, see the `ctx_*` tools, and get a doctor that names OMP. Pi and Pi-Bolt do not change by one byte.
 
 ## Users
 
-- OMP users who run context-mode today and lose their base prompt and AGENTS.md (#1332).
-- Beta testers, named in #1332:
-  - **@tejasach06**: OMP 18.18.0, Windows x64, context-mode 2.1.5; wrote the first patch.
-  - **@itsmylife44**: OMP 18.18.1, macOS arm64, daily OMP user, "Happy to test a build".
-  - **@jeffscottward**: OMP 18.18.9, Linux and macOS, context-mode 2.1.7; runs a wrapper workaround today, wants to test.
-- Pi and Pi-Bolt users: they must see no change.
+- OMP users who lose their base prompt and AGENTS.md today (#1332).
+- Beta testers named in #1332: **@tejasach06** (Windows x64), **@itsmylife44** (macOS arm64), **@jeffscottward** (Linux, macOS).
+- Pi and Pi-Bolt users: they see no change.
 
 ## Non-goals
 
-- A new MCP tool (owner rule).
-- A second bundle or an `src/adapters/omp/` dir.
-- OMP's older hooks surface (`<agentDir>/hooks/pre|post/*.ts`, `docs/hooks.md`): the extension surface covers all five events.
-- MCP delivery to `~/.omp/agent/mcp.json`.
-- Restoring `platform-bridge.mjs` (dropped for good).
-- OMP named profiles (`~/.omp/profiles/<name>/agent` [doc `docs/extension-loading.md:88`]) beyond the default profile in this first step.
+- A new MCP tool. A `src/adapters/omp/` dir. OMP's old `hooks/pre|post` surface.
+- An MCP entry in `~/.omp/agent/mcp.json`. `platform-bridge.mjs` (dropped for good).
+- OMP named profiles (`~/.omp/profiles/<name>/agent` [doc `docs/extension-loading.md:88`]) beyond the default profile.
 
 ## Milestones
 
-Each step: red test -> green -> profile (before/after) -> push `lane/r64-omp` -> one DEVIATIONS row. Steps stay on the lane; `main` gets OMP support as one whole after M8 (see Rollout, owner rule).
+Each step: red test -> green -> profile (before/after) -> push `lane/r64-omp` -> one DEVIATIONS row. Build runs only the changed test files; the full suite runs once at ship.
 
-| M | Step | Red test first | DEVIATIONS row |
-|---|---|---|---|
-| M0 | Baseline profile on `fea7780d` (see Profiling) | - | - |
-| M1 | Prompt shape helper: array appends, string unchanged (#1332) | T1-T7 | D-OMP-PROMPT-1 |
-| M2 | Agent id from the prompt shape; `pi.ts:112,117` use it | T8-T9 | D-OMP-HOST-1 |
-| M3 | `loadMode: "essential"` on the OMP path only | T10 | D-OMP-TOOLS-1 |
-| M4 | `omp` AgentId, table row, constants, remove from `UNSUPPORTED_HOSTS`, host lists in tests | T11-T14 | D-OMP-ROW-1 |
-| M5 | Setup and uninstall with OMP's own verbs | T15-T16 | D-OMP-SETUP-1 |
-| M6 | Doctor rows and fix lines | T17-T20 | D-OMP-DOCTOR-1 |
-| M7 | Live fire test on OMP + e2e cases | T21-T23 | D-OMP-FIRE-1 |
-| M8 | Docs (`docs/install/README.md`, `docs/install/omp.md`, ADR-0023 row, PRD/TECH-SPEC, 12-plugins §3.3, feature.yml) | `build/check-install-docs.mjs` red on missing `omp` | D-OMP-DOCS-1 |
-| M9 | Beta build for the three testers; their logs close the open items | - | - |
+| M | Step | Files (origin/main) | Tests | DEVIATIONS |
+|---|---|---|---|---|
+| M0 | Baseline profile on `fea7780d` | - | P1-P7 | - |
+| M1 | Prompt helper: array appends, string unchanged | `src/entries/pi.ts:52-54,167-191` | T1-T7 | D-OMP-PROMPT-1 |
+| M2 | Shared factory takes `agent`; OMP entry registers tools at load; turn once per prompt; OMP tool filter | `src/entries/pi.ts:66-80,92,112,117,156-170` | T8-T13 | D-OMP-ENTRY-1, D-OMP-TURN-1, D-OMP-FILTER-1 |
+| M3 | `loadMode: "essential"` in `piTool()` | `src/entries/pi.ts:146-153` | T14 | D-OMP-TOOLS-1 |
+| M4 | `omp` AgentId, table row, constants, manifest `omp` key, wrapper, skills, host lists | `src/core/contracts/agents.ts:2`, `src/adapters/table.ts:98-106,117,142`, `src/core/contracts/constants.ts:373,628-630,718-719,751,838,1096`, `src/core/contracts/client-map.ts:37-42`, `src/core/project/resolve.ts:43-44,64`, `src/core/ops/doctor-hook.ts:86-88`, `build/manifests.ts:229-253,284`, `build/build.mjs:252-264` | T15-T22 | D-OMP-ROW-1, D-OMP-MANIFEST-1, D-OMP-SKILLS-1 |
+| M5 | Setup and uninstall with `omp plugin` verbs | `src/setup/registry.ts:47,247,261-270`, `src/setup/engine.ts:1178`, `src/core/ops/uninstall.ts:145-150` | T23-T26 | D-OMP-SETUP-1 |
+| M6 | Doctor rows, fix lines, `ctx_upgrade`, MCP-import info | `src/core/tools/doctor.ts:184-185`, `src/core/ops/host-write.ts:28-38`, `src/core/project/config-dir.ts:147`, `src/core/ops/plugin-root.ts:186-193`, `src/core/tools/upgrade.ts:49-63` | T27-T35 | D-OMP-DOCTOR-1, D-OMP-UPGRADE-1 |
+| M7 | Live OMP fire block, e2e cases, CI job on 3 OS | `tests/0020-fire-plugin-ext.test.mjs:162`, `e2e/cases/GP2-prompt-surface.e2e.mjs:172`, `e2e/cases/GP3-hooks.e2e.mjs`, `e2e/cases/GP11-doctor-upgrade.e2e.mjs:64`, `.github/workflows/ci.yml:88-96,189-190` | T36-T51 | D-OMP-FIRE-1, D-OMP-CI-1 |
+| M8 | Docs: 10 -> 11 agents, `docs/install/omp.md`, issue forms | `build/check-install-docs.mjs:160`, docs list below | T52 | D-OMP-DOCS-1 |
+| M9 | Beta for @tejasach06 @itsmylife44 @jeffscottward from the lane build | - | their `ctx_doctor` output | - |
 
-## RGR test list (in existing ADR-grouped files, ADR-0024; no new test file)
+## RGR tests (existing ADR-grouped files only, ADR-0024; no new test file)
 
-`tests/0020-plugins.test.mjs`, new describe "ADR-0026 OMP system prompt shape (#1332)":
+Each test is red on `fea7780d` or pins today's Pi bytes.
 
-- T1: array `["BASE", "<project-context>AGENTS</project-context>", "OTHER_EXT"]` in -> out is the same 3 entries in order, then the payload; length 4; payload appears once. Red on `fea7780d` (today: one string).
-- T2: string `"base"` in -> out bytes equal the `fea7780d` output (golden). Pins Pi and Pi-Bolt.
-- T3: array, two turns with the same base array -> same output bytes both turns (D-CACHE-PI-1).
-- T4: array, hook throws after first delivery -> base entries plus the same payload.
+`tests/0020-plugins.test.mjs` [cm `docs/architecture/TEST-LAYOUT.md:51`], new describe "ADR-0026 OMP entry (#1332)":
+
+- T1: array `["BASE", "<project-context>AGENTS</project-context>", "OTHER"]` -> same 3 blocks in order, then the payload; length 4; payload once.
+- T2: string `"base"` -> bytes equal the `fea7780d` output (golden; Pi and Pi-Bolt).
+- T3: array, two turns, same base -> same output bytes (D-CACHE-PI-1).
+- T4: array, hook throws after first delivery -> base blocks plus the same payload.
 - T5: array, hook throws before first delivery -> `{}`.
-- T6: array, compact turn -> payload rebuilt, base entries kept.
+- T6: array, compact turn -> base kept, payload = INSTRUCTIONS only, no resume hint (O2a).
 - T7: empty array -> `[payload]`.
-- T8: array -> `handleHook` gets agent `omp`; string -> `pi`.
-- T9: string with `PI_CODING_AGENT_DIR` set -> agent stays `pi`.
-- T10: array path -> each `registerTool` call has `loadMode: "essential"`; string path -> the tool object is deep-equal to `fea7780d`.
+- T8: re-run in one prompt with a grown base -> output = new base + payload once; one turn counted (O2c).
+- T9: OMP entry -> `handleHook` gets `omp`; Pi entry -> `pi`.
+- T10: Pi entry with `PI_CODING_AGENT_DIR` and `PI_CONFIG_DIR` set -> stays `pi`.
+- T11: OMP entry calls `registerTool` 9 times at load; Pi entry calls it in the first `before_agent_start` (unchanged).
+- T12: two prompts -> turns 1 and 2 on both entries.
+- T13: OMP entry, `api.pi.settings` with `contextMode.excludeTools: ["read"]` -> `read` result kept; no settings -> `[]`.
+- T14: each registered tool has `loadMode: "essential"`; every other field deep-equals `fea7780d`.
 
-Host lists (same commit as M4):
+Build and host lists (same commit as M4):
 
-- T11 `tests/0018-contracts.test.mjs:35-37`: `AGENT_IDS` has 11, with `omp`.
-- T12 `tests/0007-identity.test.mjs:1226-1228`: `projectSource` for `omp` is `pi:ctx.cwd`.
-- T13 `tests/0010-doctor-upgrade.test.mjs:647,650-651,684,688`: `omp` is supported, not in `UNSUPPORTED_HOSTS`, in-process list `["pi","opencode","omp"]`.
-- T14 `tests/0019-cli.test.mjs:222-232`: "Supported agents" lists omp; `omp` and `omp-coding-agent` leave the unsupported loop. Also `tests/0020-adapters.test.mjs:370`, `tests/prd8-index-search.test.mjs:2806`, `tests/prd10-hooks-runtime.test.mjs:1143,1938-1939`, `e2e/checks/repo-github-files.mjs:13`, `e2e/checks/windows-hosts.mjs:6,33-40`.
+- T15 `tests/0018-build.test.mjs`: `package.json` has `omp.extensions = ["./omp/index.js"]`; `pi` key unchanged; `omp/index.js` in `OUT_FILES` and under 1 KB [cm `tests/0018-build.test.mjs:538`].
+- T16 `tests/0018-build.test.mjs`: rendered root `skills/ctx-doctor/SKILL.md` names `ctx_doctor` bare as one of the joined names; `pi/skills` unchanged.
+- T17 `tests/0018-contracts.test.mjs:37`: `AGENT_IDS` has 11, with `omp`.
+- T18 `tests/prd10-hooks-runtime.test.mjs:2754`: `ADAPTERS` has 11.
+- T19 `tests/0007-identity.test.mjs:1226-1228`: `projectSource` for `omp` is `pi:ctx.cwd`.
+- T20 `tests/0010-doctor-upgrade.test.mjs:647,650-651,684,688`: `omp` is supported, not in `UNSUPPORTED_HOSTS`; in-process list `["pi","opencode","omp"]`.
+- T21 `tests/0019-cli.test.mjs:222-232`: "Supported agents" lists omp; `omp` and `omp-coding-agent` leave the unsupported loop.
+- T22 `tests/0020-adapters.test.mjs`: the `omp` row uses the Pi decode and encode; `toolNamePrefix` is `""`.
 
-Setup (`tests/0019-setup-engine.test.mjs`):
+Setup (`tests/0019-setup-engine.test.mjs` [cm `docs/architecture/TEST-LAYOUT.md:58`]):
 
-- T15: `setup --agents omp` on a temp HOME with a stub `omp` plans `omp plugin install context-mode`; never `npm i -g`, never `@next`.
-- T16: uninstall plans `omp plugin uninstall context-mode` (verb **unverified**, O11).
+- T23: `setup --agents omp` with a stub `omp` plans `omp plugin install context-mode`; never `npm i -g`, never `@next`.
+- T24: uninstall plans `omp plugin uninstall context-mode`.
+- T25: `enabledProviders: [claude]` plus a `context-mode` entry in `~/.claude.json` -> setup merges `disabledServers: ["context-mode"]` and keeps other keys; import off -> no write.
+- T26: uninstall removes only our name from `disabledServers`.
 
-Doctor (`tests/0010-doctor-upgrade.test.mjs`):
+Doctor and upgrade (`tests/0010-doctor-upgrade.test.mjs` [cm `docs/architecture/TEST-LAYOUT.md:61`]):
 
-- T17: lock file with context-mode enabled -> D1 "OMP (oh-my-pi)", D3 PASS; no line names `~/.pi`.
-- T18: no lock entry -> D3 FAIL with fix line `omp plugin install context-mode`.
-- T19: `PI_CODING_AGENT_DIR` alone (no `omp` binary, no lock) -> host is never `omp` (extends `:695-703`).
-- T20: Pi-Bolt fixture -> host stays `pi`.
+- T27: lock with context-mode enabled -> `agent omp`, D3 PASS; no line names `~/.pi`.
+- T28: no lock entry -> D3 FAIL, fix `omp plugin install context-mode`.
+- T29: lock `"enabled": false` -> D3 FAIL, fix `omp plugin enable context-mode`.
+- T30: OMP version 14.6.6 -> info with `omp update`.
+- T31: `PI_CODING_AGENT_DIR` alone, no `omp`, no lock -> host is never `omp` (extends `:695-703`).
+- T32: Pi-Bolt fixture -> host stays `pi`.
+- T33: `ctx_upgrade` on an OMP fixture -> host row `omp plugin upgrade context-mode`; no plugin-root row; no file under `~/.pi` (tree hash before = after).
+- T34: MCP import on and `disabledServers` without us -> info line with the file name and the fix.
+- T35: Pi fixture -> doctor and upgrade output equal `fea7780d` (golden).
 
-Live and e2e:
+Live fire, `tests/0020-fire-plugin-ext.test.mjs` [cm `docs/architecture/TEST-LAYOUT.md:57`], OMP block next to the Pi block [cm `tests/0020-fire-plugin-ext.test.mjs:162,171`], skipped when `omp` is absent. Fixtures: the proof harness moved into the test (fake OpenAI-compatible model on port 0, first reply = one tool call picked by a prompt keyword, second = text that echoes the last tool message, a request with no tools = summary text; it saves each request). Temp HOME, `startup.setupWizard: false` in `config.yml` [src `modes/settings.ts:1270-1280`], `< /dev/null` in print mode, package installed with `omp plugin link <built dir>` [run `omp-r65-config.md` manifest test]:
 
-The harness is the one the hook proof used (proof Setup, §1-§6), moved into the repo as test fixtures. All runs use a temp HOME and `< /dev/null` in print mode (without it, `omp -p` waits 140 s on stdin [run run4]).
+- T36: print `"hi"` -> system holds the RFC 2119 base, `<project-context>`, AGENTS.md, then the payload once (today 592 chars).
+- T37: tools in request 1 = 11 built-ins + 9 `ctx_*`; `ctx_stats` call returns the stats table.
+- T38: `R64BIGREAD` (108,894 B read) -> tool message is the `ctx_execute` hint; deny -> marker file absent.
+- T39: `R64BIG` (`seq 1 40000`) -> tool message ends with the `ctx_search` hint; `events` and `sources` rows with `agent=omp`.
+- T40: RPC prompt -> `prompt` row with the text; print mode -> no row (pins the host limit).
+- T41: RPC compact (`keepRecentTokens: 1`) then a prompt -> system = base + INSTRUCTIONS; user message holds OMP's `<summary>`.
+- T42: RPC two prompts -> one `before_agent_start` per prompt; rows `turn` 1 and 2.
+- T43: `ctx_upgrade` in OMP -> no `~/.pi` dir after the run.
 
-- Fixtures: a fake OpenAI-compatible model (1st reply = one tool call picked by a prompt keyword, 2nd reply = text that echoes the last tool message, a request with no tools = a summary text; it saves each request); a `models.yml` provider for it; a probe extension that logs each event's keys; an RPC driver that sends `{"type":"prompt",...}`, waits for `agent_end`, then sends `{"type":"compact"}` [src `modes/rpc/rpc-types.ts:53,114`, `modes/rpc/rpc-mode.ts:2600-2602`]; `config.yml` with `compaction.keepRecentTokens: 1` for the compact case [src `session/context-settings.ts:282-286`; default 20000 gives "Nothing to compact", `session-maintenance.ts:1431`].
-- T21 `tests/0020-fire-plugin-ext.test.mjs` (mirror of the Pi block at `:222`): OMP block, skipped when `omp` is absent. Cases, each from a proven command:
-  - prompt: `omp -p --no-session --model faketools/fake "hi" < /dev/null` -> the saved request system text holds the RFC 2119 base, `<project-context>`, AGENTS.md and the payload once (today: 592 chars, red); the tool list holds `ctx_*` top-level (today: 11 built-ins, red) [proof §6d, §6e].
-  - `tool_call`: prompt `R64BIGREAD` (read of a 108,894 B file) -> the tool message is the `ctx_execute` hint; prompt `R64TOUCH` with a deny -> the marker file is absent [proof §1, §6a].
-  - `tool_result`: prompt `R64BIG` (`seq 1 40000`) -> the tool message ends with the `ctx_search` hint; `context.db` has the `events` row and the `sources` row [proof §6b].
-  - `input`: RPC driver -> an `events` row of kind `prompt` with the prompt text; print mode -> no such row (pins the host limit) [proof §3, §6c].
-  - `session_compact`: RPC driver with `keepRecentTokens: 1`, then one more prompt -> the next system prompt is the compact payload (closes O2a).
-- T22 `e2e/cases/GP2-prompt-surface.e2e.mjs` (mirror of `GP2/pi-system-role-injection` at `:172`): `GP2/omp-system-prompt-append`, same fake model and prompt case as T21.
-- T23 `e2e/cases/GP11-doctor-upgrade.e2e.mjs` (mirror of `GP11/pi-doctor-real-paths` at `:64`): `GP11/omp-doctor-real-paths`, temp HOME after `omp plugin install context-mode`, `ctx_doctor` names OMP and the lock file.
+E2E (existing GP files):
 
-## Files touched
+- T44 `GP2/omp-system-prompt-append` in `e2e/cases/GP2-prompt-surface.e2e.mjs` (mirror of `:172`).
+- T45 `GP3/omp-tool-call-block`, T46 `GP3/omp-tool-result-replace`, T47 `GP3/omp-input-captured`, T48 `GP3/omp-compact-resume` in `e2e/cases/GP3-hooks.e2e.mjs`.
+- T49 `GP11/omp-doctor-real-paths` in `e2e/cases/GP11-doctor-upgrade.e2e.mjs` (mirror of `:64`): `ctx_doctor` names OMP and `~/.omp`.
+- T50 `GP11/omp-upgrade-no-pi-write`: `ctx_upgrade` prints OMP verbs and leaves `~/.pi` absent.
+- T51 `GP1/omp-native-install` in `e2e/cases/GP1-install.e2e.mjs`: `omp plugin install`, `upgrade`, `uninstall` lines from `docs/install/omp.md` run in a temp HOME.
 
-- Entry: `src/entries/pi.ts` (helper, agent id, `loadMode`).
-- Identity: `src/core/contracts/agents.ts:2`, `src/adapters/table.ts` (omp row), `src/core/contracts/client-map.ts:40` (comment), `src/core/hooks/dispatch.ts:101` (check it branches on source kind, not on `"pi"`).
-- Constants `src/core/contracts/constants.ts`: `:373` read-image tools, `:628` `AGENT_HOME_DIR` (`omp: [".omp"]`), `:718-719` remove row, `:751` `HOOK_HOST_FILE` (`omp: null`), `:838` `UPGRADE_HOST_COMMAND` (`omp plugin upgrade context-mode`), `:1090-1101` `NATIVE_INSTALL` (`omp plugin install context-mode`), new OMP list and store constants.
-- Setup: `src/setup/registry.ts:47,247,266-274`, `src/setup/hook-shapes.ts:73`, `build/manifests.ts:137`.
-- Doctor and ops: `src/core/ops/doctor-config.ts:128-130,406,418`, `src/core/tools/doctor.ts:184`, `src/core/ops/host-write.ts:33`, `src/core/ops/uninstall.ts:145-150`, `src/core/project/config-dir.ts` (`ompAgentDirOf`).
-- Build checks: `build/check-install-docs.mjs:160` (`NATIVE_HOSTS` + `omp`). `build/check-removed.mjs:57,70` stays.
-- Docs: `docs/install/README.md`, new `docs/install/omp.md`, `docs/architecture/adr/ADR-0023-native-install.md:46-55`, `docs/architecture/PRD.md:328`, `docs/architecture/TECH-SPEC.md:73`, `docs/architecture/modules/12-plugins.md:62-73`, `.github/ISSUE_TEMPLATE/feature.yml:21-22`, `docs/architecture/DEVIATIONS.md`.
-- Tests: the files in the RGR list. `tests/0014-repo-hygiene.test.mjs` needs no new `TEST-LAYOUT.md` row (no new file).
+Docs check:
 
-## DEVIATIONS rows to add (`docs/architecture/DEVIATIONS.md`, one per change)
+- T52 `build/check-install-docs.mjs`: red while `NATIVE_HOSTS` [cm `build/check-install-docs.mjs:160`] has `omp` and `docs/install/omp.md` is missing.
+
+Total: 52 tests (T1-T52) in 11 existing files, plus profile runs P1-P7.
+
+## CI job (M7, `.github/workflows/ci.yml`, job `ci`, after the OpenCode steps [cm `.github/workflows/ci.yml:17-24,88-96`])
+
+The `ci` matrix already runs macOS, Ubuntu and Windows. OMP installs with its own script, pinned, unattended, into `runner.temp` [src `scripts/install.sh:6,20`, `scripts/install.ps1:18-21,36`; run `omp-r65-platform.md` §3: exit 0 in 10.4 s, HOME untouched]. `irm | iex` cannot pass flags, so Windows uses the scriptblock form of the same script. The download host can fail; each step retries 3 times, and `omp --version` then fails the job, so a missing `omp` never turns into a silent skip in CI.
+
+```yaml
+      # D-OMP-CI-1: the real OMP 18.20.0 on all 3 OS for the omp fire tests (tests/0020-fire-plugin-ext).
+      # OMP's own install script, prebuilt binary, SHA-256 checked by the script. Temp dir, no login, no key.
+      - name: omp 18.20.0 (native install script) for the omp fire tests (D-OMP-CI-1)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          PI_INSTALL_DIR: ${{ runner.temp }}/omp-bin
+        run: |
+          for i in 1 2 3; do curl -fsSL https://omp.sh/install | sh -s -- --binary --ref v18.20.0 && break; sleep 20; done
+          echo "$PI_INSTALL_DIR" >> "$GITHUB_PATH"
+      - name: omp 18.20.0 (native install script, Windows) for the omp fire tests (D-OMP-CI-1)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          PI_INSTALL_DIR: ${{ runner.temp }}\omp-bin
+        run: |
+          foreach ($i in 1..3) { try { & ([scriptblock]::Create((irm https://omp.sh/install.ps1))) -Binary -Ref v18.20.0; break } catch { Start-Sleep 20 } }
+          "$env:PI_INSTALL_DIR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - run: omp --version
+        name: omp version (D-OMP-CI-1)
+```
+
+The existing step `node --test "tests/**/*.test.mjs"` then runs T36-T43 on 3 OS x 2 Node versions. The `windows-hosts` job step name "10 agents" [cm `.github/workflows/ci.yml:189-190`] becomes "11 agents", and `e2e/checks/windows-hosts.mjs` gets an `omp` host that installs with the script above, not npm.
+
+## Profiling plan (rule: profile always)
+
+Method: median of 50 runs (p90 too), same machine, temp HOME, warm cache, runs interleaved before/after. Before = `fea7780d` (M0). After = each milestone head. Baselines below are from macOS arm64 [run `omp-r65-platform.md` §5, `omp-r65-tools.md` §5c].
+
+| P | Metric | How | Baseline | Pass |
+|---|---|---|---|---|
+| P1 | OMP `loadExtensions` | `PI_TIMING=1 omp -p --no-session ... < /dev/null`, OMP's own timer [src `sdk.ts:1237`] | 54.8 ms (p90 57.3) | <= 60 ms and <= +10% |
+| P2 | OMP startup Total delta vs `--no-extensions` | same | +64 ms (402.0 vs 337.6) | <= +70 ms |
+| P3 | `before_agent_start` in OMP's runtime | probe that imports our entry, 50 calls | median 0.23 ms, first 12-15 ms | median <= 0.5 ms |
+| P4 | `before_agent_start` on Pi, string path | same probe under Pi | M0 measures | within noise (<= +5%) |
+| P5 | `context-mode doctor` wall, OMP present | `node cli.mjs doctor < /dev/null` | 630 ms (p90 763) | <= +10% |
+| P6 | Bytes: `pi/index.js`, `omp/index.js`, request size | `wc -c`; saved requests | 2,230,634 B; Pi request 14,014 B; OMP tools 17,537 B | Pi request equal; OMP tools 25,714 B; wrapper < 1 KB |
+| P7 | Wall time of edited test files and full suite once | `node --test` | `0020-plugins` 2.0 s, `0010-doctor-upgrade` 12.9 s, `0019-setup-engine` 34.5 s [cm `docs/architecture/TEST-LAYOUT.md:51,58,61`] | <= +10% per file |
+
+## DEVIATIONS rows (`docs/architecture/DEVIATIONS.md`, one per change)
 
 | Id | Files | Decision |
 |---|---|---|
-| D-OMP-PROMPT-1 | src/entries/pi.ts, tests/0020-plugins.test.mjs | #1332: an array `systemPrompt` gets our payload appended as the last entry; a string keeps the `fea7780d` bytes. Shape check only, no regex. |
-| D-OMP-HOST-1 | src/entries/pi.ts, tests/0020-plugins.test.mjs | The agent id comes from the prompt shape (array = omp). `PI_CODING_AGENT_DIR` never selects omp. |
-| D-OMP-TOOLS-1 | src/entries/pi.ts, tests/0020-plugins.test.mjs | `loadMode: "essential"` on `ctx_*` tools on the OMP path only, so OMP lists them top-level. |
-| D-OMP-ROW-1 | agents.ts, table.ts, constants.ts, client-map.ts, host-list tests | `omp` is the 11th AgentId; OMP leaves `UNSUPPORTED_HOSTS` (reverts the OMP part of D-UNSUPPORTED-HOSTS-1). |
-| D-OMP-SETUP-1 | src/setup/registry.ts, src/core/ops/uninstall.ts, tests/0019-setup-engine.test.mjs | Setup and uninstall use OMP's own `omp plugin` verbs. |
-| D-OMP-DOCTOR-1 | doctor-config.ts, doctor.ts, config-dir.ts, tests/0010-doctor-upgrade.test.mjs | Doctor names OMP and reads `~/.omp/plugins/omp-plugins.lock.json`; fix lines use OMP's commands. |
-| D-OMP-FIRE-1 | tests/0020-fire-plugin-ext.test.mjs, e2e/cases/GP2, GP11 | Live OMP fire test, skipped when `omp` is absent. |
-| D-OMP-DOCS-1 | docs/install/*, ADR-0023, PRD.md, TECH-SPEC.md, 12-plugins.md, feature.yml | OMP install docs with OMP's native commands; agent count 10 -> 11. |
+| D-OMP-PROMPT-1 | `src/entries/pi.ts`, `tests/0020-plugins.test.mjs` | #1332: an array `systemPrompt` gets our payload as the last block; a string keeps the `fea7780d` bytes. Shape check, no regex. |
+| D-OMP-ENTRY-1 | `src/entries/pi.ts`, `tests/0020-plugins.test.mjs` | The factory takes the agent id from its entry: `omp/index.js` passes `omp`. Env never selects OMP. |
+| D-OMP-TURN-1 | `src/entries/pi.ts`, `tests/0020-plugins.test.mjs` | The OMP entry registers tools at load; the turn counts once per prompt (OMP re-runs `before_agent_start`). |
+| D-OMP-FILTER-1 | `src/entries/pi.ts`, `tests/0020-plugins.test.mjs` | On OMP, `contextMode.excludeTools` comes from `api.pi.settings`, per call. |
+| D-OMP-TOOLS-1 | `src/entries/pi.ts`, `tests/0020-plugins.test.mjs` | `loadMode: "essential"` on every `ctx_*` tool; Pi request bytes equal. |
+| D-OMP-ROW-1 | `agents.ts`, `table.ts`, `constants.ts`, `client-map.ts`, `resolve.ts`, `doctor-hook.ts`, host-list tests | `omp` is the 11th AgentId; it leaves `UNSUPPORTED_HOSTS` (OMP part of D-UNSUPPORTED-HOSTS-1 reverted). |
+| D-OMP-MANIFEST-1 | `build/manifests.ts`, `build/build.mjs`, `tests/0018-build.test.mjs` | `package.json` gets `omp.extensions` and the `omp/index.js` wrapper; `pi` key unchanged. |
+| D-OMP-SKILLS-1 | `src/adapters/table.ts`, `build/build.mjs`, `tests/0018-build.test.mjs` | Root `skills/` also names the bare `ctx_*` tools, for OMP. |
+| D-OMP-SETUP-1 | `src/setup/registry.ts`, `src/setup/engine.ts`, `src/core/ops/uninstall.ts`, `tests/0019-setup-engine.test.mjs` | Setup and uninstall use `omp plugin` verbs; `disabledServers` only when OMP imports us. |
+| D-OMP-DOCTOR-1 | `doctor.ts`, `doctor-config.ts`, `config-dir.ts`, `tests/0010-doctor-upgrade.test.mjs` | Doctor names OMP, reads the OMP lock file, prints OMP verbs. |
+| D-OMP-UPGRADE-1 | `upgrade.ts`, `host-write.ts`, `plugin-root.ts`, `tests/0010-doctor-upgrade.test.mjs` | `ctx_upgrade` on OMP writes nothing under `~/.pi`; plugin root = package dir. |
+| D-OMP-FIRE-1 | `tests/0020-fire-plugin-ext.test.mjs`, `e2e/cases/GP1`, `GP2`, `GP3`, `GP11` | Live OMP fire test and e2e cases. |
+| D-OMP-CI-1 | `.github/workflows/ci.yml`, `e2e/checks/windows-hosts.mjs` | OMP 18.20.0 from its own script on 3 OS. |
+| D-OMP-DOCS-1 | `docs/install/*`, ADR-0023, PRD, TECH-SPEC, `12-plugins.md`, issue forms | OMP install docs with OMP's verbs; 10 -> 11 agents. |
 
-## Profiling plan
+## Docs changes (M8)
 
-- Before: `fea7780d`. After: each milestone head. Median of 50 runs, same machine, temp HOME, warm cache. Report median and p95.
-- Measures:
-  1. `before_agent_start` time per turn, Pi string path (must not move beyond noise) and OMP array path (in-process, `performance.now()` around the handler, 50 turns).
-  2. Hook latency `tool_call` and `tool_result` on Pi and OMP.
-  3. `context-mode setup --agents pi` and `--agents omp` (dry run, temp HOME).
-  4. `context-mode doctor` wall time on a Pi fixture and an OMP fixture.
-  5. `pi/index.js` size in bytes.
-  6. Wall time of the edited test files (`0020-plugins` 2.0 s, `0010-doctor-upgrade` 12.9 s, `0019-cli` 35.6 s per `TEST-LAYOUT.md`) and the full `node --test "tests/**/*.test.mjs"` once at ship.
-  7. OMP extension load time of `pi/index.js` (O9).
-- Pass: Pi numbers within noise of the baseline; OMP array path within 10% of the Pi path.
-
-## Docs changes
-
-- `docs/install/README.md`: agent count 10 -> 11. Install table row: `OMP | omp plugin install context-mode | omp plugin upgrade context-mode`. Agents table row next to Pi.
-- New `docs/install/omp.md`, same sections as `docs/install/pi.md` (Install, Update, Known limits, Verified):
-  - Install OMP: `curl -fsSL https://omp.sh/install | sh` (macOS, Linux), `irm https://omp.sh/install.ps1 | iex` (Windows).
-  - Install context-mode: `omp plugin install context-mode`.
-  - Update: `omp plugin upgrade context-mode`; OMP itself: `omp update`.
-  - Check: `context-mode doctor` is not on PATH for OMP users; doctor runs as the `ctx_doctor` tool inside OMP.
-  - Known limits: the gap table from Part 1.
-  - Verified: a table from the live run (OMP version, OS, date).
+- `docs/install/README.md`: 10 -> 11 agents; row `OMP | omp plugin install context-mode | omp plugin upgrade context-mode`.
+- New `docs/install/omp.md`, same sections as `docs/install/pi.md`:
+  - Install OMP: `curl -fsSL https://omp.sh/install | sh`; Windows `irm https://omp.sh/install.ps1 | iex`.
+  - Install: `omp plugin install context-mode`. Update: `omp plugin upgrade context-mode`; OMP: `omp update`. Remove: `omp plugin uninstall context-mode`.
+  - Check: run `ctx_doctor` inside OMP, or `/skill:ctx-doctor`.
+  - Known limits: the 4 host-limit rows.
+  - Verified: OMP version, OS, date from the CI run.
+- `docs/architecture/PRD.md`, `TECH-SPEC.md`, `modules/01-contracts.md`, `modules/12-plugins.md`, ADR-0023 native table: add OMP.
+- `.github/ISSUE_TEMPLATE/feature.yml`, `bug.yml`, `agent-report.yml`, `.github/scripts/issue-intake.mjs`: add OMP, so the labels come on their own.
 
 ## Rollout
 
-Owner rule (verbatim, 2026-11-13): "OMP icin patch yapmak yasak ancak ki ancak OMP destegi gelirse o zaman hata ortadan kalkar."
+Owner rule (verbatim): "OMP icin patch yapmak yasak ancak ki ancak OMP destegi gelirse o zaman hata ortadan kalkar."
 
-Consequence: OMP support ships as one whole, not as patches.
-
-1. M1-M8 land on `lane/r64-omp`. Each green step pushes the lane (no work lost); none of them goes to `main` alone.
-2. No partial OMP patch ships alone. This includes the #1332 prompt fix (M1): it reaches `main` only together with M2-M8.
-3. When M1-M8 are green on the lane (full `node --test` once, T21-T23 on a live `omp`, profile within the pass line), `main` gets OMP support in one merge. Ship it at once when it is whole.
-4. The weekly release carries it (npm + GitHub plugins together).
-5. Ask the three beta testers in #1332 to test the release with `omp plugin install context-mode` and to send `ctx_doctor` output (M9).
+1. M1-M8 land on `lane/r64-omp`. Each green step pushes the lane, so no work is lost. No step goes to `main` alone; the #1332 prompt fix too waits for the whole.
+2. When M1-M8 are green (full `node --test` once, T36-T51 on a live `omp`, the CI job green on 3 OS, P1-P7 in the pass line), OMP support reaches `main` in one merge after the owner says yes. Ship it at once when it is whole.
+3. M9: ask @tejasach06, @itsmylife44 and @jeffscottward to install the beta with `omp plugin install context-mode` and send `ctx_doctor` output.
 
 ## Risks
 
-- OMP changes the event shapes in a minor release (9 releases in 6 days). Guard: T21 on each OMP minor.
-- Double tools if OMP imports our MCP server from `~/.claude.json` (O4).
-- Pi gets an unknown field if the `loadMode` branch leaks. Guard: T10 deep-equal on the string path.
-- Doctor reads the wrong dir for a named OMP profile. First step covers the default profile only.
+- OMP changes event shapes in a minor release. Guard: the CI job; bump the pin with T36-T43 green.
+- A later Pi release checks unknown tool fields. Guard: the Pi fire test with the real Pi CLI (T14 golden; the Pi CLI needs a native install step in CI, today the Pi fire test skips there [cm `tests/0020-fire-plugin-ext.test.mjs:171`]).
+- OMP renames `api.pi.settings`. Guard: T13; a missing value gives `[]`.
+- The download host for OMP is down. Guard: retry, then a red CI job with a clear step name.
 
-## Open questions (unverified until a source closes each one)
+## Open questions (only what this step cannot close)
 
-- O1 (closed): `ctx_*` missing in run3 -> `loadMode: "essential"` [run probe3].
-- O2 (closed): `tool_call`, `tool_result`, `input` (RPC) and `session_compact` fire live on OMP 18.20.0, and context-mode 2.1.10's handlers run [run proof §1-§4, §6a-§6c]. `input` does not fire in print mode [run proof §3; src `emitInput` has 2 callers].
-- O2a (narrowed from O2): after `session_compact`, the next turn's SessionStart(source=compact) payload on OMP. Not run: compact was the last RPC step. T21 covers it.
-- O2b (narrowed from O2): `input` in the interactive TUI. Not run (needs a pty); source says it fires [src `modes/controllers/input-controller.ts:1089`].
-- O2c: two `before_agent_start` entries, 1 ms apart, in the RPC run with context-mode loaded (one in the probe-only run) [run proof §6c]. Cause not found.
-- O3 (closed): OMP accepts a returned `structuredContent` without error, drops it, and only `content` reaches the model [run proof §2, `exit=0`; src `runner.ts:2286-2297`, `shared-events.ts:412-418`].
-- O4: double registration through OMP's MCP import, and the OMP setting that turns the import off.
-- O5: since which OMP version `systemPrompt` is `string[]` (needs full git history of `extensions/types.ts`).
-- O6: Windows install and run (`irm https://omp.sh/install.ps1 | iex`); @tejasach06 can test.
-- O7: OMP loads our `pi.skills` manifest entry (`docs/skills.md`).
-- O8: OMP user count (stars, downloads) for the README line.
-- O9: OMP load time of `pi/index.js`.
-- O10: OMP's own key for a tool filter (replaces `excludedTools`).
-- O11: the OMP uninstall verb (`omp plugin uninstall` or `remove`).
-- O12: that Pi 1.4.0 ignores an unknown `loadMode` field (only matters if the branch leaks).
+- O-A: Does a real model call `ctx_*` well on OMP? A fake model cannot prove it. M9 beta logs close it.
+- O-B: Why print mode runs `before_agent_start` once even when the base changes. Not needed: Decision 4 removes the re-run on every mode; T42 pins RPC.
+- O-C: Windows path form of `ctx.cwd` and Bun path handling. The M7 CI job on `windows-latest` proves it.
+- O-D: Pi CLI fire test in CI. Add Pi's own install step in M7 so T14 runs live, not only as a golden.
+- O-E: OMP adoption numbers for the README. Binary installs are not public; npm counts are low.
