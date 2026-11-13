@@ -801,7 +801,8 @@ const EXT_ENABLED_WORKSPACE = "Enabled (Workspace):";
 const EXT_TRUE = "true";
 type NativeState = "enabled" | "disabled" | undefined;
 /** The extension list also shows the workspace scope: off there, gemini runs none of its hooks (D-NI-GEMINI-GATE-1). */
-/** stopped: the list command ended early (signal or spawn error) after it named the plugin (D-1322-LIST-SIZE-1). */
+/** stopped: the list command ended early (signal or spawn error) after it named the plugin (D-1322-LIST-SIZE-1), or a gemini
+ *  extension on disk is missing from a list that answered with an error (D-1378-GEMINI-LIST-ERR-1). */
 interface NativeStatus { state: NativeState; workspaceOff: boolean; hookGate?: string; stopped?: string }
 
 /** D-1322-LIST-SIZE-1, codex plugin list --json (codex-rs/cli/src/plugin_cmd.rs JsonPluginListOutput): { installed: [{ pluginId,
@@ -854,8 +855,19 @@ function jsonState(n: NativePlugin, text: string): NativeStatus {
   return { state: "enabled", workspaceOff: false, hookGate };
 }
 
+/** #1378 D-1378-GEMINI-LIST-ERR-1: `gemini extensions install` left <gemini dir>/extensions/<plugin>/gemini-extension.json, but
+ *  the list did not name it (an auth error such as 402, exit 0). The install is the host's; doctor quotes the list answer. */
+function unlistedExtension(n: NativePlugin, env: SetupContext["env"], home: string, out: string, status: number | null): string | undefined {
+  if (n.bin !== "gemini") return undefined;
+  const dir = path.join(geminiDirOf(env, home), "extensions", n.plugin);
+  if (!existsSync(path.join(dir, "gemini-extension.json"))) return undefined;
+  const cmd = [n.bin, ...n.args].join(" ");
+  const first = out.split("\n").map((l) => l.trim()).find((l) => l.length)?.slice(0, 300) ?? `exit ${status}`;
+  return `context-mode is installed in ${dir}, and ${cmd} answered "${first}" in place of the extension list; run ${cmd} in a terminal and fix that answer (gemini auth)`;
+}
+
 /** The host's own install as its list command shows it (undefined: not listed in that form, setup owns the agent). */
-function nativeState(row: CheckRow, env: SetupContext["env"]): NativeStatus {
+function nativeState(row: CheckRow, env: SetupContext["env"], home: string): NativeStatus {
   const none: NativeStatus = { state: undefined, workspaceOff: false };
   const n = row.nativePlugin;
   if (!n || !hostBin(n.bin, env).file) return none;
@@ -866,11 +878,17 @@ function nativeState(row: CheckRow, env: SetupContext["env"]): NativeStatus {
     const cmd = [n.bin, ...n.args].join(" ");
     return { ...none, stopped: `${cmd} stopped before it finished (${why}); it names ${n.plugin}, run ${cmd} in a terminal` };
   }
+  if (n.format === "extension") {
+    // Gemini 0.65.0 writes the extension list to stderr (D-INST-2).
+    const out = `${r.stdout}${r.stderr}`;
+    const st = r.status === 0 ? extensionState(n, out) : none;
+    if (st.state !== undefined) return st;
+    const unlisted = unlistedExtension(n, env, home, out, r.status);
+    return unlisted ? { ...none, stopped: unlisted } : st;
+  }
   if (r.status !== 0) return none;
-  // Gemini 0.65.0 writes the extension list to stderr (D-INST-2).
   if (n.format === "json") return jsonState(n, `${r.stdout}`);
-  if (n.format === "codex-json") return { state: codexJsonState(n, `${r.stdout}`), workspaceOff: false };
-  return extensionState(n, `${r.stdout}${r.stderr}`);
+  return { state: codexJsonState(n, `${r.stdout}`), workspaceOff: false };
 }
 
 /** The row as the host's own plugin install sets it up. */
@@ -883,7 +901,7 @@ function nativeRow(row: CheckRow, n: NativePlugin): CheckRow {
  *  disabled extension is a FAIL that names the host's enable command: setup cannot link over it (D-NI-EXT-DOCTOR-1). */
 async function nativeResult(row: CheckRow, ctx: SetupContext, apply?: { run: Run; dryRun: boolean }): Promise<AgentResult | undefined> {
   const n = row.nativePlugin;
-  const { state, workspaceOff, hookGate, stopped } = nativeState(row, ctx.env);
+  const { state, workspaceOff, hookGate, stopped } = nativeState(row, ctx.env, ctx.home);
   const bin = n ? hostBin(n.bin, ctx.env).file : undefined;
   if (stopped) return { id: row.id, status: "FAIL", v1: [], changes: [], checks: [], bin, reason: stopped };
   if (n?.format === "codex-json" && !bin && codexPluginHomeOf(ctx.pkgDir) !== null) return codexCacheResult(row, ctx, apply);
