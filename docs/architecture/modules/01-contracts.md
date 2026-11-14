@@ -16,7 +16,7 @@ Write them in this order: `types.ts` needs `AgentId` from `agents.ts`; `errors.t
 Exports:
 
 ```ts
-export const AGENT_IDS = ["claude-code","codex","gemini","qwen","copilot-cli","vscode","kiro","zcode","pi","opencode"] as const;
+export const AGENT_IDS = ["claude-code","codex","gemini","qwen","copilot-cli","vscode","kiro","zcode","pi","opencode","omp"] as const; // omp: ADR-0026
 export type AgentId = typeof AGENT_IDS[number];
 ```
 

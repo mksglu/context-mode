@@ -45,7 +45,7 @@ export const ITEMS = [
 export const READY_KEYS = ["version", "steps", "output"];
 
 const AGENT_MARKERS = ["claude code", "claude-code", "claude", "codex", "gemini cli", "gemini", "qwen code", "qwen", "opencode",
-  "pi coding agent", "pi", "copilot cli", "copilot", "vs code", "vscode", "kiro", "zcode", "cursor"];
+  "pi coding agent", "pi", "oh-my-pi", "omp", "copilot cli", "copilot", "vs code", "vscode", "kiro", "zcode", "cursor"];
 const RUNTIME_MARKERS = ["node", "bun"];
 const OS_MARKERS = ["linux", "macos", "darwin", "windows", "win32", "wsl", "ubuntu", "debian", "fedora", "alpine"];
 const OBSERVED_MARKERS = ["observed", "actual", "what happened", "output", "error", "warning"];

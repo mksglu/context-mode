@@ -203,7 +203,7 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
     assert.ok(spec.includes("**[D] Agents (11):**") && spec.includes("OpenCode 2, OMP."), "TECH-SPEC agent list");
     assert.ok(read("docs", "architecture", "modules", "01-contracts.md").includes('"pi","opencode","omp"] as const'), "01-contracts AGENT_IDS");
     assert.ok(read("docs", "architecture", "modules", "12-plugins.md").includes("ADR-0026"), "12-plugins names the OMP plugin");
-    assert.ok(read("docs", "architecture", "modules", "DEVIATIONS.md").includes("| D-OMP-DOCS-1 |"), "DEVIATIONS row");
+    assert.ok(read("docs", "architecture", "DEVIATIONS.md").includes("| D-OMP-DOCS-1 |"), "DEVIATIONS row");
   });
 
   test("install-native: the real pages pass checkNativePages", () => {

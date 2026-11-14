@@ -69,8 +69,8 @@ M7 is not done. Open items are listed in `https://github.com/mksglu/context-mode
 
 ## 2. Scope
 
-- **[D] Agents (10):** Claude Code, Codex CLI, Gemini CLI, Qwen Code, Copilot CLI, VS Code Copilot, Kiro, ZCode, Pi, OpenCode 2.
-- **[D] Removed:** agy (PRD §15.5), OMP (G20), Cursor, JetBrains, Zed, Kimi, Kilo, OpenClaw, OpenCode 1.x, Codex Desktop.
+- **[D] Agents (11):** Claude Code, Codex CLI, Gemini CLI, Qwen Code, Copilot CLI, VS Code Copilot, Kiro, ZCode, Pi, OpenCode 2, OMP. OMP came back as its own agent in ADR-0026.
+- **[D] Removed:** agy (PRD §15.5), Cursor, JetBrains, Zed, Kimi, Kilo, OpenClaw, OpenCode 1.x, Codex Desktop.
 - **[D]** One `context.db` per project (G21, ADR-0002). Users install with `npm i -g context-mode && context-mode setup` (ADR-0019); the git `release` branch stays for the Claude Code marketplace (G12–G14, G22). Users get 3 command skills (`/ctx-stats`, `/ctx-doctor`, `/ctx-upgrade`) plus this repo's own `/release` skill (not shipped to users); `ctx_doctor` and `ctx_upgrade` are MCP tools; `context-mode doctor` and `context-mode upgrade` are the CLI forms that can fix (ADR-0010, ADR-0019 section 2).
 
 The PRD was rewritten on 2026-10-15 to match this spec; no PRD line is superseded.

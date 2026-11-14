@@ -6,6 +6,8 @@ Imports allowed (00 §2, module row `plugins`): `contracts`, `server` (`TOOLS`, 
 
 Files this module owns (00 §1): `src/entries/pi.ts`, `src/entries/opencode.ts`.
 
+OMP (ADR-0026) loads the same `src/entries/pi.ts` build from its plugin store (`omp plugin install context-mode`); the entry names the host `omp` and keeps Pi and Pi-Bolt request bytes as they are (ADR-0021).
+
 ## 1. Why these two files are different from every other entry
 
 Every other agent reaches context-mode over MCP: a spawned `server.mjs` process, and a spawned `hook.mjs` process per hook event. Pi and OpenCode 2 run context-mode **in-process** (PRD §3 "in-process plugin agents (Pi, OpenCode 2) … no spawn, no MCP hop"). `src/entries/pi.ts` and `src/entries/opencode.ts` are the only two files that call `TOOLS`, `INSTRUCTIONS`, and `handleHook` as plain function imports inside the host's own process, instead of over stdio or a child process.

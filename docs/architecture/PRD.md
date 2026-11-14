@@ -32,7 +32,7 @@ Current outcome counts, from `https://github.com/mksglu/context-mode/blob/274600
 
 ## 3. Agents and architecture
 
-v2.0 ships exactly 10 agents (TECH-SPEC §2):
+context-mode supports 11 agents (TECH-SPEC §2); OMP is the 11th (ADR-0026):
 
 | Agent | Install mode |
 |---|---|
@@ -46,6 +46,7 @@ v2.0 ships exactly 10 agents (TECH-SPEC §2):
 | ZCode | hooks + MCP |
 | Pi | in-process plugin |
 | OpenCode 2 | in-process plugin |
+| OMP | in-process plugin |
 
 No other agent ships in v2.0. No CLI and no `cli.mjs` entry (ADR-0002, ADR-0010): install, update and diagnosis run through each host's own mechanism and through the `ctx_doctor`/`ctx_upgrade` tools.
 
