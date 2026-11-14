@@ -8,6 +8,7 @@ import { z } from "zod/v4";
 import { checkPermission } from "../adapters/pi.ts";
 import { INTERNAL_ERROR_LINE } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
+import type { AgentId } from "../core/contracts/agents.ts";
 import type { HookOutput, ProjectContext, ToolContext, ToolReply } from "../core/contracts/types.ts";
 import { handleHook } from "../core/hooks/dispatch.ts";
 import { ownJournal } from "../core/journal/own-call.ts";
@@ -99,7 +100,17 @@ function toPi(reply: ToolReply): PiToolResult {
   return { content: [{ type: "text", text: reply.text }], details: {} };
 }
 
+// D-OMP-ENTRY-1: the hosts that load this factory. The entry names its host: the Pi entry (default export) passes
+// "pi", omp/index.js passes "omp". Env never picks the id: OMP sets PI_CODING_AGENT_DIR and PI_CONFIG_DIR, and so
+// can a Pi user. "omp" joins AGENT_IDS in M4 (D-OMP-ROW-1); until then handleHook names it on its stderr line.
+export type PiHostId = "pi" | "omp";
+
 export default function piExtension(pi: PiApi): void {
+  hostExtension(pi, "pi");
+}
+
+export function hostExtension(pi: PiApi, host: PiHostId = "pi"): void {
+  const agent = host as AgentId;
   const env = process.env;
   let sessionId = ""; // impl/10 §10: ctx.sessionManager.getSessionId(), captured once (impl/12 §3.2)
   let cwd = ""; // impl/12 §3.2 step 2: ctx.cwd, captured once
@@ -119,12 +130,12 @@ export default function piExtension(pi: PiApi): void {
   }
 
   function hook(raw: PiEvent, atTurn: number): Promise<HookOutput> {
-    return handleHook("pi", { ...raw, sessionId, cwd, turn: atTurn }, env);
+    return handleHook(agent, { ...raw, sessionId, cwd, turn: atTurn }, env);
   }
 
   // #1246: each instance resolves its own project from its own ctx.cwd, at most once.
   function projectOf(): ProjectContext {
-    project ??= resolveProject("pi", { env, argv: process.argv, cwd, piCwd: cwd });
+    project ??= resolveProject(agent, { env, argv: process.argv, cwd, piCwd: cwd });
     return project;
   }
 
