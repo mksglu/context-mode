@@ -268,7 +268,7 @@ describe("ADR-0020 fire, plugin and extension hosts", { concurrency: CONC }, () 
     const hasOmp = spawnSync("omp", ["--version"], { stdio: "ignore" }).status === 0;
     const RUN_MS = 120000;
     const PAYLOAD_HEAD = "context-mode keeps large output out of the conversation.";
-    const CTX_TOOLS = ["ctx_execute", "ctx_execute_file", "ctx_batch", "ctx_index", "ctx_search", "ctx_fetch_and_index", "ctx_stats", "ctx_doctor", "ctx_upgrade"];
+    const CTX_TOOLS = ["ctx_execute", "ctx_batch", "ctx_index", "ctx_search", "ctx_resume", "ctx_stats", "ctx_doctor", "ctx_upgrade", "ctx_purge"];
 
     const text = (c) => (typeof c === "string" ? c : JSON.stringify(c));
     function provider(bodies) {

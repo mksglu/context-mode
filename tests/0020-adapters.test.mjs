@@ -135,6 +135,17 @@ describe("ADR-0020 adapters", () => {
       }
     });
 
+    // D-OMP-FIRE-1 (M7a live run): OMP rows in context.db carried agent "pi" because the omp row used the Pi decode,
+    // which names the agent "pi". The omp row decodes the same Pi payload and names the agent "omp"; Pi stays "pi".
+    test("D-OMP-FIRE-1: the omp row decodes the Pi payload with agent omp; the pi row keeps agent pi", () => {
+      const raw = { type: "tool_call", sessionId: "s", cwd: "/p", toolName: "read", input: { path: "a.txt" }, toolCallId: "c1" };
+      const o = getAdapter("omp").decode(raw);
+      const p = getAdapter("pi").decode(raw);
+      assert.equal(o.agent, "omp");
+      assert.equal(p.agent, "pi");
+      assert.deepEqual({ ...o, agent: "pi" }, p);
+    });
+
     test("each newly wired row decodes its own native PreToolUse and encodes allow as empty stdout, exit 0", () => {
       const payloads = {
         gemini: { hook_event_name: "BeforeTool", session_id: "s", cwd: "/p", tool_name: "run_shell_command", tool_input: { command: "ls" } },
