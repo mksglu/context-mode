@@ -443,7 +443,7 @@ describe("ADR-0018 build: manifests", () => {
   // no scripts, no private.
   const D1_FILES = [
     ".claude-plugin", ".codex-plugin", ".zcode-plugin", "LICENSE", "README.md", "SHA256SUMS", "cli.mjs", "codex", "copilot", "fixtures", "gemini-extension.json", "hook.mjs", "hooks",
-    "opencode", "pi", "qwen-extension.json", "run.mjs", "search.mjs", "server.mjs", "skills",
+    "omp", "opencode", "pi", "qwen-extension.json", "run.mjs", "search.mjs", "server.mjs", "skills",
   ];
   test("package.json is the D1 npm shape: name, version, bin, type, engines, files, pi (extensions, skills)", (t) => {
     const dir = scratch(t);
@@ -456,6 +456,7 @@ describe("ADR-0018 build: manifests", () => {
       files: D1_FILES,
       main: "./opencode/plugin.js", // ADR-0023 D-NI-OPENCODE-1
       name: "context-mode",
+      omp: { extensions: ["./omp/index.js"] }, // ADR-0026 D-OMP-MANIFEST-1: OMP reads its own key; pi key unchanged
       pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"] },
       repository: { type: "git", url: "git+https://github.com/mksglu/context-mode.git" },
       type: "module",
@@ -469,6 +470,7 @@ describe("ADR-0018 build: manifests", () => {
       ...META,
       name: "context-mode", version: "2.0.0", type: "module", bin: { "context-mode": "cli.mjs" }, engines: { node: ">=24.15.0" },
       files: D1_FILES, main: "./opencode/plugin.js", exports: { ".": "./opencode/plugin.js", "./server": "./opencode/plugin.js" }, pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"] },
+      omp: { extensions: ["./omp/index.js"] },
       repository: { type: "git", url: "git+https://github.com/mksglu/context-mode.git" },
     };
     assert.doesNotThrow(() => assertOutPackageJson(ok));
@@ -481,6 +483,8 @@ describe("ADR-0018 build: manifests", () => {
     assert.throws(() => assertOutPackageJson({ ...ok, engines: { node: ">=22.5.0" } }), /engines/);
     assert.throws(() => assertOutPackageJson({ ...ok, files: D1_FILES.slice(1) }), /files/);
     assert.throws(() => assertOutPackageJson({ ...ok, pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"], prompts: [] } }), /pi/);
+    assert.throws(() => assertOutPackageJson({ ...ok, omp: { extensions: ["./pi/index.js"] } }), /omp/); // D-OMP-MANIFEST-1
+    assert.throws(() => assertOutPackageJson({ ...ok, omp: { extensions: ["./omp/index.js"], skills: ["./skills"] } }), /omp/);
     // D-RN-REPO-1: npm provenance (E422) needs repository.url to name the source repo; npm pkg fix form, so it stays a no-op.
     assert.throws(() => assertOutPackageJson({ ...ok, repository: { type: "git", url: "" } }), /repository/);
     assert.throws(() => assertOutPackageJson({ ...ok, repository: { type: "git", url: "https://github.com/mksglu/context-mode" } }), /repository/);
@@ -488,7 +492,7 @@ describe("ADR-0018 build: manifests", () => {
       assert.throws(() => assertOutPackageJson({ ...ok, [key]: "x" }), new RegExp(key));
     }
     assert.throws(() => assertOutPackageJson({ ...ok, main: "./server.mjs" }), /main/); // ADR-0023 D-NI-OPENCODE-1
-    for (const key of ["pi", "bin", "engines", "files", "repository"]) {
+    for (const key of ["pi", "omp", "bin", "engines", "files", "repository"]) {
       const { [key]: _drop, ...missing } = ok;
       assert.throws(() => assertOutPackageJson(missing), new RegExp(key));
     }
@@ -1186,6 +1190,12 @@ describe("ADR-0023 build: native host manifests", () => {
     assert.equal(p.version, VERSION);
     for (const rel of p.pi.extensions) assert.ok(isFile(pkg, stripRoot(rel)), "pi extension " + rel);
     for (const dir of p.pi.skills) assertSkills(pkg, dir, "", "pi");
+    // ADR-0026 T15 (D-OMP-MANIFEST-1): OMP reads package.json "omp".extensions; the wrapper calls the Pi factory, under 1 KB.
+    assert.deepEqual(p.omp, { extensions: ["./omp/index.js"] });
+    for (const rel of p.omp.extensions) {
+      assert.ok(isFile(pkg, stripRoot(rel)), "omp extension " + rel);
+      assert.ok(statSync(path.join(pkg, stripRoot(rel))).size < 1024, "omp wrapper is under 1 KB");
+    }
     assert.equal(typeof p.main, "string", "opencode: package.json main (OpenCode imports the plugin by package name)");
     assert.equal(stripRoot(p.main), "opencode/plugin.js");
     assert.ok(isFile(pkg, stripRoot(p.main)), "opencode: main " + p.main + " shipped");
