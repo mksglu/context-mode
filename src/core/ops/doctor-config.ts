@@ -12,7 +12,8 @@ import {
   HOOKS_KEY, MCP_ANY_MATCH, POST_TOOL_USE, KIRO_ACTION_FIELD, KIRO_TOOL_MATCHERS, KIRO_TRIGGER_FIELD, MATCHER_ALT, MATCHER_ANY, MATCHER_CLOSE, MATCHER_OPEN,
   OPENCODE_BASE_CONFIG_FILE, OPENCODE_CONFIG_FILES, OPENCODE_GIT_SPEC, OPENCODE_NPM_SPEC_PREFIX, OPENCODE_MCP_COMMAND_FIELD, OPENCODE_PACKAGE_FIELD, OPENCODE_PLUGIN_KEY, OPENCODE_PLUGIN_PATH, OPENCODE_PLUGINS_KEY, OWN_MCP_ENTRY, OWN_TOOL_PREFIX, REGEX_ESCAPE,
   REGEX_SPECIAL_CHARS, SETTINGS_FILE, SHELL_QUOTE, TOOL_HOOK_EVENTS, V1_PATH_SEPS, VSCODE_CLAUDE_HOOKS_SETTING,
-  VSCODE_DIR_NAME, VSCODE_SETTINGS_FILE,
+  VSCODE_DIR_NAME, VSCODE_SETTINGS_FILE, OMP_CONTENT_INFO, OMP_ENABLE_COMMAND, OMP_FLOOR_INFO, OMP_IMPORT_INFO, OMP_MIN_VERSION, OMP_PRINT_MODE_INFO,
+  OMP_SCRIPTS_INFO, PI_PACKAGE_JSON_FILE,
 } from "../contracts/constants.ts";
 import type { AdapterRow, AgentId, DoctorRow } from "../contracts/types.ts";
 import { hasReplace } from "../../adapters/table.ts";
@@ -23,6 +24,8 @@ import { hostConfigValueAt, isNodeCommand, mergeOwnEntries, opencodePluginFile, 
 import { marketplaceChoice, resolvePluginRoot } from "./plugin-root.ts";
 import { ownBundleDir } from "./bundle-dir.ts";
 import { piInstalledIn } from "../../setup/pi-gate.ts";
+import { compareVersions } from "./doctor-env.ts";
+import { OMP_DISABLED_SERVERS_KEY, ompImportFiles, ompImportsUs } from "./omp-import.ts";
 
 type D3Part = (typeof D3_PARTS)[number];
 const [PART_MCP, PART_HOOKS, PART_TIMEOUT] = D3_PARTS;
@@ -422,14 +425,45 @@ function checkPiInstall(env: NodeJS.ProcessEnv, home: string, worktree: string):
   return fail("D3", D3_DETAIL([PART_MCP]) + D4_REASON_JOIN + join(piAgentDirOf(env, home), SETTINGS_FILE), NATIVE_INSTALL.pi[0]);
 }
 
-// ADR-0026 decision 7: OMP records its plugins in ~/.omp/plugins/omp-plugins.lock.json; context-mode must be there and enabled.
-const OMP_LOCK_FILE = ["plugins", "omp-plugins.lock.json"] as const;
+// ADR-0026 decision 7 (D-OMP-DOCTOR-1): OMP records its plugins in ~/.omp/plugins/omp-plugins.lock.json and installs them
+// as dependencies of ~/.omp/plugins/package.json; context-mode must be in both and enabled. Fix lines are OMP's own verbs.
+const OMP_PLUGINS_DIR = "plugins";
+const OMP_LOCK_FILE = "omp-plugins.lock.json";
+function readJson(file: string): Record<string, unknown> | undefined {
+  try {
+    const doc: unknown = JSON.parse(readFileSync(file, "utf8"));
+    return typeof doc === "object" && doc !== null ? doc as Record<string, unknown> : undefined;
+  } catch { return undefined; }
+}
+function ownEntry(doc: Record<string, unknown> | undefined, key: string): unknown {
+  const map = doc?.[key];
+  return typeof map === "object" && map !== null ? (map as Record<string, unknown>)[SERVER_KEY] : undefined;
+}
 function checkOmpInstall(home: string): DoctorRow {
-  const file = join(home, ...AGENT_HOME_DIR.omp, ...OMP_LOCK_FILE);
-  let entry: unknown;
-  try { entry = (JSON.parse(readFileSync(file, "utf8")) as { plugins?: Record<string, unknown> }).plugins?.[SERVER_KEY]; } catch { entry = undefined; }
-  const on = typeof entry === "object" && entry !== null && (entry as { enabled?: unknown }).enabled === true;
-  return on ? { ...pass("D3"), detail: file } : fail("D3", D3_DETAIL([PART_MCP]) + D4_REASON_JOIN + file, NATIVE_INSTALL.omp[0]);
+  const dir = join(home, ...AGENT_HOME_DIR.omp, OMP_PLUGINS_DIR);
+  const lock = join(dir, OMP_LOCK_FILE);
+  const pkg = join(dir, PI_PACKAGE_JSON_FILE);
+  const entry = ownEntry(readJson(lock), "plugins");
+  const missing = (file: string): DoctorRow => fail("D3", D3_DETAIL([PART_MCP]) + D4_REASON_JOIN + file, NATIVE_INSTALL.omp[0]);
+  if (typeof entry !== "object" || entry === null) return missing(lock);
+  if (ownEntry(readJson(pkg), "dependencies") === undefined) return missing(pkg);
+  if ((entry as { enabled?: unknown }).enabled !== true) return fail("D3", D3_DETAIL([PART_MCP]) + D4_REASON_JOIN + lock, OMP_ENABLE_COMMAND);
+  return { ...pass("D3"), detail: lock };
+}
+
+/** ADR-0026 support matrix rows 9, 11, 25, 28 and 23 (D-OMP-DOCTOR-1): info lines under the OMP report. `version` is the
+ *  OMP version when the host names it; an unknown version gets no floor line (doctor states only what it read). */
+export function ompInfoLines(env: NodeJS.ProcessEnv, version: string | undefined): string[] {
+  const out: string[] = [];
+  if (version !== undefined && compareVersions(version, OMP_MIN_VERSION) === -1) out.push(OMP_FLOOR_INFO(version));
+  out.push(OMP_CONTENT_INFO, OMP_PRINT_MODE_INFO, OMP_SCRIPTS_INFO);
+  const home = homeDirOf(env);
+  if (home === null) return out;
+  const files = ompImportFiles(home);
+  if (!ompImportsUs(files, env)) return out;
+  const listed = readJson(files.mcp)?.[OMP_DISABLED_SERVERS_KEY];
+  if (!(Array.isArray(listed) && listed.includes(SERVER_KEY))) out.push(OMP_IMPORT_INFO(files.claude, files.mcp));
+  return out;
 }
 
 /** D4 — old entries: every finding's reason in one row, joined "; ". */

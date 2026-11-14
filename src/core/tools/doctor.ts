@@ -8,14 +8,14 @@ import { z } from "zod/v4";
 import { getAdapter } from "../../adapters/table.ts";
 import {
   D5_LAST_HOOK_ERROR, D5_PAST_HOOK_ERROR, DOCTOR_CHECK_ORDER, DOCTOR_DOCS_LABEL, DOCTOR_DOCS_LINK, DOCTOR_LABEL, OWNER_PID_EXT, OWNERS_DIR_NAME,
-  NATIVE_INSTALL, PI_LIST_COMMAND, PROJECTS_DIR_NAME, REPORT_ENV_ENUMS, BUNDLE_SHA, D1_REGISTRY_URL, DOCTOR_GIT_TIMEOUT_MS, REPORT_CAP, REPORT_SOURCE_LABEL,
+  NATIVE_INSTALL, OMP_LIST_COMMAND, PI_LIST_COMMAND, PROJECTS_DIR_NAME, REPORT_ENV_ENUMS, BUNDLE_SHA, D1_REGISTRY_URL, DOCTOR_GIT_TIMEOUT_MS, REPORT_CAP, REPORT_SOURCE_LABEL,
 } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 import type {
   AdapterRow, CtxDoctorInput, DbHandle, DoctorCheckId, DoctorRow, ToolContext, ToolReply,
 } from "../contracts/types.ts";
 import { ownBundleDir } from "../ops/bundle-dir.ts";
-import { checkDoubleFire, checkHostConfig, checkV1Leftovers } from "../ops/doctor-config.ts";
+import { checkDoubleFire, checkHostConfig, checkV1Leftovers, ompInfoLines } from "../ops/doctor-config.ts";
 import { checkDb, checkIndex } from "../ops/doctor-db.ts";
 import type { DbCheck } from "../ops/doctor-db.ts";
 import { bundleVersion, checkMcp, checkMode, checkNode, checkProject, checkRuntimes, checkShell, checkVersion } from "../ops/doctor-env.ts";
@@ -182,6 +182,7 @@ export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<T
   // ADR-0019 D7: name the CLI command; setup when a row failed (it repairs and verifies), else doctor.
   // D-R38-PI-CMD-1 (#1312): Pi installs through `pi install` and has no global context-mode CLI; name Pi's own commands.
   const command = adapter.id === "pi" ? (failed ? NATIVE_INSTALL.pi[0] : PI_LIST_COMMAND)
+    : adapter.id === "omp" ? ompCommand(rows, failed) // D-OMP-DOCTOR-1: OMP's own verbs, no context-mode CLI
     : `context-mode ${failed ? "setup" : "doctor"} --agents ${adapter.id}`;
   const input = { agent: adapter.id, rows, env: reportEnv(host.env), command };
   const envLine = environmentLine(ctx, adapter, host.env, bundleVersion(host.bundleDir), await runtime);
@@ -197,7 +198,9 @@ export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<T
   // D-DOCTOR-FIX-1: one docs link (UTM) under the table, for the first row that needs a look.
   const look = rows.find((r) => r.status === "FAIL") ?? rows.find((r) => r.status !== "PASS");
   const docs = look === undefined ? [] : [DOCTOR_DOCS_LABEL + DOCTOR_DOCS_LINK(look.id)];
-  const whole = [envLine, table, ...docs, ...notes].join("\n");
+  // D-OMP-DOCTOR-1: OMP host-limit lines (ADR-0026 support matrix); the version is OMP's own when the host names it.
+  const info = adapter.id === "omp" ? ompInfoLines(host.env, ctx.clientInfo?.version) : [];
+  const whole = [envLine, table, ...docs, ...info, ...notes].join("\n");
   const bytes = Buffer.byteLength(whole, "utf8");
   if (bytes <= REPORT_CAP) return { text: whole, isError: false, sandboxBytes: bytes }; // step 4
   // D-NO-LOSSY-CUT-1: over the cap, the whole report is stored first; the reply holds the FAIL rows and the pointer.
@@ -207,8 +210,16 @@ export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<T
   } finally {
     closeDb(db);
   }
-  const text = [envLine, buildReportHead(input), ...docs, ...notes].join("\n");
+  const text = [envLine, buildReportHead(input), ...docs, ...info, ...notes].join("\n");
   return { text, isError: false, sandboxBytes: bytes };
+}
+
+/** D-OMP-DOCTOR-1: the closing command on OMP. A failed D3 names its OMP verb (install or enable); any other FAIL gets the
+ *  install command, which OMP runs as a repair; all clear gets `omp plugin list`. */
+function ompCommand(rows: DoctorRow[], failed: boolean): string {
+  if (!failed) return OMP_LIST_COMMAND;
+  const d3 = rows.find((r) => r.id === "D3" && r.status === "FAIL");
+  return d3?.fixCommand ?? NATIVE_INSTALL.omp[0];
 }
 
 async function handler(_input: CtxDoctorInput, ctx: ToolContext): Promise<ToolReply> {

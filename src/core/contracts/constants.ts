@@ -870,6 +870,16 @@ export const PI_NPM_DIR = "npm";
 export const PI_NODE_MODULES_DIR = "node_modules";
 export const PI_PACKAGE_JSON_FILE = "package.json";
 export const PI_LIST_COMMAND = "pi list"; // D-R38-PI-CMD-1: Pi's own command that lists installed packages
+// ADR-0026 decision 7 (D-OMP-DOCTOR-1): OMP's own plugin verbs and the host-limit info lines of the support matrix.
+export const OMP_LIST_COMMAND = "omp plugin list";
+export const OMP_ENABLE_COMMAND = "omp plugin enable context-mode";
+export const OMP_MIN_VERSION = "14.7.0"; // first OMP with systemPrompt: string[] (ADR-0026 decision 15)
+export const OMP_FLOOR_INFO = (v: string): string => `OMP ${v} is older than the tested floor ${OMP_MIN_VERSION}. Update it with: omp update`;
+export const OMP_CONTENT_INFO = "OMP keeps tool output in content; context-mode writes its notes there.";
+export const OMP_PRINT_MODE_INFO = "Print mode sends no prompt event. Use omp or omp --mode rpc to keep prompts.";
+export const OMP_SCRIPTS_INFO = "Add < /dev/null in scripts.";
+export const OMP_IMPORT_INFO = (claude: string, mcp: string): string =>
+  `OMP also imports context-mode from ${claude}. To run it once, add "context-mode" to disabledServers in ${mcp}.`;
 export const PI_CURRENT_MAJOR = 2; // an installed context-mode at this major or later is the current Pi package
 export const V1_OPENCODE_PLUGIN_SPEC = "context-mode"; // bare npm spec in .plugin[]
 export const V1_TMP_PREFIX = "context-mode-"; // <os tmp>/context-mode-*
