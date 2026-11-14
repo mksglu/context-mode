@@ -986,8 +986,9 @@ describe("ADR-0020 plugins", () => {
       const handlers = new Map();
       piEntry.hostExtension({ on: (name, fn) => handlers.set(name, fn), registerTool() {} }, agent);
       const ctx = { cwd: repo, sessionManager: { getSessionId: () => sid } };
-      return (ev) => handlers.get(ev.type)(ev, ctx);
+      return (ev) => handlers.get(ev.type)?.(ev, ctx);
     }
+    const unknownOmp = (err) => err.split('hooks: unknown agent "omp"').length - 1;
     async function promptRows(sid) {
       const db = await openDb(resolveProject("pi", { env: process.env, argv: [], cwd: repo, piCwd: repo }));
       let rows = [];
@@ -1045,6 +1046,64 @@ describe("ADR-0020 plugins", () => {
         await handlers.get("input")({ text: "hi" }, ctx);
       });
       assert.deepEqual((await promptRows("omp-t10-default")).map((r) => r.agent), ["pi"]);
+    });
+
+    // D-OMP-TURN-1 (O2c): OMP re-runs before_agent_start in one prompt when its base changed during the call
+    // (agent-session.ts:9413-9432). A re-run is the same event.prompt with no input or agent_end in between.
+    // Until M4 (D-OMP-ROW-1) the OMP entry writes no rows: each handleHook call is one stderr line, so the line
+    // count shows the hook calls; the Pi entry shows the turn numbers in its prompt rows.
+    test("[T8] a re-run in one prompt with a grown base: new base + payload once, one turn counted", async () => {
+      for (const agent of ["pi", "omp"]) {
+        const sid = "omp-t8-" + agent;
+        const run = hosted(agent, sid);
+        let first;
+        let second;
+        const err = await stderrOf(async () => {
+          await run({ type: "input", text: "p1" });
+          first = await run({ type: "before_agent_start", prompt: "p1", systemPrompt: ["BASE"] });
+          second = await run({ type: "before_agent_start", prompt: "p1", systemPrompt: ["BASE", "TOOLS"] });
+          await run({ type: "agent_end" });
+          await run({ type: "input", text: "p2" });
+        });
+        const payload = first.systemPrompt[1];
+        assert.deepEqual(second.systemPrompt, ["BASE", "TOOLS", payload], agent + ": the new base, then the payload");
+        assert.equal(once(second.systemPrompt, INSTRUCTIONS), 1, agent + ": INSTRUCTIONS once");
+        if (agent === "pi") assert.deepEqual((await promptRows(sid)).map((r) => r.turn), [1, 2], "prompt 2 is turn 2");
+        else assert.equal(unknownOmp(err), 3, "input, one SessionStart, input: the re-run calls no hook\n" + err);
+      }
+    });
+
+    test("[T11] the OMP entry registers the 9 tools at load; the Pi entry in the first before_agent_start", async () => {
+      for (const [agent, atLoad] of [["omp", 9], ["pi", 0]]) {
+        const names = [];
+        const handlers = new Map();
+        piEntry.hostExtension({ on: (name, fn) => handlers.set(name, fn), registerTool: (t) => names.push(t.name) }, agent);
+        assert.equal(names.length, atLoad, agent + " at load");
+        const ctx = { cwd: repo, sessionManager: { getSessionId: () => "omp-t11-" + agent } };
+        await stderrOf(() => handlers.get("before_agent_start")({ prompt: "p", systemPrompt: ["BASE"] }, ctx));
+        await stderrOf(() => handlers.get("before_agent_start")({ prompt: "p", systemPrompt: ["BASE", "TOOLS"] }, ctx));
+        assert.equal(names.length, 9, agent + ": 9 tools, each once");
+        assert.equal(new Set(names).size, 9);
+      }
+      const names = [];
+      piExtension({ on() {}, registerTool: (t) => names.push(t.name) });
+      assert.equal(names.length, 0, "the Pi default export registers nothing at load");
+    });
+
+    test("[T12] two prompts: turns 1 and 2 on both entries, also with the same prompt text", async () => {
+      for (const agent of ["pi", "omp"]) {
+        const sid = "omp-t12-" + agent;
+        const run = hosted(agent, sid);
+        const err = await stderrOf(async () => {
+          for (const end of [true, false]) {
+            await run({ type: "input", text: "continue" });
+            await run({ type: "before_agent_start", prompt: "continue", systemPrompt: ["BASE"] });
+            if (end) await run({ type: "agent_end" });
+          }
+        });
+        if (agent === "pi") assert.deepEqual((await promptRows(sid)).map((r) => r.turn), [1, 2]);
+        else assert.equal(unknownOmp(err), 4, "one hook call per input and per prompt\n" + err);
+      }
     });
   });
 });
