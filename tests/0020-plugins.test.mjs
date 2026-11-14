@@ -9,6 +9,7 @@ import { mkdtempSync, mkdirSync, rmSync, realpathSync, readFileSync } from "node
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import piExtension from "../src/entries/pi.ts";
+import * as piEntry from "../src/entries/pi.ts";
 import { resolveProject } from "../src/core/project/resolve.ts";
 import { openDb } from "../src/core/store/db.ts";
 import { readSessionEvents } from "../src/core/journal/read.ts";
@@ -977,6 +978,73 @@ describe("ADR-0020 plugins", () => {
 
     test("[T7] empty array: [payload]", async () => {
       assert.deepEqual((await start().run(turn([]))).systemPrompt, [FIRST]);
+    });
+
+    // D-OMP-ENTRY-1: one factory, the agent id comes from the entry. omp/index.js calls hostExtension(pi, "omp");
+    // the Pi entry is hostExtension(pi, "pi"). PI_CODING_AGENT_DIR and PI_CONFIG_DIR never pick the id.
+    function hosted(agent, sid) {
+      const handlers = new Map();
+      piEntry.hostExtension({ on: (name, fn) => handlers.set(name, fn), registerTool() {} }, agent);
+      const ctx = { cwd: repo, sessionManager: { getSessionId: () => sid } };
+      return (ev) => handlers.get(ev.type)(ev, ctx);
+    }
+    async function promptRows(sid) {
+      const db = await openDb(resolveProject("pi", { env: process.env, argv: [], cwd: repo, piCwd: repo }));
+      let rows = [];
+      for (let i = 0; i < 100 && rows.length === 0; i++) {
+        rows = readSessionEvents(db, sid, "prompt");
+        if (rows.length === 0) await sleep(20);
+      }
+      return rows;
+    }
+    async function stderrOf(fn) {
+      const write = process.stderr.write;
+      let text = "";
+      process.stderr.write = (chunk) => { text += String(chunk); return true; };
+      try { await fn(); } finally { process.stderr.write = write; }
+      return text;
+    }
+    async function withPiEnv(fn) {
+      const keep = { a: process.env.PI_CODING_AGENT_DIR, b: process.env.PI_CONFIG_DIR };
+      process.env.PI_CODING_AGENT_DIR = join(root, ".omp", "agent");
+      process.env.PI_CONFIG_DIR = ".omp";
+      try { return await fn(); } finally {
+        if (keep.a === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = keep.a;
+        if (keep.b === undefined) delete process.env.PI_CONFIG_DIR; else process.env.PI_CONFIG_DIR = keep.b;
+      }
+    }
+
+    test("[T9] the OMP entry hands handleHook omp; the Pi entry (default export) hands it pi", async () => {
+      assert.equal(typeof piEntry.hostExtension, "function");
+      const pi = hosted("pi", "omp-t9-pi");
+      await pi(turn("base"));
+      await pi({ type: "input", text: "hello pi" });
+      assert.deepEqual((await promptRows("omp-t9-pi")).map((r) => r.agent), ["pi"]);
+      // The omp AgentId arrives in M4 (D-OMP-ROW-1); until then handleHook names the id it got on its stderr line.
+      const omp = hosted("omp", "omp-t9-omp");
+      const err = await stderrOf(async () => { await omp(turn(["BASE"])); await omp({ type: "input", text: "hello omp" }); });
+      assert.ok(err.includes('hooks: unknown agent "omp"'), err);
+      assert.ok(!err.includes('"pi"'), err);
+    });
+
+    test("[T10] PI_CODING_AGENT_DIR and PI_CONFIG_DIR set: the Pi entry stays pi, the OMP entry stays omp", async () => {
+      await withPiEnv(async () => {
+        const pi = hosted("pi", "omp-t10-pi");
+        await pi(turn("base"));
+        await pi({ type: "input", text: "hello pi" });
+        const err = await stderrOf(async () => { const omp = hosted("omp", "omp-t10-omp"); await omp({ type: "input", text: "x" }); });
+        assert.ok(err.includes('hooks: unknown agent "omp"'), err);
+      });
+      assert.deepEqual((await promptRows("omp-t10-pi")).map((r) => r.agent), ["pi"]);
+      // Default export with the env set: still pi.
+      await withPiEnv(async () => {
+        const handlers = new Map();
+        piExtension({ on: (name, fn) => handlers.set(name, fn), registerTool() {} });
+        const ctx = { cwd: repo, sessionManager: { getSessionId: () => "omp-t10-default" } };
+        await handlers.get("before_agent_start")({ systemPrompt: "base" }, ctx);
+        await handlers.get("input")({ text: "hi" }, ctx);
+      });
+      assert.deepEqual((await promptRows("omp-t10-default")).map((r) => r.agent), ["pi"]);
     });
   });
 });
