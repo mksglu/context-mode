@@ -53,6 +53,16 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
+// D-OMP-PROMPT-1 (#1332): our payload goes after the host's system prompt, once, in the host's own shape.
+// OMP >= 14.7.0 sends string[] (runner.ts:2682-2686): every block stays, in order, and the payload is the last
+// block. A string (Pi, Pi-Bolt, OMP < 14.7.0) keeps the fea7780d bytes. Absent or empty is the payload alone.
+// Built from the event on every call, so a re-run with a changed base gets the payload once.
+function appendPayload(base: unknown, payload: string): string | unknown[] {
+  if (Array.isArray(base)) return [...base, payload];
+  const text = str(base);
+  return text === "" ? payload : text + "\n\n" + payload;
+}
+
 // Pi tool_result content is a list of parts; the text parts are the result text.
 function textOf(content: unknown): string {
   if (typeof content === "string") return content;
@@ -168,8 +178,7 @@ export default function piExtension(pi: PiApi): void {
     identify(ctx);
     turn += 1;
     registerTools();
-    const base = str(event.systemPrompt);
-    const withPayload = (): { systemPrompt: string } => ({ systemPrompt: base === "" ? payload : base + "\n\n" + payload });
+    const withPayload = (): { systemPrompt: string | unknown[] } => ({ systemPrompt: appendPayload(event.systemPrompt, payload) });
     let out: HookOutput;
     try {
       out = await hook({ type: compactPending ? "session_compact" : "session_start" }, turn);
