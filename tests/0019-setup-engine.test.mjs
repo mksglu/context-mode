@@ -20,6 +20,7 @@ import { generateManifests } from "../build/manifests.ts";
 import { FAKE_APP_SERVER, PLUGIN_EVENTS, PLUGIN_ID, PLUGIN_KEY, hashOf } from "./_lib/codex-fake.mjs";
 import { vscodeUserDirOf } from "../src/core/project/config-dir.ts";
 import { detectV1 } from "../src/core/ops/detect-v1.ts";
+import { runUninstall } from "../src/core/ops/uninstall.ts";
 
   // serial: runSetup and runDoctor share in-process state; the tests fail when they overlap
 describe("ADR-0019 section 3: setup engine (setup, doctor, remove, spawn, lock, backup)", () => {
@@ -633,6 +634,77 @@ exit 0`);
     const text = readFileSync(log, "utf8");
     assert.ok(text.includes("extensions link "), text);
     assert.ok(text.includes("answer=y"), text);
+  });
+
+  // ADR-0026 M5 (T23-T26, D-OMP-SETUP-1): OMP installs by name from its own plugin store with its own verbs; setup and
+  // uninstall never touch ~/.pi; `disabledServers` gets our name only when OMP imports a context-mode server from Claude.
+  function ompSandbox(t) {
+    const s = sandbox(t);
+    const log = path.join(s.root, "omp.log");
+    const state = path.join(s.root, "omp.state");
+    fakeBin(s.root, "omp", `echo "$@" >> "${log}"
+case "$1 $2" in
+  "plugin list") if [ -f "${state}" ]; then echo "context-mode 2.0.0"; fi ;;
+  "plugin install") touch "${state}" ;;
+  "plugin uninstall") rm -f "${state}" ;;
+esac
+exit 0`);
+    const agentDir = path.join(s.home, ".omp", "agent");
+    return { ...s, log, agentDir, mcpJson: path.join(agentDir, "mcp.json") };
+  }
+  const ompCommands = (res) => res.agents[0].changes.flatMap((c) => c.command ? [c.command.join(" ")] : []);
+  const CLAUDE_JSON_WITH_US = JSON.stringify({ mcpServers: { "context-mode": { command: "node", args: ["server.mjs"] } } });
+
+  test("T23 setup --agents omp plans `omp plugin install context-mode`, no npm, no @next, nothing under ~/.pi (ADR-0026 M5)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = ompSandbox(t);
+    const dry = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["omp"], runId: "d", dryRun: true });
+    assert.deepEqual(ompCommands(dry), ["omp plugin install context-mode"]);
+    for (const c of ompCommands(dry)) { assert.ok(!c.includes("npm") && !c.includes("@next"), c); }
+    await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["omp"], runId: "r" });
+    const lines = readFileSync(s.log, "utf8").split("\n");
+    assert.ok(lines.includes("plugin install context-mode"), lines.join("\n"));
+    assert.equal(existsSync(path.join(s.home, ".pi")), false);
+  });
+
+  test("T24 uninstall plans `omp plugin uninstall context-mode` (ADR-0026 M5)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const rows = Object.fromEntries(buildRegistry({ home: "/h", pkgDir: "/p/context-mode", env: {} }).map((r) => [r.id, r]));
+    assert.deepEqual(rows.omp.cli.remove, [["plugin", "uninstall", "context-mode"]]);
+    const s = ompSandbox(t);
+    await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["omp"], runId: "r" });
+    runRemove({ home: s.home, env: s.env });
+    assert.ok(readFileSync(s.log, "utf8").split("\n").includes("plugin uninstall context-mode"));
+    assert.equal(existsSync(path.join(s.home, ".pi")), false);
+  });
+
+  test("T25 OMP imports Claude MCP servers -> setup merges disabledServers [context-mode]; import off -> no write (ADR-0026 M5)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    for (const config of ["theme: dark\nenabledProviders: [claude]\n", "enabledProviders:\n  - codex\n  - claude\n"]) {
+      const s = ompSandbox(t);
+      put(path.join(s.agentDir, "config.yml"), config);
+      put(path.join(s.home, ".claude.json"), CLAUDE_JSON_WITH_US);
+      put(s.mcpJson, JSON.stringify({ mcpServers: { x: { command: "x" } }, disabledServers: ["other"] }, null, 2));
+      const dry = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["omp"], runId: "d", dryRun: true });
+      assert.ok(dry.agents[0].changes.some((c) => c.file === s.mcpJson), JSON.stringify(dry.agents[0].changes));
+      const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["omp"], runId: "r" });
+      assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+      assert.deepEqual(JSON.parse(readFileSync(s.mcpJson, "utf8")), { mcpServers: { x: { command: "x" } }, disabledServers: ["other", "context-mode"] });
+      assert.equal(existsSync(path.join(s.home, ".pi")), false);
+    }
+    // Import off (OMP's default) or no context-mode entry in ~/.claude.json: no mcp.json write.
+    for (const [config, claude] of [[undefined, CLAUDE_JSON_WITH_US], ["enabledProviders: [codex]\n", CLAUDE_JSON_WITH_US], ["enabledProviders: [claude]\n", JSON.stringify({ mcpServers: {} })]]) {
+      const s = ompSandbox(t);
+      if (config !== undefined) put(path.join(s.agentDir, "config.yml"), config);
+      put(path.join(s.home, ".claude.json"), claude);
+      await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["omp"], runId: "r" });
+      assert.equal(existsSync(s.mcpJson), false, String(config));
+    }
+  });
+
+  test("T26 uninstall removes only our name from OMP disabledServers (ADR-0026 M5)", (t) => {
+    const s = sandbox(t);
+    const mcpJson = put(path.join(s.home, ".omp", "agent", "mcp.json"), JSON.stringify({ mcpServers: { x: { command: "x" } }, disabledServers: ["other", "context-mode"] }, null, 2));
+    runUninstall({ adapter: { id: "omp", installMode: "in-process" }, project: { projectKey: "abcdef0123456789" }, env: { HOME: s.home, USERPROFILE: s.home }, confirmDelete: false });
+    assert.deepEqual(JSON.parse(readFileSync(mcpJson, "utf8")), { mcpServers: { x: { command: "x" } }, disabledServers: ["other"] });
+    assert.equal(existsSync(path.join(s.home, ".pi")), false);
   });
 
   // D-SETUP-SLOW-1: a first run of an agent CLI can unpack its own package before `mcp add` answers (copilot on a fresh
