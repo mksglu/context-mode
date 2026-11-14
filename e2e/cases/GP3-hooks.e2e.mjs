@@ -337,6 +337,97 @@ import { DatabaseSync } from "node:sqlite";
     }
   });
 
+  // ADR-0026 M7 (T45-T48, D-OMP-FIRE-1): the built OMP entry release-out/omp/index.js with a fake OMP extension API in a
+  // child process (temp HOME, git repo cwd). OMP sends Pi's event names (before_agent_start, input, tool_call,
+  // tool_result, session_compact); rows must say agent omp. The live omp run of the same paths is tests/0020 "fire omp".
+  const OMP_BUNDLE = path.join(REPO_ROOT, "release-out", "omp", "index.js");
+  const OMP_PAYLOAD_HEAD = "context-mode keeps large output out of the conversation.";
+  const OMP_DRIVER = `
+const mod = await import(process.argv[1]);
+const ext = mod.default ?? mod;
+const tools = new Map(); const handlers = new Map();
+ext({ on: (e, h) => handlers.set(e, h), registerTool: (t) => tools.set(t.name, t) });
+const ctx = { cwd: process.argv[2], sessionManager: { getSessionId: () => "gp3-omp" } };
+const loaded = [...tools.keys()];
+const out = [];
+for (const [ev, payload] of JSON.parse(process.argv[3])) out.push(handlers.has(ev) ? ((await handlers.get(ev)(payload, ctx)) ?? null) : "NO_HANDLER");
+process.stdout.write(JSON.stringify({ loaded, out }));
+process.exit(0);
+`;
+  function ompFixture(t) {
+    const root = mkdtempSync(path.join(tmpdir(), "gp3-omp-"));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const home = path.join(root, "home");
+    const repo = path.join(root, "repo");
+    mkdirSync(home);
+    execFileSync("git", ["init", "-q", repo]);
+    writeFileSync(path.join(repo, "small.txt"), "small file line\n");
+    writeFileSync(path.join(repo, "big.txt"), "line lorem ipsum dolor sit amet\n".repeat(3403));
+    return { home, repo };
+  }
+  function ompRun(f, steps) {
+    const env = { PATH: process.env.PATH ?? "", HOME: f.home, USERPROFILE: f.home, TMPDIR: f.home };
+    const stdout = execFileSync(process.execPath, ["--input-type=module", "-e", OMP_DRIVER, pathToFileURL(OMP_BUNDLE).href, f.repo, JSON.stringify(steps)], { env, cwd: f.repo, encoding: "utf8" });
+    return JSON.parse(stdout);
+  }
+  function ompRows(home, sql) {
+    const root = path.join(home, ".context-mode", "projects");
+    if (!existsSync(root)) return [];
+    const out = [];
+    for (const p of readdirSync(root)) {
+      const f = path.join(root, p, "context.db");
+      if (!existsSync(f)) continue;
+      const db = new DatabaseSync(f);
+      try { out.push(...db.prepare(sql).all()); } finally { db.close(); }
+    }
+    return out;
+  }
+  const ompStart = (prompt, systemPrompt = "OMP_BASE system text") => ["before_agent_start", { prompt, systemPrompt }];
+
+  test("[M7] GP3/omp-tool-call-block: tool_call on a 108 KB read returns OMP's {block, reason} with the ctx_execute redirect (T45)", (t) => {
+    const f = ompFixture(t);
+    const { out } = ompRun(f, [ompStart("read big"), ["tool_call", { toolName: "read", toolCallId: "c1", input: { path: "big.txt" } }], ["tool_call", { toolName: "read", toolCallId: "c2", input: { path: "small.txt" } }]]);
+    assert.equal(out[1]?.block, true, JSON.stringify(out[1]));
+    assert.ok(String(out[1].reason).includes("ctx_execute"), String(out[1].reason));
+    assert.equal(out[2], null, "a small read is allowed: " + JSON.stringify(out[2]));
+  });
+
+  test("[M7] GP3/omp-tool-result-replace: a large bash result becomes the ctx_search hint; events and sources rows say agent omp (T46)", (t) => {
+    const f = ompFixture(t);
+    const big = Array.from({ length: 40000 }, (_, i) => String(i + 1)).join("\n") + "\n";
+    const { out } = ompRun(f, [ompStart("seq"), ["tool_result", { toolName: "bash", toolCallId: "c1", input: { command: "seq 1 40000" }, content: [{ type: "text", text: big }], isError: false }]]);
+    const text = out[1]?.content?.[0]?.text ?? "";
+    assert.ok(text.includes("ctx_search"), text.slice(0, 400));
+    assert.ok(Buffer.byteLength(text) < 20000, `the model gets ${Buffer.byteLength(text)} bytes, not ${big.length}`);
+    const ev = ompRows(f.home, "SELECT agent FROM events");
+    assert.ok(ev.length > 0 && ev.every((r) => r.agent === "omp"), JSON.stringify(ev));
+    const src = ompRows(f.home, "SELECT agent FROM sources");
+    assert.ok(src.length > 0 && src.every((r) => r.agent === "omp"), JSON.stringify(src));
+  });
+
+  test("[M7] GP3/omp-input-captured: the input event writes a prompt row with the text and agent omp (T47)", (t) => {
+    const f = ompFixture(t);
+    ompRun(f, [["input", { text: "GP3_OMP_PROMPT read small", source: "rpc" }], ompStart("GP3_OMP_PROMPT read small")]);
+    const rows = ompRows(f.home, "SELECT agent, body FROM events WHERE kind = 'prompt'");
+    assert.ok(rows.some((r) => r.agent === "omp" && String(r.body).includes("GP3_OMP_PROMPT")), JSON.stringify(rows));
+  });
+
+  test("[M7] GP3/omp-compact-resume: after session_compact the next turn keeps OMP's new base and sends the payload once (T48)", (t) => {
+    const f = ompFixture(t);
+    const { out } = ompRun(f, [
+      ["input", { text: "GP3_OMP_P1" }], ompStart("GP3_OMP_P1"),
+      ["session_compact", {}],
+      ["input", { text: "GP3_OMP_P2" }], ompStart("GP3_OMP_P2", "OMP_BASE_AFTER_COMPACT"),
+    ]);
+    const first = String(out[1]?.systemPrompt ?? "");
+    const next = String(out[4]?.systemPrompt ?? "");
+    assert.ok(first.startsWith("OMP_BASE system text") && first.split(OMP_PAYLOAD_HEAD).length === 2, first.slice(0, 300));
+    assert.ok(next.startsWith("OMP_BASE_AFTER_COMPACT"), next.slice(0, 300));
+    assert.equal(next.split(OMP_PAYLOAD_HEAD).length - 1, 1, "payload once after compact");
+    const turns = ompRows(f.home, "SELECT turn FROM events WHERE kind = 'prompt' ORDER BY turn").map((r) => r.turn);
+    assert.deepEqual(turns, [1, 2], JSON.stringify(turns));
+  });
+
   test("[M5] GP3/tool-name-map-opencode-webfetch: OpenCode's webfetch call gets the WebFetch hint (#1052)", async () => {
     const bundlePath = path.join(path.resolve(__dirname, "..", ".."), "release-out", "opencode", "plugin.js");
     const mod = await import(`file://${bundlePath}`);
