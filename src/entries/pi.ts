@@ -123,6 +123,10 @@ export function hostExtension(pi: PiApi, host: PiHostId = "pi"): void {
   let payload = "";
   const journal = ownJournal(); // D-HF-INPROC-JOURNAL-1
   let toolsRegistered = false; // #1098: a failed registration retries on the next before_agent_start
+  // D-OMP-TURN-1 (O2c): the prompt of the open agent run. OMP re-runs before_agent_start in one prompt when its
+  // base changed during the call (agent-session.ts:9413-9432); the same event.prompt with no input, agent_end or
+  // session_compact in between is that re-run: no new turn, no second SessionStart. Pi never re-runs, so Pi is unchanged.
+  let openPrompt: string | undefined;
 
   function identify(ctx: PiContext | undefined): void {
     if (sessionId === "") sessionId = str(ctx?.sessionManager?.getSessionId());
@@ -187,9 +191,13 @@ export function hostExtension(pi: PiApi, host: PiHostId = "pi"): void {
   // impl/12 §3.3: SessionStart (startup, or compact after a session_compact), then the system prompt.
   pi.on("before_agent_start", async (event, ctx) => {
     identify(ctx);
-    turn += 1;
+    const prompt = typeof event.prompt === "string" ? event.prompt : undefined;
+    const rerun = prompt !== undefined && prompt === openPrompt;
+    openPrompt = prompt;
+    if (!rerun) turn += 1;
     registerTools();
     const withPayload = (): { systemPrompt: string | unknown[] } => ({ systemPrompt: appendPayload(event.systemPrompt, payload) });
+    if (rerun && payload !== "") return withPayload(); // the new base + the same payload, once
     let out: HookOutput;
     try {
       out = await hook({ type: compactPending ? "session_compact" : "session_start" }, turn);
@@ -213,6 +221,7 @@ export function hostExtension(pi: PiApi, host: PiHostId = "pi"): void {
   // impl/10 §10 UserPromptSubmit: the prompt row belongs to the turn it starts.
   pi.on("input", async (event, ctx) => {
     identify(ctx);
+    openPrompt = undefined;
     await hook({ type: "input", message: str(event.text) }, turn + 1);
     return undefined;
   });
@@ -243,6 +252,17 @@ export function hostExtension(pi: PiApi, host: PiHostId = "pi"): void {
   // impl/12 §3.6: only the flag; the next before_agent_start delivers (D-M5-P1-1).
   pi.on("session_compact", () => {
     compactPending = true;
+    openPrompt = undefined;
     return undefined;
   });
+
+  // D-OMP-TURN-1: the agent run ends, so the next before_agent_start starts a new prompt (print mode has no input).
+  pi.on("agent_end", () => {
+    openPrompt = undefined;
+    return undefined;
+  });
+
+  // D-OMP-TURN-1 (O2c probe): OMP gets its tools at load, so the first before_agent_start leaves the base as it is.
+  // The Pi entry keeps registering in the first before_agent_start (Pi request bytes unchanged, ADR-0021).
+  if (host === "omp") registerTools();
 }
