@@ -2746,12 +2746,12 @@ describe("PRD-v2 section 10: host tool names in hook output", () => {
     event: "PreToolUse", agent: row.id, sessionId: "s1", cwd, tool: { name, canonicalName, input },
   });
 
-  test("all 10 hosts: the Read deny names <prefix>ctx_execute", () => {
+  test("all 11 hosts: the Read deny names <prefix>ctx_execute", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "cm-names-"));
     try {
       const big = path.join(dir, "big.log");
       writeFileSync(big, "x".repeat(300 * 1024));
-      assert.equal(ADAPTERS.length, 10);
+      assert.equal(ADAPTERS.length, 11); // ADR-0026 T18: omp is the 11th row
       for (const row of ADAPTERS) {
         const d = decide(ev(row, dir, "Read", "Read", { file_path: big }), row, []);
         assert.equal(d.kind, "deny", row.id);

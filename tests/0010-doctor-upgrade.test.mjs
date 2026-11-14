@@ -644,11 +644,11 @@ describe("ADR-0010 doctor on every unsupported host: one clear line, no false FA
       assert.equal(r.fixCommand, undefined);
     }
   }
-  const AGENT_LIST = ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode"].join(", ");
+  const AGENT_LIST = ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode", "omp"].join(", ");
 
   test("[D-UNSUPPORTED-HOSTS-1] the list holds the removed 2.0 hosts, each with a source line", () => {
     const ids = C.UNSUPPORTED_HOSTS.map((h) => h.id).sort();
-    assert.deepEqual(ids, ["antigravity", "cursor", "jetbrains-copilot", "kilo", "kimi", "omp", "openclaw", "zed"]);
+    assert.deepEqual(ids, ["antigravity", "cursor", "jetbrains-copilot", "kilo", "kimi", "openclaw", "zed"]); // ADR-0026 T20: omp is supported (D-OMP-ROW-1)
     for (const h of C.UNSUPPORTED_HOSTS) assert.ok(h.source.includes(":"), h.id);
   });
 
@@ -681,11 +681,11 @@ describe("ADR-0010 doctor on every unsupported host: one clear line, no false FA
     const rs = await rows(home, "claude-code", { clientName: "claude-code", env: { CURSOR_TRACE_ID: "x", ZED_TERM: "true", KILO: "1" } });
     assert.equal(rs.find((x) => x.id === "D3").status, "FAIL");
     assert.equal(unsupportedHostOf({ clientName: "gemini-cli-mcp-client" }), undefined);
-    for (const id of ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode"]) assert.equal(unsupportedHostByName(id), undefined, id);
+    for (const id of ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode", "omp", "omp-coding-agent"]) assert.equal(unsupportedHostByName(id), undefined, id); // ADR-0026 T20
   });
 
-  test("[D-UNSUPPORTED-HOSTS-1] an in-process host (Pi, OpenCode) is the host: a foreign env var from the terminal never marks it unsupported", async (t) => {
-    for (const agent of ["pi", "opencode"]) {
+  test("[D-UNSUPPORTED-HOSTS-1] an in-process host (Pi, OpenCode, OMP) is the host: a foreign env var from the terminal never marks it unsupported", async (t) => {
+    for (const agent of ["pi", "opencode", "omp"]) { // ADR-0026 T20
       const home = tmp(t);
       const rs = await rows(home, agent, { env: { CURSOR_TRACE_ID: "x", ZED_TERM: "true" } });
       for (const id of ["D3", "D5"]) assert.equal(rs.find((x) => x.id === id).detail.includes("not a supported host"), false, `${agent} ${id}`);
@@ -2638,10 +2638,10 @@ describe("ADR-0010 doctor: hook-runs check per agent (GP11)", { concurrency: CON
     return { home, env, reg: buildRegistry({ home, pkgDir, env }) };
   }
 
-  test("H5: doctor hook-runs PASSES on all 10 hosts with the real hook: the large shell read gets the saving effect", (t) => {
+  test("H5: doctor hook-runs PASSES on all 11 hosts with the real hook: the large shell read gets the saving effect", (t) => {
     const s = sandbox(t, REAL_HOOK);
     assert.equal(s.reg.length, ADAPTERS.length);
-    assert.equal(s.reg.length, 10);
+    assert.equal(s.reg.length, 11); // ADR-0026: omp is the 11th row
     for (const row of s.reg) {
       const c = hookRunsCheck(row, s.env);
       assert.equal(c.name, "hook-runs", row.id);

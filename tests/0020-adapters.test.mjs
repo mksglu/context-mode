@@ -163,6 +163,25 @@ describe("ADR-0020 adapters", () => {
       assert.throws(() => r.decode(null), /pi: hook payload is not an object/);
     });
 
+    test("omp row: the Pi decode and encode, bare tool names, Pi native tools and events (ADR-0026 T22, D-OMP-ROW-1)", () => {
+      const omp = getAdapter("omp");
+      const p = getAdapter("pi");
+      assert.equal(omp.id, "omp");
+      assert.equal(omp.decode, pi.decode);
+      assert.equal(omp.encode, pi.encode);
+      assert.equal(omp.checkPermission, pi.checkPermission);
+      assert.equal(omp.toolNamePrefix, "");
+      assert.equal(omp.installMode, "in-process");
+      assert.equal(omp.projectSource, "pi:ctx.cwd");
+      assert.deepEqual(omp.nativeTools, p.nativeTools);
+      assert.deepEqual(omp.eventMap, p.eventMap);
+      assert.equal(omp.compactDelivery, p.compactDelivery);
+      assert.equal(omp.denyChannel, p.denyChannel);
+      assert.deepEqual(omp.hookChannel, { kind: "in-process", path: "omp/index.js" });
+      assert.equal(CLIENT_NAME_TO_PLATFORM["omp-coding-agent"], "omp");
+      assert.ok(AGENT_IDS.includes(CLIENT_NAME_TO_PLATFORM["omp-coding-agent"]));
+    });
+
     test("pi encode: allow is the empty shape; injected text is a custom-role message with a timestamp", () => {
       const r = getAdapter("pi");
       const ss = { event: "SessionStart", agent: "pi", sessionId: "s", cwd: "/p" };
