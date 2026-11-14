@@ -858,6 +858,7 @@ describe("ADR-0019 build: npm package", () => {
       files: top,
       main: "./opencode/plugin.js", // ADR-0023 D-NI-OPENCODE-1: OpenCode imports the plugin by package name
       name: "context-mode",
+      omp: { extensions: ["./omp/index.js"] }, // ADR-0026 D-OMP-MANIFEST-1
       pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"] },
       repository: { type: "git", url: "git+https://github.com/mksglu/context-mode.git" }, // D-RN-REPO-1
       type: "module",
