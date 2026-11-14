@@ -1105,5 +1105,40 @@ describe("ADR-0020 plugins", () => {
         else assert.equal(unknownOmp(err), 4, "one hook call per input and per prompt\n" + err);
       }
     });
+
+    // D-OMP-FILTER-1 (O10): OMP has no getSettings. contextMode.excludeTools comes from api.pi.settings, project
+    // over global, read on each tool_result, never at load. No settings or a bad value gives []. Pi reads getSettings.
+    test("[T13] OMP entry: contextMode.excludeTools from api.pi.settings per call; no settings -> []", async () => {
+      const S = (list) => ({ contextMode: { excludeTools: list } });
+      const omp = (global, project) => ({ pi: { settings: { getGlobalSettings: () => global, getProjectSettings: () => project } } });
+      const of = piEntry.excludedTools;
+      assert.deepEqual(of(omp(S(["read"])), "omp"), ["read"], "global settings");
+      assert.deepEqual(of(omp(S(["read"]), {}), "omp"), ["read"], "a project with no list keeps the global list");
+      assert.deepEqual(of(omp(S(["read"]), S(["bash"])), "omp"), ["bash"], "the project list wins");
+      const empty = [
+        {}, { pi: {} }, { pi: { settings: {} } }, omp(undefined, undefined), omp({ contextMode: null }),
+        omp(S("read")), omp(S([1, null, { name: "read" }])),
+        { pi: { settings: { getGlobalSettings: () => { throw new Error("not bound"); } } } },
+        { getSettings: () => S(["read"]) },
+      ];
+      for (const [i, api] of empty.entries()) assert.deepEqual(of(api, "omp"), [], "omp variant " + i);
+      assert.deepEqual(of({ getSettings: () => S(["read"]), ...omp(S(["bash"])) }, "pi"), ["read"], "Pi reads getSettings only");
+
+      let reads = 0;
+      const handlers = new Map();
+      const api = {
+        on: (name, fn) => handlers.set(name, fn), registerTool() {},
+        pi: { settings: { getGlobalSettings: () => { reads += 1; return S(["read"]); }, getProjectSettings: () => ({}) } },
+      };
+      piEntry.hostExtension(api, "omp");
+      assert.equal(reads, 0, "never read at load");
+      const ctx = { cwd: repo, sessionManager: { getSessionId: () => "omp-t13" } };
+      await stderrOf(async () => {
+        for (const id of ["r1", "r2"]) {
+          await handlers.get("tool_result")({ toolName: "read", toolCallId: id, input: {}, content: [{ type: "text", text: "x" }], isError: false }, ctx);
+        }
+      });
+      assert.equal(reads, 2, "read once per tool_result, so a settings change counts at once");
+    });
   });
 });
