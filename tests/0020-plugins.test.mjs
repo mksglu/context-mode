@@ -622,6 +622,24 @@ describe("ADR-0020 plugins", () => {
       assert.ok(out.systemPrompt.startsWith("base"), "the host prompt stays first");
     });
 
+    // T14 / D-OMP-TOOLS-1 (ADR-0026 M3): OMP lists a tool as a top-level tool only with loadMode "essential"
+    // (OMP docs/extensions.md:826); Pi ignores the field. Every other field keeps the fea7780d shape.
+    test("before_agent_start: all 9 ctx_* tools register with loadMode essential, other fields unchanged (OMP M3, T14)", async () => {
+      const { pi, handlers, tools } = fakePi();
+      piExtension(pi);
+      await handlers.get("before_agent_start")({ systemPrompt: "base" }, ctxFor("s-t14"));
+      assert.equal(tools.size, 9);
+      for (const [name, t] of tools) {
+        assert.equal(t.loadMode, "essential", name);
+        const { loadMode, execute, ...rest } = t;
+        assert.equal(typeof execute, "function", name);
+        assert.deepEqual(Object.keys(rest), ["name", "label", "description", "parameters"], name);
+        assert.equal(rest.label, name);
+        assert.equal(typeof rest.description, "string");
+        assert.equal(rest.parameters.type, "object", name);
+      }
+    });
+
     // D-CACHE-PI-1 replaces A24's "a second turn returns nothing": Pi 0.73.1 resets the system prompt to base on
     // a turn without systemPrompt (agent-session.js:791-797), so "nothing" dropped INSTRUCTIONS on turn 2 and
     // broke the cache. Pi replaces, never appends, so the prompt the model sees must hold INSTRUCTIONS exactly once
