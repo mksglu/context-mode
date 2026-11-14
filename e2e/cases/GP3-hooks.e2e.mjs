@@ -352,7 +352,6 @@ const loaded = [...tools.keys()];
 const out = [];
 for (const [ev, payload] of JSON.parse(process.argv[3])) out.push(handlers.has(ev) ? ((await handlers.get(ev)(payload, ctx)) ?? null) : "NO_HANDLER");
 process.stdout.write(JSON.stringify({ loaded, out }));
-process.exit(0);
 `;
   function ompFixture(t) {
     const root = mkdtempSync(path.join(tmpdir(), "gp3-omp-"));
@@ -367,7 +366,7 @@ process.exit(0);
   }
   function ompRun(f, steps) {
     const env = { PATH: process.env.PATH ?? "", HOME: f.home, USERPROFILE: f.home, TMPDIR: f.home };
-    const stdout = execFileSync(process.execPath, ["--input-type=module", "-e", OMP_DRIVER, pathToFileURL(OMP_BUNDLE).href, f.repo, JSON.stringify(steps)], { env, cwd: f.repo, encoding: "utf8" });
+    const stdout = execFileSync(process.execPath, ["--input-type=module", "-e", OMP_DRIVER, pathToFileURL(OMP_BUNDLE).href, f.repo, JSON.stringify(steps)], { env, cwd: f.repo, encoding: "utf8", timeout: 60000 });
     return JSON.parse(stdout);
   }
   function ompRows(home, sql) {
