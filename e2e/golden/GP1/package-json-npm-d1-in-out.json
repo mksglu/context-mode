@@ -12,6 +12,7 @@
     "license",
     "main",
     "name",
+    "omp",
     "pi",
     "repository",
     "type",
@@ -24,7 +25,7 @@
     "bugs": {
       "url": "https://github.com/mksglu/context-mode/issues"
     },
-    "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
+    "description": "Context window saver for 11 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
     "engines": {
       "node": ">=24.15.0"
     },
@@ -46,6 +47,7 @@
       "gemini-extension.json",
       "hook.mjs",
       "hooks",
+      "omp",
       "opencode",
       "pi",
       "qwen-extension.json",
@@ -66,6 +68,7 @@
       "pi",
       "kiro",
       "zcode",
+      "omp",
       "mcp",
       "context-window",
       "sandbox",
@@ -75,6 +78,11 @@
     "license": "Elastic-2.0",
     "main": "./opencode/plugin.js",
     "name": "context-mode",
+    "omp": {
+      "extensions": [
+        "./omp/index.js"
+      ]
+    },
     "pi": {
       "extensions": [
         "./pi/index.js"
