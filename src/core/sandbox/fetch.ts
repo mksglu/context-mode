@@ -1,14 +1,17 @@
 // impl/03 §6, impl/05 §4, TECH-SPEC GP5 (proxy env, SSRF per hop), DECISIONS-r3 Q19, DECISIONS-r4 A8/A52/B57,
 // DEVIATIONS D-M2-T5-2. One path: resolve the connect target, check every address, connect to the
 // checked address (no second DNS lookup), follow redirects as new hops.
+import { readFileSync } from "node:fs";
 import { lookup } from "node:dns/promises";
 import http from "node:http";
 import https from "node:https";
 import { BlockList, isIP } from "node:net";
 import type { Socket } from "node:net";
+import { join } from "node:path";
 import { connect as tlsConnect } from "node:tls";
-import { FETCH_MAX_HOPS } from "../contracts/constants.ts";
+import { D1_PACKAGE_FILE, FETCH_MAX_HOPS } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
+import { ownBundleDir } from "../ops/bundle-dir.ts";
 
 // impl/03 §6 step 3 / "Constants used": fixed protocol data, not tunable, written inline.
 const PRIVATE_RANGES: ReadonlyArray<readonly [string, number, "ipv4" | "ipv6"]> = [
@@ -36,6 +39,26 @@ for (const [net, prefix, type] of PRIVATE_RANGES) BLOCKED.addSubnet(net, prefix,
 const STATUS_OK_FIRST = 200;
 const STATUS_OK_END = 300;
 const STATUS_REDIRECT: ReadonlySet<number> = new Set([301, 302, 303, 307, 308]);
+
+// D-1380-FETCH-UA-1 (#1380): every request names itself, as v1's undici fetch did (user-agent and accept). Some
+// hosts (en.wikipedia.org) answer 403 to a request with no user-agent. The version comes once from the bundle's
+// package.json; the dev tree has none, so it is "dev".
+const UA_HOME = "https://github.com/mksglu/context-mode";
+const UA_DEV_VERSION = "dev";
+let namedHeaders: Readonly<Record<string, string>> | undefined;
+function baseHeaders(): Readonly<Record<string, string>> {
+  if (namedHeaders === undefined) {
+    let version = UA_DEV_VERSION;
+    try {
+      const v: unknown = JSON.parse(readFileSync(join(ownBundleDir(), D1_PACKAGE_FILE), "utf8")).version;
+      if (typeof v === "string" && v !== "") version = v;
+    } catch {
+      // no package.json next to the bundle: the dev tree
+    }
+    namedHeaders = Object.freeze({ "user-agent": "context-mode/" + version + " (+" + UA_HOME + ")", accept: "*/*" });
+  }
+  return namedHeaders;
+}
 
 type Target = { host: string; port: number; address: string };
 type Proxy = { url: URL; auth: string | undefined };
@@ -169,11 +192,12 @@ function request(u: URL, conn: Target, proxy: Proxy | undefined, signal: AbortSi
     const onErr = (err: unknown) => reject(fail(causeCode(err)));
     if (proxy === undefined) {
       const mod = u.protocol === "https:" ? https : http;
-      const req = mod.request({ host: conn.address, port, path, signal, servername: tlsName(host), headers: { host: u.host } });
+      const req = mod.request({ host: conn.address, port, path, signal, servername: tlsName(host), headers: { ...baseHeaders(), host: u.host } });
       req.on("response", resolve).on("error", onErr).end();
       return;
     }
-    const proxyHeaders: Record<string, string> = proxy.auth === undefined ? {} : { "proxy-authorization": proxy.auth };
+    const proxyHeaders: Record<string, string> = proxy.auth === undefined ? { ...baseHeaders() }
+      : { ...baseHeaders(), "proxy-authorization": proxy.auth };
     if (u.protocol === "http:") {
       const req = http.request({ host: conn.address, port: conn.port, path: u.href, signal, headers: { host: u.host, ...proxyHeaders } });
       req.on("response", resolve).on("error", onErr).end();
@@ -189,7 +213,7 @@ function request(u: URL, conn: Target, proxy: Proxy | undefined, signal: AbortSi
         return;
       }
       const req = https.request({
-        host, port, path, signal, headers: { host: u.host },
+        host, port, path, signal, headers: { ...baseHeaders(), host: u.host },
         createConnection: () => tlsConnect({ socket, host, servername: tlsName(host) }),
       });
       req.on("response", resolve).on("error", onErr).end();
@@ -234,7 +258,8 @@ export async function safeFetch(url: string, signal: AbortSignal): Promise<{ bod
     }
     if (status < STATUS_OK_FIRST || status >= STATUS_OK_END) {
       res.resume();
-      throw fail(status);
+      // D-1380-FETCH-UA-1: name the host that refused, so the user knows which hop failed.
+      throw fail(status + " from " + bare(current.hostname));
     }
     const body = await readBody(res);
     // finalUrl labels the indexed source and is echoed in replies: never carry userinfo (a secret).
