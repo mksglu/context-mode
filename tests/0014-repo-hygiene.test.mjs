@@ -2461,6 +2461,14 @@ describe("ADR-0014 issue intake: score, one comment, issue state stays with main
     assert.equal(score("## Notes\n\nall fine").have.report, false);
   });
 
+  // ADR-0026 M8 (D-OMP-DOCS-1): an OMP report gets the agent item on its own, so the label comes without a hand edit.
+  test("intake: an OMP version line counts as the agent item; the feature form lists omp (D-OMP-DOCS-1)", async () => {
+    const { score, AGENT_IDS } = await intake();
+    assert.ok(score("## Steps\n\n1. omp plugin install context-mode\n2. run omp\n\nOMP 18.20.0 on macOS").have.agent, "OMP 18.20.0 is the agent version");
+    assert.ok(AGENT_IDS.includes("omp"), "AGENT_IDS has omp");
+    assert.ok(readRepo(".github/ISSUE_TEMPLATE/feature.yml").includes("\n        - omp\n"), "feature.yml agent dropdown has omp");
+  });
+
   test("version, agent, Node and steps read from free text by substring and digit walk", async () => {
     const { score, versionAfter, isPlaceholder } = await intake();
     assert.ok(versionAfter("context-mode version: 2.0.0", "context-mode"));

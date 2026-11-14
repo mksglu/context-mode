@@ -193,6 +193,19 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
     assert.ok(list.includes("| OMP | `omp plugin install context-mode` | `omp plugin upgrade context-mode` |"), "docs/install/README.md OMP row");
   });
 
+  // ADR-0026 M8 (D-OMP-DOCS-1): the architecture docs name OMP as the 11th agent with its own verbs.
+  test("install-native: T52 ADR-0023, PRD, TECH-SPEC, 01-contracts, 12-plugins and DEVIATIONS name OMP (D-OMP-DOCS-1)", () => {
+    const a23 = read("docs", "architecture", "adr", "ADR-0023-native-install.md");
+    assert.ok(a23.includes("| omp | `omp plugin install context-mode` |") && a23.includes("`omp plugin upgrade context-mode`"), "ADR-0023 omp row");
+    const prd = read("docs", "architecture", "PRD.md");
+    assert.ok(prd.includes("11 agents") && prd.includes("| OMP | in-process plugin |"), "PRD agent table");
+    const spec = read("docs", "architecture", "TECH-SPEC.md");
+    assert.ok(spec.includes("**[D] Agents (11):**") && spec.includes("OpenCode 2, OMP."), "TECH-SPEC agent list");
+    assert.ok(read("docs", "architecture", "modules", "01-contracts.md").includes('"pi","opencode","omp"] as const'), "01-contracts AGENT_IDS");
+    assert.ok(read("docs", "architecture", "modules", "12-plugins.md").includes("ADR-0026"), "12-plugins names the OMP plugin");
+    assert.ok(read("docs", "architecture", "modules", "DEVIATIONS.md").includes("| D-OMP-DOCS-1 |"), "DEVIATIONS row");
+  });
+
   test("install-native: the real pages pass checkNativePages", () => {
     const pages = Object.fromEntries([...Object.keys(NATIVE), ...FALLBACK].map((id) => [`${id}.md`, read("docs", "install", `${id}.md`)]));
     assert.deepEqual(checkNativePages(pages), []);
