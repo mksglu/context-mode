@@ -49,7 +49,7 @@ Starred by engineers at these companies: each name is the company field of 2 or 
 
 ## Install
 
-Pick your agent: [Claude Code](#install-claude-code) · [Codex](#install-codex) · [Gemini CLI](#install-gemini) · [Qwen Code](#install-qwen) · [Pi](#install-pi) · [OpenCode](#install-opencode) · [Copilot CLI](#install-copilot-cli) · [Kiro](#install-kiro) · [VS Code](#install-vscode) · [ZCode](#install-zcode)
+Pick your agent: [Claude Code](#install-claude-code) · [Codex](#install-codex) · [Gemini CLI](#install-gemini) · [Qwen Code](#install-qwen) · [Pi](#install-pi) · [OMP](#install-omp) · [OpenCode](#install-opencode) · [Copilot CLI](#install-copilot-cli) · [Kiro](#install-kiro) · [VS Code](#install-vscode) · [ZCode](#install-zcode)
 
 Open its block and copy its own install command. Each block also holds the update, check and remove steps, and the [Install guide](https://contextmode.ai/docs/engine/install?utm_source=github&utm_medium=readme&utm_content=install) walks through them.
 
@@ -147,6 +147,24 @@ pi update --extensions
 pi list
 # remove
 pi remove npm:context-mode
+```
+
+Hooks ✓ (the plugin's own event handlers) · MCP ✓ (ctx tools built into the plugin) · Skills ✓
+
+</details>
+<details id="install-omp"><summary><b>OMP</b></summary>
+
+```sh
+omp plugin install context-mode
+```
+
+```sh
+# update
+omp plugin upgrade context-mode
+# check
+omp plugin list
+# remove
+omp plugin uninstall context-mode
 ```
 
 Hooks ✓ (the plugin's own event handlers) · MCP ✓ (ctx tools built into the plugin) · Skills ✓
@@ -310,6 +328,7 @@ Run the stats skill right after a prompt. Each agent uses its own command; the s
 | Copilot CLI | `/ctx-stats` |
 | Gemini CLI | `Call ctx_stats and show me the report.` |
 | Kiro | `Call ctx_stats and show me the report.` |
+| OMP | `/skill:ctx-stats` |
 | OpenCode | `Call ctx_stats and show me the report.` |
 | Pi | `/skill:ctx-stats` |
 | Qwen Code | `Call ctx_stats and show me the report.` |
