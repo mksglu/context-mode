@@ -639,6 +639,27 @@ describe("ADR-0013 repo: scheduled workflows", () => {
     assert.ok(l.indexOf("- run: echo \"CM_OPENCODE2_DIR=${{ runner.temp }}/opencode2\" >> \"$GITHUB_ENV\"") < i, "CM_OPENCODE2_DIR is set before the step");
   });
 
+  // ADR-0026 M7 (D-OMP-CI-1): the real OMP 18.20.0 from its own install script on all 3 OS, before the v2 unit tests
+  // (the omp fire block in tests/0020-fire-plugin-ext) and with a step for the OMP e2e cases.
+  test("ci.yml: OMP 18.20.0 installs with its own script on every OS, omp --version gates it, OMP fire and e2e cases run (D-OMP-CI-1)", () => {
+    const l = lines(read(".github/workflows/ci.yml"));
+    const unix = l.indexOf("- name: omp 18.20.0 (native install script) for the omp fire tests (D-OMP-CI-1)");
+    const win = l.indexOf("- name: omp 18.20.0 (native install script, Windows) for the omp fire tests (D-OMP-CI-1)");
+    const ver = l.indexOf("- run: omp --version");
+    const e2e = l.indexOf("- run: node --test --test-name-pattern \"/omp-\" e2e/cases/GP2-prompt-surface.e2e.mjs e2e/cases/GP3-hooks.e2e.mjs e2e/cases/GP11-doctor-upgrade.e2e.mjs");
+    const unit = l.indexOf("- run: node --test \"tests/**/*.test.mjs\"");
+    assert.ok(unix > 0 && win > 0, "both install steps");
+    assert.ok(l.slice(unix, unix + 3).includes("if: runner.os != 'Windows'"), "unix step skips Windows");
+    assert.ok(l.slice(win, win + 3).includes("if: runner.os == 'Windows'"), "Windows step runs on Windows");
+    assert.ok(l.some((x) => x.includes("https://omp.sh/install | sh -s -- --binary --ref v18.20.0")), "pinned unix script");
+    assert.ok(l.some((x) => x.includes("irm https://omp.sh/install.ps1))) -Binary -Ref v18.20.0")), "pinned Windows script");
+    assert.ok(!l.some((x) => x.includes("npm") && x.includes("omp")), "native install only, no npm for omp");
+    assert.ok(unix < ver && win < ver, "omp --version after both installs");
+    assert.ok(!l.slice(ver, ver + 3).some((x) => x.startsWith("if:") || x.startsWith("continue-on-error")), "omp --version fails the job on every OS");
+    assert.ok(ver < e2e && e2e < unit, "OMP e2e cases and the v2 unit tests run after omp --version");
+    assert.ok(!l.slice(e2e, e2e + 3).some((x) => x.startsWith("if:")), "OMP e2e cases run on every OS");
+  });
+
   // D-RN-GEM-1: v2.0.0-next.2 smoke hung on the gemini step until the 20-minute job timeout cancelled the job, so
   // continue-on-error never applied. The tier-2 gemini step has its own short timeout.
   test("release.yml: the tier-2 gemini smoke step has its own timeout under the job timeout (D-RN-GEM-1)", () => {
