@@ -211,5 +211,24 @@ jobs:
         name: dev tooling (npm is dev-only, never shipped; retried, every package proven on disk, D-CI-INSTALL-1)
       - run: node build/build.mjs --generated-only
         name: src/prompt/_generated.ts
+      # D-OMP-CI-2: the omp row of the matrix runs setup and doctor against the real omp, so this job installs it too.
+      - name: omp 18.20.0 (native install script) for the omp host row (D-OMP-CI-2)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          PI_INSTALL_DIR: ${{ runner.temp }}/omp-bin
+        run: |
+          for i in 1 2 3; do curl -fsSL https://omp.sh/install | sh -s -- --binary --ref v18.20.0 && break; sleep 20; done
+          echo "$PI_INSTALL_DIR" >> "$GITHUB_PATH"
+      - name: omp 18.20.0 (native install script, Windows) for the omp host row (D-OMP-CI-2)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          PI_INSTALL_DIR: ${{ runner.temp }}\omp-bin
+        run: |
+          foreach ($i in 1..3) { try { & ([scriptblock]::Create((irm https://omp.sh/install.ps1))) -Binary -Ref v18.20.0; break } catch { Start-Sleep 20 } }
+          "$env:PI_INSTALL_DIR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - run: omp --version
+        name: omp version (D-OMP-CI-2)
       - run: node e2e/checks/windows-hosts.mjs
         name: 11 agents x setup, doctor, hook, MCP handshake from the packed package

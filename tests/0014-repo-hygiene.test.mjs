@@ -660,6 +660,26 @@ describe("ADR-0013 repo: scheduled workflows", () => {
     assert.ok(!l.slice(e2e, e2e + 3).some((x) => x.startsWith("if:")), "OMP e2e cases run on every OS");
   });
 
+  // D-OMP-CI-2: the windows-hosts job runs the omp row (setup, doctor) of e2e/checks/windows-hosts.mjs, so it installs
+  // OMP 18.20.0 with OMP's own script too (first main run 120ac299: omp setup + doctor "omp not on PATH" on ubuntu).
+  test("ci.yml: the windows-hosts job installs OMP 18.20.0 with its own script before the 11-agent matrix (D-OMP-CI-2)", () => {
+    const l = lines(read(".github/workflows/ci.yml"));
+    const job = l.indexOf("windows-hosts:");
+    const matrix = l.indexOf("- run: node e2e/checks/windows-hosts.mjs");
+    assert.ok(job > 0 && matrix > job, "windows-hosts job and its matrix step");
+    const body = l.slice(job, matrix);
+    const unix = body.indexOf("- name: omp 18.20.0 (native install script) for the omp host row (D-OMP-CI-2)");
+    const win = body.indexOf("- name: omp 18.20.0 (native install script, Windows) for the omp host row (D-OMP-CI-2)");
+    const ver = body.indexOf("- run: omp --version");
+    assert.ok(unix > 0 && win > 0, "both install steps in the windows-hosts job");
+    assert.ok(body.slice(unix, unix + 3).includes("if: runner.os != 'Windows'"), "unix step skips Windows");
+    assert.ok(body.slice(win, win + 3).includes("if: runner.os == 'Windows'"), "Windows step runs on Windows");
+    assert.ok(body.filter((x) => x.includes("https://omp.sh/install | sh -s -- --binary --ref v18.20.0")).length === 1, "pinned unix script");
+    assert.ok(body.filter((x) => x.includes("irm https://omp.sh/install.ps1))) -Binary -Ref v18.20.0")).length === 1, "pinned Windows script");
+    assert.ok(unix < ver && win < ver, "omp --version after both installs, before the matrix");
+    assert.ok(!body.slice(ver, ver + 3).some((x) => x.startsWith("if:") || x.startsWith("continue-on-error")), "omp --version fails the job on every OS");
+  });
+
   // D-RN-GEM-1: v2.0.0-next.2 smoke hung on the gemini step until the 20-minute job timeout cancelled the job, so
   // continue-on-error never applied. The tier-2 gemini step has its own short timeout.
   test("release.yml: the tier-2 gemini smoke step has its own timeout under the job timeout (D-RN-GEM-1)", () => {

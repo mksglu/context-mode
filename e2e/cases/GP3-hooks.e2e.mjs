@@ -350,7 +350,8 @@ ext({ on: (e, h) => handlers.set(e, h), registerTool: (t) => tools.set(t.name, t
 const ctx = { cwd: process.argv[2], sessionManager: { getSessionId: () => "gp3-omp" } };
 const loaded = [...tools.keys()];
 const out = [];
-for (const [ev, payload] of JSON.parse(process.argv[3])) out.push(handlers.has(ev) ? ((await handlers.get(ev)(payload, ctx)) ?? null) : "NO_HANDLER");
+let raw = ""; for await (const c of process.stdin) raw += c; // D-OMP-CI-2: steps on stdin, Windows caps argv at 32 KB
+for (const [ev, payload] of JSON.parse(raw)) out.push(handlers.has(ev) ? ((await handlers.get(ev)(payload, ctx)) ?? null) : "NO_HANDLER");
 process.stdout.write(JSON.stringify({ loaded, out }));
 `;
   function ompFixture(t) {
@@ -366,7 +367,7 @@ process.stdout.write(JSON.stringify({ loaded, out }));
   }
   function ompRun(f, steps) {
     const env = { PATH: process.env.PATH ?? "", HOME: f.home, USERPROFILE: f.home, TMPDIR: f.home };
-    const stdout = execFileSync(process.execPath, ["--input-type=module", "-e", OMP_DRIVER, pathToFileURL(OMP_BUNDLE).href, f.repo, JSON.stringify(steps)], { env, cwd: f.repo, encoding: "utf8", timeout: 60000 });
+    const stdout = execFileSync(process.execPath, ["--input-type=module", "-e", OMP_DRIVER, pathToFileURL(OMP_BUNDLE).href, f.repo], { env, cwd: f.repo, input: JSON.stringify(steps), encoding: "utf8", timeout: 60000 });
     return JSON.parse(stdout);
   }
   function ompRows(home, sql) {
