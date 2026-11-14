@@ -1006,7 +1006,6 @@ describe("ADR-0020 plugins", () => {
       const ctx = { cwd: repo, sessionManager: { getSessionId: () => sid } };
       return (ev) => handlers.get(ev.type)?.(ev, ctx);
     }
-    const unknownOmp = (err) => err.split('hooks: unknown agent "omp"').length - 1;
     async function promptRows(sid) {
       const db = await openDb(resolveProject("pi", { env: process.env, argv: [], cwd: repo, piCwd: repo }));
       let rows = [];
@@ -1039,11 +1038,11 @@ describe("ADR-0020 plugins", () => {
       await pi(turn("base"));
       await pi({ type: "input", text: "hello pi" });
       assert.deepEqual((await promptRows("omp-t9-pi")).map((r) => r.agent), ["pi"]);
-      // The omp AgentId arrives in M4 (D-OMP-ROW-1); until then handleHook names the id it got on its stderr line.
+      // D-OMP-ROW-1 (M4): the omp AgentId writes its own rows.
       const omp = hosted("omp", "omp-t9-omp");
-      const err = await stderrOf(async () => { await omp(turn(["BASE"])); await omp({ type: "input", text: "hello omp" }); });
-      assert.ok(err.includes('hooks: unknown agent "omp"'), err);
-      assert.ok(!err.includes('"pi"'), err);
+      await omp(turn(["BASE"]));
+      await omp({ type: "input", text: "hello omp" });
+      assert.deepEqual((await promptRows("omp-t9-omp")).map((r) => r.agent), ["omp"]);
     });
 
     test("[T10] PI_CODING_AGENT_DIR and PI_CONFIG_DIR set: the Pi entry stays pi, the OMP entry stays omp", async () => {
@@ -1051,10 +1050,11 @@ describe("ADR-0020 plugins", () => {
         const pi = hosted("pi", "omp-t10-pi");
         await pi(turn("base"));
         await pi({ type: "input", text: "hello pi" });
-        const err = await stderrOf(async () => { const omp = hosted("omp", "omp-t10-omp"); await omp({ type: "input", text: "x" }); });
-        assert.ok(err.includes('hooks: unknown agent "omp"'), err);
+        const omp = hosted("omp", "omp-t10-omp");
+        await omp({ type: "input", text: "x" });
       });
       assert.deepEqual((await promptRows("omp-t10-pi")).map((r) => r.agent), ["pi"]);
+      assert.deepEqual((await promptRows("omp-t10-omp")).map((r) => r.agent), ["omp"]);
       // Default export with the env set: still pi.
       await withPiEnv(async () => {
         const handlers = new Map();
@@ -1068,15 +1068,14 @@ describe("ADR-0020 plugins", () => {
 
     // D-OMP-TURN-1 (O2c): OMP re-runs before_agent_start in one prompt when its base changed during the call
     // (agent-session.ts:9413-9432). A re-run is the same event.prompt with no input or agent_end in between.
-    // Until M4 (D-OMP-ROW-1) the OMP entry writes no rows: each handleHook call is one stderr line, so the line
-    // count shows the hook calls; the Pi entry shows the turn numbers in its prompt rows.
+    // Both entries write prompt rows (D-OMP-ROW-1, M4); the turn numbers show one turn per prompt.
     test("[T8] a re-run in one prompt with a grown base: new base + payload once, one turn counted", async () => {
       for (const agent of ["pi", "omp"]) {
         const sid = "omp-t8-" + agent;
         const run = hosted(agent, sid);
         let first;
         let second;
-        const err = await stderrOf(async () => {
+        await stderrOf(async () => {
           await run({ type: "input", text: "p1" });
           first = await run({ type: "before_agent_start", prompt: "p1", systemPrompt: ["BASE"] });
           second = await run({ type: "before_agent_start", prompt: "p1", systemPrompt: ["BASE", "TOOLS"] });
@@ -1086,8 +1085,7 @@ describe("ADR-0020 plugins", () => {
         const payload = first.systemPrompt[1];
         assert.deepEqual(second.systemPrompt, ["BASE", "TOOLS", payload], agent + ": the new base, then the payload");
         assert.equal(once(second.systemPrompt, INSTRUCTIONS), 1, agent + ": INSTRUCTIONS once");
-        if (agent === "pi") assert.deepEqual((await promptRows(sid)).map((r) => r.turn), [1, 2], "prompt 2 is turn 2");
-        else assert.equal(unknownOmp(err), 3, "input, one SessionStart, input: the re-run calls no hook\n" + err);
+        assert.deepEqual((await promptRows(sid)).map((r) => [r.agent, r.turn]), [[agent, 1], [agent, 2]], agent + ": prompt 2 is turn 2");
       }
     });
 
@@ -1112,15 +1110,14 @@ describe("ADR-0020 plugins", () => {
       for (const agent of ["pi", "omp"]) {
         const sid = "omp-t12-" + agent;
         const run = hosted(agent, sid);
-        const err = await stderrOf(async () => {
+        await stderrOf(async () => {
           for (const end of [true, false]) {
             await run({ type: "input", text: "continue" });
             await run({ type: "before_agent_start", prompt: "continue", systemPrompt: ["BASE"] });
             if (end) await run({ type: "agent_end" });
           }
         });
-        if (agent === "pi") assert.deepEqual((await promptRows(sid)).map((r) => r.turn), [1, 2]);
-        else assert.equal(unknownOmp(err), 4, "one hook call per input and per prompt\n" + err);
+        assert.deepEqual((await promptRows(sid)).map((r) => [r.agent, r.turn]), [[agent, 1], [agent, 2]], agent);
       }
     });
 
