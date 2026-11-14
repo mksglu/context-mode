@@ -23,6 +23,7 @@ export interface HostShape { stdout?: string; output: Readonly<Record<string, Sc
 
 export const HOST_SHAPES: Readonly<Record<AgentId, HostShape>> = {
   "claude-code": claudeCode, codex, gemini, qwen, "copilot-cli": copilotCli, vscode, kiro, zcode, pi, opencode,
+  omp: pi, // ADR-0026: OMP reads the Pi extension reply
 };
 
 const NOTE_KEYS = new Set(["$schema", "title", "description", "definitions", "default"]);

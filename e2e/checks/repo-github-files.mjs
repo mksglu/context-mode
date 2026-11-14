@@ -10,7 +10,7 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const GH = path.join(REPO, ".github");
 const TPL = path.join(GH, "ISSUE_TEMPLATE");
 // Mirror of src/core/contracts/agents.ts AGENT_IDS (e2e/ never imports src/).
-const AGENT_IDS = ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode"];
+const AGENT_IDS = ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode", "omp"];
 
 const read = (p) => readFileSync(p, "utf8");
 

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import {
   AGENT_HOME_DIR, DATA_PLUGINS_DIR_NAME, HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME, OPENCODE_BASE_CONFIG_FILE, OPENCODE_GIT_SPEC, OPENCODE_PLUGIN_KEY,
   OWN_MCP_ENTRY, OWNER_STOP_EXT, OWNERS_DIR_NAME, PI_GIT_PACKAGE,
-  PI_PACKAGE_SOURCE_KEY, PI_PACKAGES_KEY, PROJECTS_DIR_NAME, SETTINGS_FILE, UPGRADE_AREA_KEY_SEP,
+  PI_PACKAGE_SOURCE_KEY, PI_PACKAGES_KEY, PROJECTS_DIR_NAME, SERVER_KEY, SETTINGS_FILE, UPGRADE_AREA_KEY_SEP,
   UPGRADE_CACHE_AREA, UPGRADE_CACHE_BY_HAND, UPGRADE_CONFIG_AREA, UPGRADE_DATA_AREA, UPGRADE_DATA_DELETED,
   UPGRADE_DATA_KEPT, UPGRADE_NOT_FOUND, UPGRADE_OWN_ENTRY, UPGRADE_REMOVED, UPGRADE_SERVER_AREA,
   UPGRADE_SERVER_RUNNING, UPGRADE_SERVER_STOPPED, V1_KEY_PATH_SEP,
@@ -18,6 +18,7 @@ import { claudeDirOf, opencodeDirOf, ownMcpFileOf, piAgentDirOf, requireHomeDir,
 import { listLiveOwners } from "../store/owners.ts";
 import { hostConfigValueAt, parseHostConfig, readHostConfig, writeHostConfigEdit } from "./host-config.ts";
 import { resolvePluginRoot } from "./plugin-root.ts";
+import { OMP_DISABLED_SERVERS_KEY, ompImportFiles } from "./omp-import.ts";
 
 export interface UninstallInput {
   adapter: Pick<AdapterRow, "id" | "installMode">;
@@ -150,6 +151,16 @@ function ownEntries(agent: AgentId, env: NodeJS.ProcessEnv): OwnEntry[] {
       shown: PI_PACKAGES_KEY,
       has: (v) => Array.isArray(v) && v.some((x) => piSource(x) === PI_GIT_PACKAGE),
       drop: (v) => (v as unknown[]).filter((x) => piSource(x) !== PI_GIT_PACKAGE),
+    }];
+  }
+  if (agent === "omp") {
+    // ADR-0026 decision 11 (D-OMP-SETUP-1): setup adds our name to OMP's `disabledServers` denylist; drop only that name.
+    return [{
+      file: ompImportFiles(home).mcp,
+      key: OMP_DISABLED_SERVERS_KEY,
+      shown: OMP_DISABLED_SERVERS_KEY,
+      has: (v) => Array.isArray(v) && v.includes(SERVER_KEY),
+      drop: (v) => (v as unknown[]).filter((x) => x !== SERVER_KEY),
     }];
   }
   return [];

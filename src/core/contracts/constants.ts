@@ -370,7 +370,7 @@ const READ_IMAGES_AND_PDF: readonly ReadMediaType[] = Object.freeze([...READ_IMA
  *  A host with no checked media path keeps the size deny for every file. */
 export const READ_MEDIA_BY_AGENT: Readonly<Record<AgentId, readonly ReadMediaType[]>> = Object.freeze({
   "claude-code": READ_IMAGES_AND_PDF, gemini: READ_IMAGES_AND_PDF, qwen: READ_IMAGES_AND_PDF, opencode: READ_IMAGES_AND_PDF,
-  pi: READ_IMAGES, vscode: READ_IMAGES, zcode: READ_IMAGES, "copilot-cli": [], codex: [], kiro: [],
+  pi: READ_IMAGES, omp: READ_IMAGES, vscode: READ_IMAGES, zcode: READ_IMAGES, "copilot-cli": [], codex: [], kiro: [],
 });
 
 // impl/09 §4 hooks dispatch (DEVIATIONS D-M3-H2-1..6). Keys and texts the dispatch reads; no numbers.
@@ -628,6 +628,7 @@ export const EXTENSIONS_DIR_NAME = "extensions"; // Gemini/Qwen: <agent home>/ex
 export const AGENT_HOME_DIR: Readonly<Record<AgentId, readonly string[]>> = Object.freeze({
   "claude-code": [".claude"], codex: [".codex"], gemini: [".gemini"], qwen: [".qwen"], "copilot-cli": [".copilot"],
   vscode: [".vscode"], kiro: [".kiro"], zcode: [".zcode"], pi: [".pi"], opencode: [".config", "opencode"],
+  omp: [".omp"], // ADR-0026: OMP data and plugins live under ~/.omp
 });
 export const UPGRADE_RESTART_LINE = "restart needed"; // impl/07 §6 step 8
 export const UPGRADE_HOST_AREA = "host update"; // impl/07 §6 step 4
@@ -715,8 +716,6 @@ export const UNSUPPORTED_HOSTS: readonly UnsupportedHost[] = Object.freeze([
     configDirs: [".gemini/antigravity", ".gemini/antigravity-cli", ".gemini/config"], binaries: ["agy"], source: "v1.0.169:src/adapters/client-map.ts:15-17; detect.ts:156,481-483; #1340" }),
   unsupported({ id: "cursor", name: "Cursor", clientNames: ["cursor-vscode"], envVars: ["CURSOR_TRACE_ID", "CURSOR_CLI", "CURSOR_CWD"],
     pluginPaths: [], configDirs: [".cursor"], binaries: [], source: "v1.0.169:src/adapters/client-map.ts:18; detect.ts:163-165,584" }),
-  unsupported({ id: "omp", name: "OMP (oh-my-pi)", clientNames: ["omp-coding-agent"], envVars: [],
-    pluginPaths: [], configDirs: [".omp"], binaries: ["omp"], source: "v1.0.169:src/adapters/client-map.ts:37; detect.ts:543 (PI_CODING_AGENT_DIR is not a signal: supported Pi reads it too)" }),
   unsupported({ id: "openclaw", name: "OpenClaw", clientNames: [], envVars: [],
     pluginPaths: [], configDirs: [".openclaw"], binaries: [], source: "v1.0.169:src/adapters/detect.ts:252,575 (the runtime sets no env var)" }),
   unsupported({ id: "kimi", name: "Kimi Code", clientNames: ["kimi-code", "kimi"], envVars: [],
@@ -750,6 +749,7 @@ export const HOOK_HOST_FILE: Readonly<Record<AgentId, {
   zcode: { root: "home", file: [".zcode", "cli", "config.json"], key: ["hooks", "events"], shape: "zcode", timeoutKey: "timeoutMs", matcher: true },
   pi: null,
   opencode: null,
+  omp: null, // ADR-0026: in-process, no hook file
 });
 export const TOOL_HOOK_EVENTS: readonly string[] = Object.freeze(["PreToolUse", "PostToolUse"]); // canonical events that carry the matcher
 export const HOOK_MATCHER_FIELD = "matcher";
@@ -788,7 +788,7 @@ export function D5_SLOW_DETAIL(ms: number, bound: number = HOOK_P95_MS): string 
 export function D5_SLOW_START_DETAIL(ms: number, bare: number, bound: number): string {
   return `hook adds ${ms} ms to a ${bare} ms node start, inside ${bound} ms (half a start): node starts slowly on this machine`;
 }
-// #1350: OpenCode and Pi run hooks inside the host process; D5 checks the shape, a tool call pays no node start.
+// #1350: OpenCode, Pi and OMP run hooks inside the host process; D5 checks the shape, a tool call pays no node start.
 export const D5_IN_PROCESS_DETAIL = "native shape ok; hooks run inside the host process, so a tool call pays no node start";
 // D-1323-CODEX-STOP-1 (#1323): the Codex Stop probe (rust-v0.166.0 stop.command.input) failed or wrote a hook-errors.log line.
 export const D5_STOP_DETAIL = "Codex Stop event: the hook did not give an empty or Codex Stop reply, or it logged a hook error";
@@ -836,6 +836,7 @@ export const UPGRADE_HOST_COMMAND: Readonly<Record<AgentId, string>> = Object.fr
   gemini: "gemini extensions update context-mode",
   qwen: "qwen extensions update context-mode",
   pi: "pi update --extensions",
+  omp: "omp plugin upgrade context-mode", // ADR-0026 decision 4: OMP native update
   opencode: "opencode plugin update",
   "copilot-cli": "npm i -g context-mode && context-mode setup --agents copilot-cli",
   vscode: "npm i -g context-mode && context-mode setup --agents vscode",
@@ -869,6 +870,16 @@ export const PI_NPM_DIR = "npm";
 export const PI_NODE_MODULES_DIR = "node_modules";
 export const PI_PACKAGE_JSON_FILE = "package.json";
 export const PI_LIST_COMMAND = "pi list"; // D-R38-PI-CMD-1: Pi's own command that lists installed packages
+// ADR-0026 decision 7 (D-OMP-DOCTOR-1): OMP's own plugin verbs and the host-limit info lines of the support matrix.
+export const OMP_LIST_COMMAND = "omp plugin list";
+export const OMP_ENABLE_COMMAND = "omp plugin enable context-mode";
+export const OMP_MIN_VERSION = "14.7.0"; // first OMP with systemPrompt: string[] (ADR-0026 decision 15)
+export const OMP_FLOOR_INFO = (v: string): string => `OMP ${v} is older than the tested floor ${OMP_MIN_VERSION}. Update it with: omp update`;
+export const OMP_CONTENT_INFO = "OMP keeps tool output in content; context-mode writes its notes there.";
+export const OMP_PRINT_MODE_INFO = "Print mode sends no prompt event. Use omp or omp --mode rpc to keep prompts.";
+export const OMP_SCRIPTS_INFO = "Add < /dev/null in scripts.";
+export const OMP_IMPORT_INFO = (claude: string, mcp: string): string =>
+  `OMP also imports context-mode from ${claude}. To run it once, add "context-mode" to disabledServers in ${mcp}.`;
 export const PI_CURRENT_MAJOR = 2; // an installed context-mode at this major or later is the current Pi package
 export const V1_OPENCODE_PLUGIN_SPEC = "context-mode"; // bare npm spec in .plugin[]
 export const V1_TMP_PREFIX = "context-mode-"; // <os tmp>/context-mode-*
@@ -1094,6 +1105,7 @@ export const NATIVE_INSTALL: Readonly<Record<string, readonly string[]>> = Objec
   qwen: ["qwen extensions install https://github.com/mksglu/context-mode:context-mode"],
   opencode: ["opencode plugin add context-mode"],
   pi: ["pi install npm:context-mode"],
+  omp: ["omp plugin install context-mode"], // ADR-0026 decision 4: OMP native install
   "copilot-cli": ["npm i -g context-mode", "context-mode setup --agents copilot-cli"],
   vscode: ["npm i -g context-mode", "context-mode setup --agents vscode"],
   kiro: ["npm i -g context-mode", "context-mode setup --agents kiro"],

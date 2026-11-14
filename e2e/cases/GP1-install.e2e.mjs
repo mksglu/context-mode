@@ -389,9 +389,9 @@ import { vscodeMcpFile } from "../harness/vscode-user-dir.mjs";
   // Given the docs set, When each supported host is checked, Then each host has one install section.
   // Also pins the M6-R1 doc rules: README links each guide's #install anchor, the issue link goes to
   // the v2 bug form (ADR-0014), and no doc names a retired tool. Docs-only: needs no release-out/.
-  // e2e/ never imports src/: the host list is the 10 v2 agents (ADR-0015 row 4).
+  // e2e/ never imports src/: the host list is the 11 v2 agents (ADR-0015 row 4; omp per ADR-0026).
   const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-  const HOSTS = ["claude-code", "codex", "copilot-cli", "gemini", "kiro", "opencode", "pi", "qwen", "vscode", "zcode"];
+  const HOSTS = ["claude-code", "codex", "copilot-cli", "gemini", "kiro", "omp", "opencode", "pi", "qwen", "vscode", "zcode"];
   const RETIRED_TOOLS = ["ctx_fetch_and_index", "ctx_batch_execute"];
   const BUG_FORM = "https://github.com/mksglu/context-mode/issues/new?template=bug.yml";
   const DISCORD = "https://discord.gg/DCN9jUgN5v";

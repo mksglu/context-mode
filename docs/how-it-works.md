@@ -108,8 +108,8 @@ agent runs ctx_search(queries, scope)
 
 ## Adapters: one mechanism per host
 
-Every coding agent host (Claude Code, Codex, Gemini, Qwen, Copilot CLI, VS Code, Kiro, ZCode, Pi,
-OpenCode) wires hooks and the MCP server in a different way. The adapter table names, per host: how
+Every agent host (Claude Code, Codex, Gemini, Qwen, Copilot CLI, VS Code, Kiro, ZCode, Pi,
+OpenCode, OMP) wires hooks and the MCP server in a different way. The adapter table names, per host: how
 context-mode installs (`installMode`), how it finds the project root (`projectSource`), what its MCP tool
 names are prefixed with (`toolNamePrefix`), how a compaction-recovery block is delivered
 (`compactDelivery`), and how deny messages reach the host (`denyChannel`) (`docs/architecture/modules/10-adapters.md`
@@ -123,9 +123,9 @@ names are prefixed with (`toolNamePrefix`), how a compaction-recovery block is d
 | Qwen | extension | spawn cwd | `SessionStart(source=compact)` |
 | Kiro | MCP entry | `--agent` + cwd | none |
 | ZCode | hooks + MCP | spawn cwd | `SessionStart(source=compact)` (unverified) |
-| Pi, OpenCode | plugin inside the agent | the agent's own cwd | agent-specific flag/cache |
+| Pi, OpenCode, OMP | plugin inside the agent | the agent's own cwd | agent-specific flag/cache |
 
-One mechanism, ten adapters: the rules in the sections above (deny, chunk, search, compact) are the same
+One mechanism, 11 agents: the rules in the sections above (deny, chunk, search, compact) are the same
 everywhere; only how a host is told about them changes.
 
 ## Engineering details

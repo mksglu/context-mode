@@ -87,6 +87,53 @@ process.stdout.write(r.content[0].text);
     assert.ok(row.includes(path.join(agentDir, "settings.json")), row);
   });
 
+  // ADR-0026 M7 (T49, T50, D-OMP-DOCTOR-1, D-OMP-UPGRADE-1): mirror of pi-doctor-real-paths for the built OMP entry
+  // release-out/omp/index.js. OMP keeps its plugins under ~/.omp/plugins; the reply names that file and agent omp, and
+  // never a ~/.pi path. PI_CODING_AGENT_DIR never selects OMP.
+  const OMP_BUNDLE = path.join(OUT, "omp", "index.js");
+  const OMP_DRIVER = `
+const mod = await import(process.argv[1]);
+const ext = mod.default ?? mod;
+const tools = new Map(); const handlers = new Map();
+ext({ on: (e, h) => handlers.set(e, h), registerTool: (t) => tools.set(t.name, t) });
+const ctx = { cwd: process.argv[2], sessionManager: { getSessionId: () => "gp11-omp" } };
+await handlers.get("before_agent_start")({ prompt: "p", systemPrompt: "" }, ctx);
+const r = await tools.get(process.argv[3]).execute("c1", JSON.parse(process.argv[4]));
+process.stdout.write(r.content[0].text);
+process.exit(0);
+`;
+  function ompTool(home, repo, tool, params, extra = {}) {
+    const env = { PATH: process.env.PATH ?? "", HOME: home, USERPROFILE: home, TMPDIR: home, ...extra };
+    return execFileSync(process.execPath, ["--input-type=module", "-e", OMP_DRIVER, `file://${OMP_BUNDLE}`, repo, tool, JSON.stringify(params)], { env, cwd: repo, encoding: "utf8", timeout: 120000 });
+  }
+  function ompInstall(home) {
+    const dir = path.join(home, ".omp", "plugins");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "omp-plugins.lock.json"), JSON.stringify({ plugins: { "context-mode": { version: "2.1.10", enabled: true } }, settings: {} }), "utf8");
+    writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "omp-plugins", private: true, dependencies: { "context-mode": "2.1.10" } }), "utf8");
+    return path.join(dir, "omp-plugins.lock.json");
+  }
+
+  test("[M7] GP11/omp-doctor-real-paths: ctx_doctor on OMP checks ~/.omp/plugins, says agent omp, names no ~/.pi path (T49)", (t) => {
+    const { home, repo } = piFixture(t);
+    const lock = ompInstall(home);
+    const report = ompTool(home, repo, "ctx_doctor", {}, { PI_CODING_AGENT_DIR: path.join(home, "pi-dir") });
+    const row = d3Row(report);
+    assert.ok(row.includes("| PASS |"), row);
+    assert.ok(row.includes(lock), row);
+    assert.ok(report.includes("agent omp"), report);
+    assert.ok(!report.includes(path.join(home, ".pi")) && !report.includes("~/.pi") && !report.includes("pi-dir"), report);
+  });
+
+  test("[M7] GP11/omp-upgrade-no-pi-write: ctx_upgrade on OMP prints omp plugin upgrade context-mode and leaves ~/.pi absent (T50)", (t) => {
+    const { home, repo } = piFixture(t);
+    ompInstall(home);
+    const text = ompTool(home, repo, "ctx_upgrade", {});
+    assert.ok(text.includes("omp plugin upgrade context-mode"), text);
+    assert.ok(!text.includes("pi update") && !text.includes(".pi/"), text);
+    assert.equal(existsSync(path.join(home, ".pi")), false);
+  });
+
   // #1206: agy is not a v2 agent (D-M7-arch-1); the class is "each generated hook file passes its own host schema"
   // (impl/10 §1.5 table). One validator per host shape; every file in release-out/hooks/ must have one and pass it.
   const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -186,7 +233,7 @@ describe("GP11 release build audit", () => {
   // publishes it); no package.json below the root.
   // D-RN-REPO-1: repository (npm provenance needs repository.url to match the source repo).
   // D-PKG-META-1: description, keywords, license, homepage, bugs are copied from the repo package.json.
-  const ALLOWED_ROOT_KEYS = ["bin", "bugs", "description", "engines", "exports", "files", "homepage", "keywords", "license", "main", "name", "pi", "repository", "type", "version"]; // main: D-NI-OPENCODE-1; exports: D-OC2-SETUP-1
+  const ALLOWED_ROOT_KEYS = ["bin", "bugs", "description", "engines", "exports", "files", "homepage", "keywords", "license", "main", "name", "omp", "pi", "repository", "type", "version"]; // main: D-NI-OPENCODE-1; exports: D-OC2-SETUP-1; omp: D-OMP-MANIFEST-1
   const DEV = JSON.parse(readFileSync(path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".."), "package.json"), "utf8"));
 
   test("[M6] GP11/npm-audit-zero-high-critical: release-out has no runtime dependencies, no node_modules, no nested package.json (#1225)", () => {

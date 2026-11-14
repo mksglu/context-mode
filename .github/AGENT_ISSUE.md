@@ -2,7 +2,7 @@
 
 Your user asked you to report a context-mode problem. Write the issue so a maintainer's agent can replay it in one pass: the facts, the smallest repro from a fresh project, the exact output, and the cause when you found it. Follow the rules below in order. A GitHub Action scores every new issue against them, labels it `repro-ready` or `needs-info`, and keeps one comment with a checklist of what is still missing. Edit the issue body to fill that checklist; the comment updates itself.
 
-One person maintains context-mode for 10 agents on 3 operating systems. A fix starts from the doctor report and a repro that runs in a fresh directory.
+One person maintains context-mode for 11 agents on 3 operating systems. A fix starts from the doctor report and a repro that runs in a fresh directory.
 
 Security problems go to https://github.com/mksglu/context-mode/security/advisories/new as a private advisory.
 
@@ -36,7 +36,7 @@ Run each command in the user's real HOME, where the problem happened, and keep i
 |---|---|---|
 | context-mode version | row D1 of the doctor table; also `npm ls -g context-mode --depth=0` | Environment: context-mode version |
 | install route | the native command from the README that installed it (for example `codex plugin add context-mode@context-mode`), or `npm i -g context-mode` | Environment: Install route |
-| agent and version | `claude --version`, `codex --version`, `gemini --version`, `qwen --version`, `pi --version`, `opencode --version` (run your own) | Environment: Agent and version |
+| agent and version | `claude --version`, `codex --version`, `gemini --version`, `qwen --version`, `pi --version`, `omp --version`, `opencode --version` (run your own) | Environment: Agent and version |
 | OS and arch | `uname -sm` (macOS, Linux); `$env:OS` and `$env:PROCESSOR_ARCHITECTURE` in PowerShell | Environment: OS and arch |
 | Node version | `node --version` | Environment: Node version |
 | doctor, from the agent | call the `ctx_doctor` tool (it takes an empty argument object); on Claude Code the user can run `/ctx-doctor` | ctx-report |
@@ -72,6 +72,7 @@ Run these steps yourself before you file, in a new shell session with a temporar
    - Gemini CLI: `gemini extensions install https://github.com/mksglu/context-mode`
    - Qwen Code: `qwen extensions install https://github.com/mksglu/context-mode:context-mode`
    - Pi: `pi install npm:context-mode`
+   - OMP: `omp plugin install context-mode`
    - OpenCode: `opencode plugin add context-mode`
    - Copilot CLI, Kiro, VS Code, ZCode: `npm i -g context-mode` then `context-mode setup --agents <agent>`
    - Check: `context-mode doctor --agents <agent>`

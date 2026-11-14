@@ -65,7 +65,7 @@ Project source per agent (D-FU-PS-1, owner decision 2026-10-21, ADR-0001: one fi
 | codex, copilot-cli, kiro | `arg:--agent+cwd` | `src.cwd` | `NO_PROJECT` |
 | vscode | `arg:workspaceFolder` | argv value after `--workspace-folder` | `NO_PROJECT` |
 | gemini, qwen, zcode, opencode | `spawn-cwd` | `src.cwd` | `NO_PROJECT` |
-| pi | `pi:ctx.cwd` | `src.piCwd` | `NO_PROJECT` |
+| pi, omp | `pi:ctx.cwd` | `src.piCwd` | `NO_PROJECT` |
 
 When `resolveProject` throws in `handleHook` step 3 (`NO_PROJECT`, or `NO_GIT_DIR` for a dir that does not exist), the hook answers allow and writes one stderr line `hooks: no project: <code> <message>`.
 

@@ -66,6 +66,24 @@ const BUNDLES = Object.freeze([
   { name: "cli", entry: "src/entries/cli.ts", out: "cli.mjs", banner: { js: "#!/usr/bin/env node" } },
 ]);
 
+// ADR-0026 (D-OMP-MANIFEST-1): OMP reads package.json "omp".extensions. One bundle serves Pi and OMP: this wrapper
+// imports the Pi factory and runs it with the agent id omp (D-OMP-ENTRY-1), so the package grows by under 1 KB.
+const OMP_WRAPPER_OUT = path.join("omp", "index.js");
+const OMP_WRAPPER = [
+  "// ADR-0026: the OMP entry. It runs the Pi extension with the agent id omp; pi/index.js holds the code.",
+  'import { hostExtension } from "../pi/index.js";',
+  "export default function ompExtension(pi) {",
+  '  hostExtension(pi, "omp");',
+  "}",
+  "",
+].join("\n");
+
+function writeOmpWrapper(outDir) {
+  const dest = path.join(outDir, OMP_WRAPPER_OUT);
+  mkdirSync(path.dirname(dest), { recursive: true });
+  writeFileSync(dest, OMP_WRAPPER);
+}
+
 // Same options for every row (impl/13 §2.2 step 2, "same").
 const ESBUILD_COMMON = Object.freeze({
   bundle: true,
@@ -288,6 +306,7 @@ async function main(outDir, sha, version) {
   try {
     writeGeneratedPrompt();
     for (const bundle of BUNDLES) await buildBundle(bundle, outDir, define);
+    writeOmpWrapper(outDir); // D-OMP-MANIFEST-1: after pi/index.js, which it imports
   } finally {
     if (!keep) rmSync(GENERATED, { force: true });
   }

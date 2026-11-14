@@ -3,7 +3,7 @@
 // packed npm bin and the host CLIs; no src/ import.
 //
 // build release-out -> npm pack -> npm i -g into a prefix under a dir WITH A SPACE -> install each host CLI that npm can
-// install without login into the same prefix. Then, for each of the 10 agents, in its own HOME (also with a space):
+// install without login into the same prefix. Then, for each of the 11 agents, in its own HOME (also with a space):
 //   setup    context-mode setup --yes --agents <a> --json   (status PASS, every check ok)
 //   doctor   context-mode doctor --agents <a> --json       (exit 0, every check ok)
 //   hook     the host's PreToolUse (deny rows) or PostToolUse (replace rows) payload for a 200 KB shell cat, piped into
@@ -40,6 +40,8 @@ const HOSTS = [
   { id: "vscode", why: "VS Code is a desktop app; setup writes the user-profile mcp.json (Code/User) and the Copilot hook file, no CLI" },
   { id: "kiro", why: "Kiro CLI has no npm package; setup writes its config files" },
   { id: "zcode", why: "ZCode CLI has no npm package; setup writes its config file" },
+  // ADR-0026 (D-OMP-CI-1): OMP installs from its own script, not npm; the M7 CI job adds that step.
+  { id: "omp", why: "OMP installs from its own install script (Bun runtime); the ci.yml OMP job runs it" },
 ];
 
 // How each host names its events and shell tool, and which saving effect it shows (from the host docs and
@@ -55,6 +57,7 @@ const HOOKS = {
   zcode: { effect: "deny", event: "PreToolUse", tool: "Bash", shape: "claude" },
   pi: { effect: "replace", event: "tool_result", tool: "bash", shape: "pi" },
   opencode: { effect: "deny", event: "execute.before", tool: "bash", shape: "opencode" },
+  omp: { effect: "replace", event: "tool_result", tool: "bash", shape: "pi" }, // ADR-0026: the Pi wire
 };
 
 const results = []; // { agent, step, ok, detail }
@@ -206,7 +209,7 @@ function registeredHook(id, home, project, notes, env = process.env) {
   else if (id === "vscode") file = path.join(home, ".copilot", "hooks", "context-mode-vscode.json");
   else if (id === "kiro") file = path.join(home, ".kiro", "hooks", "context-mode.json");
   else if (id === "zcode") file = path.join(home, ".zcode", "cli", "config.json");
-  if (!file) { // pi, opencode: in-process plugins, no hook command in the host config
+  if (!file) { // pi, opencode, omp: in-process plugins, no hook command in the host config
     notes.push("in-process agent: no hook command in the host config; ran hook.mjs from the package as doctor hook-runs does");
     return `"${process.execPath}" "${path.join(pkgDir, "hook.mjs")}" --agent ${id}`;
   }
@@ -235,8 +238,9 @@ function registeredServer(id, home, project, notes, env = process.env) {
       return fix({ command, args });
     }
     case "pi":
-      notes.push("pi needs no MCP entry (docs/install/pi.md); ran the packaged server.mjs");
-      return { command: process.execPath, args: [path.join(pkgDir, "server.mjs"), "--agent", "pi"] };
+    case "omp":
+      notes.push(id + " needs no MCP entry (docs/install/" + id + ".md); ran the packaged server.mjs");
+      return { command: process.execPath, args: [path.join(pkgDir, "server.mjs"), "--agent", id] };
     default: throw new Error(`unknown agent ${id}`);
   }
 }

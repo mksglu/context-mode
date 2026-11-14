@@ -136,6 +136,7 @@ const HOOK_SHAPES: Readonly<Record<AgentId, ((row: AdapterRow) => JsonObject) | 
   zcode: zcodeShape,
   pi: null,
   opencode: null,
+  omp: null, // ADR-0026: in-process like pi
 };
 
 // D-FU-RM-GEMINI-1: Gemini reads only hooks/hooks.json; every other host reads hooks/<id>.json.
@@ -228,6 +229,7 @@ function zcodePlugin(row: AdapterRow, version: string): [string, JsonObject][] {
 const OUT_PACKAGE_JSON = "package.json";
 const PI_EXTENSION = "./pi/index.js";
 const PI_SKILLS = "./pi/skills"; // D-HQ-SKILLS-1: pi's own rendered copy
+const OMP_EXTENSION = "./omp/index.js"; // ADR-0026 D-OMP-MANIFEST-1: OMP reads its own "omp" key first; skills come from root skills/
 const OPENCODE_MAIN = "./opencode/plugin.js"; // ADR-0023 (D-NI-OPENCODE-1): OpenCode imports the plugin by package name
 // D-OC2-SETUP-1: the OpenCode 2 loader resolves a package plugin through exports["./server"] (main alone finds no entry).
 const OPENCODE_EXPORTS = { ".": OPENCODE_MAIN, "./server": OPENCODE_MAIN };
@@ -237,21 +239,22 @@ const NODE_ENGINE = ">=" + NODE_MIN; // D1, the runtime check constant (D-PKG-ME
 // D1 "files = the release tree": every top-level name build.mjs writes, except package.json (npm always packs it).
 // build.mjs assertOutTree fails the build when the real tree and this list differ.
 export const OUT_FILES: readonly string[] = [
-  ".claude-plugin", CODEX_PLUGIN_DIR, ZCODE_PLUGIN_DIR, CLI_BUNDLE, "codex", "copilot", "fixtures", "gemini-extension.json", HOOK_BUNDLE, HOOKS_DIR, "opencode", "pi",
+  ".claude-plugin", CODEX_PLUGIN_DIR, ZCODE_PLUGIN_DIR, CLI_BUNDLE, "codex", "copilot", "fixtures", "gemini-extension.json", HOOK_BUNDLE, HOOKS_DIR, "omp", "opencode", "pi",
   "qwen-extension.json", "run.mjs", "search.mjs", SERVER_BUNDLE, "skills", RELEASE_SUMS_FILE, "README.md", "LICENSE", // D-NPM-README-1
 ].slice().sort();
 // D-RN-REPO-1: npm provenance rejects a publish (E422) unless repository.url names the source repo. This is the
 // `npm pkg fix` form, so check-npm-tarball.mjs's "npm pkg fix is a no-op" gate still holds.
 const REPOSITORY = { type: "git", url: "git+https://github.com/mksglu/context-mode.git" };
-const OUT_PACKAGE_KEYS: readonly string[] = ["bin", "bugs", "description", "engines", "exports", "files", "homepage", "keywords", "license", "main", "name", "pi", "repository", "type", "version"];
+const OUT_PACKAGE_KEYS: readonly string[] = ["bin", "bugs", "description", "engines", "exports", "files", "homepage", "keywords", "license", "main", "name", "omp", "pi", "repository", "type", "version"];
 const PI_KEYS: readonly string[] = ["extensions", "skills"];
+const OMP_KEYS: readonly string[] = ["extensions"];
 
 export function npmPackageJson(version: string, name: string = NPM_MAIN): JsonObject {
   const meta = devMeta();
   return {
     name, version, type: "module", bin: { [SERVER_KEY]: CLI_BUNDLE }, engines: { node: NODE_ENGINE },
     files: [...OUT_FILES], main: OPENCODE_MAIN, exports: OPENCODE_EXPORTS, pi: { extensions: [PI_EXTENSION], skills: [PI_SKILLS] },
-    description: meta.description, keywords: [...meta.keywords], license: meta.license, homepage: meta.homepage, bugs: meta.bugs, repository: meta.repository,
+    omp: { extensions: [OMP_EXTENSION] }, description: meta.description, keywords: [...meta.keywords], license: meta.license, homepage: meta.homepage, bugs: meta.bugs, repository: meta.repository,
   };
 }
 
@@ -283,6 +286,11 @@ export function assertOutPackageJson(pkg: unknown, name: string = NPM_MAIN): voi
   if (piKeys.join(",") !== PI_KEYS.join(",")) throw new Error("package.json: pi keys must be " + PI_KEYS.join(","));
   if (JSON.stringify(piObj.extensions) !== JSON.stringify([PI_EXTENSION])) throw new Error("package.json: pi.extensions must be [" + PI_EXTENSION + "]");
   if (JSON.stringify(piObj.skills) !== JSON.stringify([PI_SKILLS])) throw new Error("package.json: pi.skills must be [" + PI_SKILLS + "]");
+  const omp = obj.omp;
+  if (omp === null || typeof omp !== "object" || Array.isArray(omp)) throw new Error("package.json: omp must be an object");
+  const ompObj = omp as Record<string, unknown>;
+  if (Object.keys(ompObj).sort().join(",") !== OMP_KEYS.join(",")) throw new Error("package.json: omp keys must be " + OMP_KEYS.join(","));
+  if (JSON.stringify(ompObj.extensions) !== JSON.stringify([OMP_EXTENSION])) throw new Error("package.json: omp.extensions must be [" + OMP_EXTENSION + "]");
 }
 
 // impl/13 §3.1 step 3: alphabetical keys inside every object, array order kept.

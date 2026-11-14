@@ -42,6 +42,11 @@ function readResult(p: Record<string, unknown>): ToolResultInfo {
   return info;
 }
 
+/** ADR-0026 (D-OMP-FIRE-1): OMP sends the Pi payload; the event names the agent omp, so its rows say omp. */
+export function decodeOmp(raw: unknown): CanonicalHookEvent {
+  return { ...decode(raw), agent: "omp" };
+}
+
 export function decode(raw: unknown): CanonicalHookEvent {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("pi: hook payload is not an object");
   const p = raw as Record<string, unknown>;

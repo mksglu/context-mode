@@ -2773,9 +2773,9 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
 
   // Moved from tests/e2e/fetch-index-search-parity.test.mjs
   // Serial inside the concurrent stage: the summary tests read the Map the per-host tests fill, in order.
-  describe("PRD-v2 section 8 / fetch, index, search parity on 10 hosts", { concurrency: 1 }, () => {
+  describe("PRD-v2 section 8 / fetch, index, search parity on 11 hosts", { concurrency: 1 }, () => {
     // Owner scenario (Pi session 2026-10-30): "Fetch the React useEffect docs, index them, and find the cleanup pattern
-    // with code examples." For all 10 hosts: ctx_index {url} then ctx_search {queries}, each the way the host runs it.
+    // with code examples." For all 11 hosts: ctx_index {url} then ctx_search {queries}, each the way the host runs it.
     //   MCP hosts (claude-code, codex, gemini, qwen, copilot-cli, vscode, kiro, zcode): the built server.mjs --agent <host>
     //     over stdio JSON-RPC (vscode also gets --workspace-folder, as setup writes it).
     //   pi: src/entries/pi.ts in process, with the documented ctx object ({cwd, sessionManager}) from before_agent_start.
@@ -2803,7 +2803,7 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
     const QUERY = "useEffect cleanup function return pattern";
     const OUTPUT_CAP = 16384; // src/core/contracts/constants.ts OUTPUT_CAP: the one bound for every reply
     const MCP_HOSTS = ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode"];
-    const ALL_HOSTS = [...MCP_HOSTS, "pi", "opencode"];
+    const ALL_HOSTS = [...MCP_HOSTS, "pi", "opencode", "omp"]; // ADR-0026: omp runs the Pi factory with its own id
 
     let root, pkg, srv, url, probeUrl;
     const results = new Map(); // host -> { indexText, searchText }
@@ -2883,12 +2883,12 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
     }
 
     /** The pi extension, driven as Pi drives it: before_agent_start with ctx, then tool.execute. */
-    async function piRun(proj, calls) {
-      const { default: piExtension } = await import("../src/entries/pi.ts");
+    async function piRun(proj, calls, host = "pi") {
+      const { hostExtension } = await import("../src/entries/pi.ts");
       const handlers = new Map();
       const tools = new Map();
-      piExtension({ on: (n, f) => handlers.set(n, f), registerTool: (t) => tools.set(t.name, t) });
-      const ctx = { cwd: proj, sessionManager: { getSessionId: () => "parity-pi" } };
+      hostExtension({ on: (n, f) => handlers.set(n, f), registerTool: (t) => tools.set(t.name, t) }, host);
+      const ctx = { cwd: proj, sessionManager: { getSessionId: () => "parity-" + host } };
       await handlers.get("before_agent_start")({ systemPrompt: "" }, ctx);
       const out = [];
       for (const [name, a] of calls) {
@@ -2922,7 +2922,7 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
       const proj = gitRepo(join(root, "proj-" + tag));
       if (mcp) return mcpRun(host, home, proj, calls);
       process.env.HOME = home; process.env.USERPROFILE = home; process.env.PARITY_HOST = HOST;
-      return host === "pi" ? piRun(proj, calls) : opencodeRun(proj, calls);
+      return host === "opencode" ? opencodeRun(proj, calls) : piRun(proj, calls, host); // pi and omp share the factory
     }
 
     const chunksOf = (t) => Number(/(\d+) chunk\(s\)/.exec(t)?.[1]);
@@ -2956,7 +2956,7 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
       assert.equal(out[1].text, results.get("claude-code").searchText);
     });
 
-    test("[parity] all 10 hosts: same chunk count, same hit list, same reply bytes, reply under OUTPUT_CAP", () => {
+    test("[parity] all 11 hosts: same chunk count, same hit list, same reply bytes, reply under OUTPUT_CAP", () => {
       assert.equal(results.size, ALL_HOSTS.length, "every host ran: " + [...results.keys()].join(","));
       const ref = results.get("claude-code");
       const table = ALL_HOSTS.map((h) => `${h}: chunks=${chunksOf(results.get(h).indexText)} bytes=${bytes(results.get(h).searchText)} hits=${hitIds(results.get(h).searchText).length}`);

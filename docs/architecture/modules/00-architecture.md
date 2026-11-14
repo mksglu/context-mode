@@ -84,7 +84,7 @@ Owner column = module id (§2).
 
 | Path | Purpose | Owner |
 |---|---|---|
-| `build/build.mjs` | esbuild: 7 bundles (server, hook, run, search, pi, opencode, cli), inline prompt md; the hook bundle is minified (D-CI-PERF-4); writes the ADR-0019 D1 `package.json` out | build-release |
+| `build/build.mjs` | esbuild: 7 bundles (server, hook, run, search, pi, opencode, cli) plus the `omp/index.js` wrapper over pi (ADR-0026), inline prompt md; the hook bundle is minified (D-CI-PERF-4); writes the ADR-0019 D1 `package.json` out | build-release |
 | `build/manifests.ts` | generate every manifest + hook config from `adapters/table.ts` | build-release |
 | `build/hash.mjs` | `SHA256SUMS` over the release tree | build-release |
 | `build/check-removed.mjs` | GS5: fail if a removed path or routing file exists | v1-transition |
@@ -161,7 +161,7 @@ No cycle: contracts → store → sandbox → tools-index → tools-exec; adapte
 ### 3.1 Types (`src/core/contracts/types.ts`, `agents.ts`)
 
 ```ts
-export const AGENT_IDS = ["claude-code","codex","gemini","qwen","copilot-cli","vscode","kiro","zcode","pi","opencode"] as const; // TECH-SPEC §2
+export const AGENT_IDS = ["claude-code","codex","gemini","qwen","copilot-cli","vscode","kiro","zcode","pi","opencode","omp"] as const; // TECH-SPEC §2; omp is the 11th (ADR-0026)
 export type AgentId = typeof AGENT_IDS[number];
 
 export type CanonicalEventName = "SessionStart" | "UserPromptSubmit" | "PreToolUse" | "PostToolUse"; // ADR-0001, PRD §10.1

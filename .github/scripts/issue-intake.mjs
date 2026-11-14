@@ -45,7 +45,7 @@ export const ITEMS = [
 export const READY_KEYS = ["version", "steps", "output"];
 
 const AGENT_MARKERS = ["claude code", "claude-code", "claude", "codex", "gemini cli", "gemini", "qwen code", "qwen", "opencode",
-  "pi coding agent", "pi", "copilot cli", "copilot", "vs code", "vscode", "kiro", "zcode", "cursor"];
+  "pi coding agent", "pi", "oh-my-pi", "omp", "copilot cli", "copilot", "vs code", "vscode", "kiro", "zcode", "cursor"];
 const RUNTIME_MARKERS = ["node", "bun"];
 const OS_MARKERS = ["linux", "macos", "darwin", "windows", "win32", "wsl", "ubuntu", "debian", "fedora", "alpine"];
 const OBSERVED_MARKERS = ["observed", "actual", "what happened", "output", "error", "warning"];
@@ -58,7 +58,7 @@ const SECRET_MARKERS = ["github_pat_", "ghp_", "sk-ant-", "sk-proj-", "TOKEN="];
 export const FEATURE_TITLES = ["feature request", "[feature request]", "[feature]"];
 export const BUG_TITLE = "bug"; // "[Bug]: ..." titles of bug.yml
 // = the agent dropdown of .github/ISSUE_TEMPLATE/feature.yml; "[<agent>] ..." titles are bug reports.
-export const AGENT_IDS = ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode"];
+export const AGENT_IDS = ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode", "omp"];
 // = the field labels of feature.yml; a body with all three came from the feature form.
 export const FEATURE_FORM_HEADS = ["Agent", "Problem", "Evidence links"];
 // = the first field of bug.yml and REPORT_FIELD of agent-report.yml; a body with one came from a bug form.

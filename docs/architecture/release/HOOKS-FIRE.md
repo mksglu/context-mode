@@ -28,4 +28,4 @@ Both stay open. They are not hidden behind a skip: the live tests print the reas
 
 ## Windows
 
-The CI job `windows hosts` runs setup, doctor, the hook and an MCP handshake for all 10 hosts from the packed package on Windows, macOS and Linux. All 10 pass on the release run. Two known Windows shell defects (Q-WIN-5 qwen, KIRO-WIN-4 kiro, D-WIN-QWEN-SHELL-1 and D-WIN-KIRO-SHELL-1) are still marked as known and need a design decision.
+The CI job `windows hosts` runs setup, doctor, the hook and an MCP handshake for all 11 hosts from the packed package on Windows, macOS and Linux. All 10 passed on the 2.0 release run; OMP joined as the 11th host with ADR-0026, and CI also installs the real OMP for its own tests. Two known Windows shell defects (Q-WIN-5 qwen, KIRO-WIN-4 kiro, D-WIN-QWEN-SHELL-1 and D-WIN-KIRO-SHELL-1) are still marked as known and need a design decision.

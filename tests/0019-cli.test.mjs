@@ -228,7 +228,7 @@ describe("ADR-0019 cli", () => {
           assert.equal(r.status, 2, n);
           assert.ok(r.stderr.includes(`${h.name} is not a supported host today.`), r.stderr);
           assert.ok(r.stderr.includes("Setup writes nothing for it."), r.stderr);
-          assert.ok(r.stderr.includes("Supported agents: claude-code, codex, gemini, qwen, copilot-cli, vscode, kiro, zcode, pi, opencode"), r.stderr);
+          assert.ok(r.stderr.includes("Supported agents: claude-code, codex, gemini, qwen, copilot-cli, vscode, kiro, zcode, pi, opencode, omp"), r.stderr);
           assert.equal(r.stderr.includes("unknown agent"), false, r.stderr);
           assert.deepEqual(snapshot(s.home), before, n);
         }

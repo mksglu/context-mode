@@ -31,7 +31,7 @@ const DOCTOR_AGENT = ", agent ";
 export const AGENT_NAMES = [
   ["claude code", "claude-code"], ["claude-code", "claude-code"], ["claude", "claude-code"], ["codex", "codex"],
   ["gemini cli", "gemini"], ["gemini", "gemini"], ["qwen code", "qwen"], ["qwen", "qwen"], ["opencode", "opencode"],
-  ["pi coding agent", "pi"], ["pi", "pi"], ["copilot cli", "copilot-cli"], ["copilot-cli", "copilot-cli"], ["copilot", "copilot-cli"],
+  ["pi coding agent", "pi"], ["pi", "pi"], ["oh-my-pi", "omp"], ["oh my pi", "omp"], ["omp", "omp"], ["copilot cli", "copilot-cli"], ["copilot-cli", "copilot-cli"], ["copilot", "copilot-cli"],
   ["vs code", "vscode"], ["vscode", "vscode"], ["kiro", "kiro"], ["z code", "zcode"], ["zcode", "zcode"],
 ];
 

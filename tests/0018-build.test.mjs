@@ -94,14 +94,14 @@ describe("ADR-0018 build: release-out tree", () => {
 
   // Skills fix: gemini loads <extension>/skills and pi loads package.json pi.skills unrendered, so the build writes
   // each host's copy from the one skills/ source with that host's real tool names (split/join, D-HQ-SKILLS-1).
-  test("[M6] build/command-skills: gemini skills/ and pi pi/skills are the 3 skills rendered with the host tool names", async (t) => {
+  test("[M6] build/command-skills: gemini and omp skills/ (D-OMP-SKILLS-1) and pi pi/skills are the 3 skills rendered with the host tool names", async (t) => {
     const { renderSkill } = await import("../src/setup/registry.ts");
     const { getAdapter } = await import("../src/adapters/table.ts");
     const { out, status, stderr } = build(t);
     assert.equal(status, 0, stderr);
     // D-HQ-SKILLS-3: qwen reads the same <extension>/skills dir as gemini, so that dir names both tools.
     // D-R33-CC-SKILLS-1: Claude Code always loads <plugin>/skills too, so that dir names its tool first.
-    for (const [id, dir, stats, prefixes] of [["gemini", "skills", "mcp__plugin_context-mode_context-mode__ctx_stats or mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats", ["mcp__plugin_context-mode_context-mode__", "mcp_context-mode_", "mcp__context-mode__"]], ["pi", "pi/skills", "ctx_stats", [""]]]) {
+    for (const [id, dir, stats, prefixes] of [["gemini", "skills", "mcp__plugin_context-mode_context-mode__ctx_stats or mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats or ctx_stats", ["mcp__plugin_context-mode_context-mode__", "mcp_context-mode_", "mcp__context-mode__", ""]], ["omp", "skills", "mcp__plugin_context-mode_context-mode__ctx_stats or mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats or ctx_stats", ["mcp__plugin_context-mode_context-mode__", "mcp_context-mode_", "mcp__context-mode__", ""]], ["pi", "pi/skills", "ctx_stats", [""]]]) {
       assert.equal(getAdapter(id).skillChannel.path, dir, id + " skill channel is the build dir");
       assert.deepEqual(readdirSync(path.join(out, dir)).sort(), [...SKILLS].sort(), dir);
       for (const s of SKILLS) {
@@ -443,7 +443,7 @@ describe("ADR-0018 build: manifests", () => {
   // no scripts, no private.
   const D1_FILES = [
     ".claude-plugin", ".codex-plugin", ".zcode-plugin", "LICENSE", "README.md", "SHA256SUMS", "cli.mjs", "codex", "copilot", "fixtures", "gemini-extension.json", "hook.mjs", "hooks",
-    "opencode", "pi", "qwen-extension.json", "run.mjs", "search.mjs", "server.mjs", "skills",
+    "omp", "opencode", "pi", "qwen-extension.json", "run.mjs", "search.mjs", "server.mjs", "skills",
   ];
   test("package.json is the D1 npm shape: name, version, bin, type, engines, files, pi (extensions, skills)", (t) => {
     const dir = scratch(t);
@@ -456,6 +456,7 @@ describe("ADR-0018 build: manifests", () => {
       files: D1_FILES,
       main: "./opencode/plugin.js", // ADR-0023 D-NI-OPENCODE-1
       name: "context-mode",
+      omp: { extensions: ["./omp/index.js"] }, // ADR-0026 D-OMP-MANIFEST-1: OMP reads its own key; pi key unchanged
       pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"] },
       repository: { type: "git", url: "git+https://github.com/mksglu/context-mode.git" },
       type: "module",
@@ -469,6 +470,7 @@ describe("ADR-0018 build: manifests", () => {
       ...META,
       name: "context-mode", version: "2.0.0", type: "module", bin: { "context-mode": "cli.mjs" }, engines: { node: ">=24.15.0" },
       files: D1_FILES, main: "./opencode/plugin.js", exports: { ".": "./opencode/plugin.js", "./server": "./opencode/plugin.js" }, pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"] },
+      omp: { extensions: ["./omp/index.js"] },
       repository: { type: "git", url: "git+https://github.com/mksglu/context-mode.git" },
     };
     assert.doesNotThrow(() => assertOutPackageJson(ok));
@@ -481,6 +483,8 @@ describe("ADR-0018 build: manifests", () => {
     assert.throws(() => assertOutPackageJson({ ...ok, engines: { node: ">=22.5.0" } }), /engines/);
     assert.throws(() => assertOutPackageJson({ ...ok, files: D1_FILES.slice(1) }), /files/);
     assert.throws(() => assertOutPackageJson({ ...ok, pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"], prompts: [] } }), /pi/);
+    assert.throws(() => assertOutPackageJson({ ...ok, omp: { extensions: ["./pi/index.js"] } }), /omp/); // D-OMP-MANIFEST-1
+    assert.throws(() => assertOutPackageJson({ ...ok, omp: { extensions: ["./omp/index.js"], skills: ["./skills"] } }), /omp/);
     // D-RN-REPO-1: npm provenance (E422) needs repository.url to name the source repo; npm pkg fix form, so it stays a no-op.
     assert.throws(() => assertOutPackageJson({ ...ok, repository: { type: "git", url: "" } }), /repository/);
     assert.throws(() => assertOutPackageJson({ ...ok, repository: { type: "git", url: "https://github.com/mksglu/context-mode" } }), /repository/);
@@ -488,7 +492,7 @@ describe("ADR-0018 build: manifests", () => {
       assert.throws(() => assertOutPackageJson({ ...ok, [key]: "x" }), new RegExp(key));
     }
     assert.throws(() => assertOutPackageJson({ ...ok, main: "./server.mjs" }), /main/); // ADR-0023 D-NI-OPENCODE-1
-    for (const key of ["pi", "bin", "engines", "files", "repository"]) {
+    for (const key of ["pi", "omp", "bin", "engines", "files", "repository"]) {
       const { [key]: _drop, ...missing } = ok;
       assert.throws(() => assertOutPackageJson(missing), new RegExp(key));
     }
@@ -699,7 +703,7 @@ describe("ADR-0019 build: host skills", () => {
   // N5 (2.0.0-next.5 live runs): codex ctx-stats said "mcp_context-mode_mcp__context_mode__ctx_stats". Setup rendered the
   // home-dir skills from the package skills/ dir, which build.mjs already rendered with Gemini's prefix, so the prefix
   // doubled. Expected names: each host's real tool name as the host lists it (adapters TOOL_NAME_PREFIX, D-HQ-COPILOT-NAMES-2).
-  const SHARED_STATS = "mcp__plugin_context-mode_context-mode__ctx_stats or mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats";
+  const SHARED_STATS = "mcp__plugin_context-mode_context-mode__ctx_stats or mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats or ctx_stats"; // omp reads skills/ too (D-OMP-SKILLS-1)
   const CTX_STATS_NAME = {
     // D-HQ-SKILLS-3, D-R33-CC-SKILLS-1: claude-code, gemini and qwen share <plugin>/skills
     "claude-code": SHARED_STATS,
@@ -712,6 +716,7 @@ describe("ADR-0019 build: host skills", () => {
     zcode: "mcp__context-mode__ctx_stats",
     pi: "ctx_stats",
     opencode: "ctx_stats",
+    omp: SHARED_STATS, // D-OMP-SKILLS-1: <plugin>/skills, bare ctx_stats
   };
 
   test("[D-N5-SKILL-1] the built package's ctx-stats skill names each host's real tool once, never a doubled prefix", () => {
@@ -733,12 +738,13 @@ describe("ADR-0019 build: host skills", () => {
     for (const name of SKILLS) {
       let rest = readFileSync(path.join(out, "skills", name, "SKILL.md"), "utf8");
       for (const tool of toolsIn(SOURCE[name])) {
-        for (const p of [ADAPTERS.find((a) => a.id === "claude-code").toolNamePrefix, gemini.toolNamePrefix, qwen.toolNamePrefix]) {
+        // D-OMP-SKILLS-1: omp reads <plugin>/skills too, so the bare name is last (after the prefixed names are cut out).
+        for (const p of [ADAPTERS.find((a) => a.id === "claude-code").toolNamePrefix, gemini.toolNamePrefix, qwen.toolNamePrefix, getAdapter("omp").toolNamePrefix]) {
           assert.ok(rest.includes(p + tool), `${name} names ${p + tool}`);
           rest = rest.split(p + tool).join("");
         }
       }
-      assert.equal(rest.includes("ctx_"), false, `${name} names a tool that is not claude-code's, gemini's or qwen's: ${rest}`);
+      assert.equal(rest.includes("ctx_"), false, `${name} names a tool that is not claude-code's, gemini's, qwen's or omp's: ${rest}`);
     }
   });
 
@@ -852,6 +858,7 @@ describe("ADR-0019 build: npm package", () => {
       files: top,
       main: "./opencode/plugin.js", // ADR-0023 D-NI-OPENCODE-1: OpenCode imports the plugin by package name
       name: "context-mode",
+      omp: { extensions: ["./omp/index.js"] }, // ADR-0026 D-OMP-MANIFEST-1
       pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"] },
       repository: { type: "git", url: "git+https://github.com/mksglu/context-mode.git" }, // D-RN-REPO-1
       type: "module",
@@ -1184,6 +1191,12 @@ describe("ADR-0023 build: native host manifests", () => {
     assert.equal(p.version, VERSION);
     for (const rel of p.pi.extensions) assert.ok(isFile(pkg, stripRoot(rel)), "pi extension " + rel);
     for (const dir of p.pi.skills) assertSkills(pkg, dir, "", "pi");
+    // ADR-0026 T15 (D-OMP-MANIFEST-1): OMP reads package.json "omp".extensions; the wrapper calls the Pi factory, under 1 KB.
+    assert.deepEqual(p.omp, { extensions: ["./omp/index.js"] });
+    for (const rel of p.omp.extensions) {
+      assert.ok(isFile(pkg, stripRoot(rel)), "omp extension " + rel);
+      assert.ok(statSync(path.join(pkg, stripRoot(rel))).size < 1024, "omp wrapper is under 1 KB");
+    }
     assert.equal(typeof p.main, "string", "opencode: package.json main (OpenCode imports the plugin by package name)");
     assert.equal(stripRoot(p.main), "opencode/plugin.js");
     assert.ok(isFile(pkg, stripRoot(p.main)), "opencode: main " + p.main + " shipped");

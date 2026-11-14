@@ -6,10 +6,10 @@
 import { describe, test } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { OLD_FORMS, checkLines, checkNativePages, checkNoV1, checkOpencodeCommands, OPENCODE2_INSTALL, checkPages, checkPlainCommands, checkSimpleLines, checkSimplePages, docFiles, fencedBlocks, installSection, v1FreeFiles } from "../build/check-install-docs.mjs";
+import { NATIVE_HOSTS, OLD_FORMS, checkLines, checkNativePages, checkNoV1, checkOpencodeCommands, OPENCODE2_INSTALL, checkPages, checkPlainCommands, checkSimpleLines, checkSimplePages, docFiles, fencedBlocks, installSection, v1FreeFiles } from "../build/check-install-docs.mjs";
 import { getAdapter } from "../src/adapters/table.ts";
 
 describe("ADR-0023 install pages: lines and pages", { concurrency: CONC }, () => {
@@ -115,6 +115,8 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
     pi: [["pi install npm:context-mode"], ["pi update --extensions"]],
     // D-OC2-NATIVE-CMD-1: OpenCode 2 first (@opencode/cli 2.2.5: `plugin add`, `plugin update`); the 1.19 form is a plain line after the block.
     opencode: [["opencode plugin add context-mode"], ["opencode plugin update"]],
+    // ADR-0026 M8 (D-OMP-DOCS-1): OMP's own verbs [run omp-r65-platform.md §7].
+    omp: [["omp plugin install context-mode"], ["omp plugin upgrade context-mode"]],
   };
   const FALLBACK = ["copilot-cli", "vscode", "kiro"];
 
@@ -175,6 +177,33 @@ describe("ADR-0023 native install commands per host", { concurrency: CONC }, () 
       assert.ok(!install.includes("prerelease tag"), `${id}.md still names the prerelease tag`);
       assert.ok(!text.includes("node -e"), `${id}.md has node -e`);
     }
+  });
+
+  // T52 (ADR-0026 M8, D-OMP-DOCS-1): omp is a native host; its page exists and names only OMP's own commands.
+  test("install-native: T52 omp is a native host and docs/install/omp.md names OMP's own install, update and remove", () => {
+    assert.ok(NATIVE_HOSTS.includes("omp"), "NATIVE_HOSTS has omp");
+    assert.ok(existsSync(path.join(REPO, "docs", "install", "omp.md")), "docs/install/omp.md exists");
+    const page = read("docs", "install", "omp.md");
+    for (const c of ["curl -fsSL https://omp.sh/install | sh", "irm https://omp.sh/install.ps1 | iex", "omp plugin install context-mode",
+      "omp plugin upgrade context-mode", "omp update", "omp plugin uninstall context-mode"]) assert.ok(fencedBlocks(page).flat().includes(c), `omp.md fence: ${c}`);
+    assert.equal(fencedBlocks(page.slice(page.indexOf("\n## Remove\n")))[0][0], "omp plugin uninstall context-mode", "native remove first");
+    for (const bad of ["npm:context-mode", "context-mode@next", "#release", "PI_CODING_AGENT_DIR"]) assert.ok(!page.includes(bad), `omp.md has ${bad}`);
+    const list = read("docs", "install", "README.md");
+    assert.ok(list.includes("11 agents") && !list.includes("10 agents"), "docs/install/README.md says 11 agents");
+    assert.ok(list.includes("| OMP | `omp plugin install context-mode` | `omp plugin upgrade context-mode` |"), "docs/install/README.md OMP row");
+  });
+
+  // ADR-0026 M8 (D-OMP-DOCS-1): the architecture docs name OMP as the 11th agent with its own verbs.
+  test("install-native: T52 ADR-0023, PRD, TECH-SPEC, 01-contracts, 12-plugins and DEVIATIONS name OMP (D-OMP-DOCS-1)", () => {
+    const a23 = read("docs", "architecture", "adr", "ADR-0023-native-install.md");
+    assert.ok(a23.includes("| omp | `omp plugin install context-mode` |") && a23.includes("`omp plugin upgrade context-mode`"), "ADR-0023 omp row");
+    const prd = read("docs", "architecture", "PRD.md");
+    assert.ok(prd.includes("11 agents") && prd.includes("| OMP | in-process plugin |"), "PRD agent table");
+    const spec = read("docs", "architecture", "TECH-SPEC.md");
+    assert.ok(spec.includes("**[D] Agents (11):**") && spec.includes("OpenCode 2, OMP."), "TECH-SPEC agent list");
+    assert.ok(read("docs", "architecture", "modules", "01-contracts.md").includes('"pi","opencode","omp"] as const'), "01-contracts AGENT_IDS");
+    assert.ok(read("docs", "architecture", "modules", "12-plugins.md").includes("ADR-0026"), "12-plugins names the OMP plugin");
+    assert.ok(read("docs", "architecture", "DEVIATIONS.md").includes("| D-OMP-DOCS-1 |"), "DEVIATIONS row");
   });
 
   test("install-native: the real pages pass checkNativePages", () => {

@@ -1140,7 +1140,7 @@ describe("PRD-v2 section 10: compaction delivery, recall and decision rows (GP6)
       const out = r.encode(ev, { kind: "hint", text: "RECALL-PROBE", onceKey: "recall" });
       assert.equal(hasRecall(r), JSON.stringify(out).includes("RECALL-PROBE"), r.id);
     }
-    assert.deepEqual(ADAPTERS.filter((r) => !hasRecall(r)).map((r) => r.id), ["pi", "opencode"]); // D-R33-KIRO-RECALL-1
+    assert.deepEqual(ADAPTERS.filter((r) => !hasRecall(r)).map((r) => r.id), ["pi", "opencode", "omp"]); // D-R33-KIRO-RECALL-1; omp keeps the Pi compact path
   });
 
   // ---------- decision rows (ADR-0009 §8.2) ----------
@@ -1896,7 +1896,7 @@ describe("PRD-v2 section 10: PreToolUse module load set", { concurrency: CONC },
 describe("PRD-v2 section 10: hook never errors (D-HNE-GUARD-1)", () => {
   // D-HNE-GUARD-1 (owner decision 2026-10-29): a hook never errors. On any internal failure it exits 0 with a valid decision
   // for its host: own ctx_* tools allowed, flooding tools denied with the redirect plus "run ctx_doctor", and the error with
-  // its stack in <HOME>/.context-mode/hook-errors.log. Runs the built bundle for all 10 hosts (CM_HNE_BUNDLE overrides it).
+  // its stack in <HOME>/.context-mode/hook-errors.log. Runs the built bundle for all 11 hosts (CM_HNE_BUNDLE overrides it).
   const REPO = join(import.meta.dirname, "..");
   let root;
   let bundle;
@@ -1934,9 +1934,10 @@ describe("PRD-v2 section 10: hook never errors (D-HNE-GUARD-1)", () => {
     zcode: { pay: (t, i) => SNAKE("PreToolUse", t, i), shell: "Bash", own: "mcp__context-mode__ctx_execute", safe: "TodoWrite" },
     pi: { pay: (t, i) => ({ type: "tool_call", sessionId: "s1", cwd: repo, toolName: t, input: i }), shell: "bash", own: "ctx_execute", safe: "todo" },
     opencode: { pay: (t, i) => ({ type: "execute.before", sessionID: "s1", directory: repo, tool: t, args: i }), shell: "bash", own: "context-mode_ctx_execute", safe: "todowrite" },
+    omp: { pay: (t, i) => ({ type: "tool_call", sessionId: "s1", cwd: repo, toolName: t, input: i }), shell: "bash", own: "ctx_execute", safe: "todo" }, // ADR-0026: the Pi wire
   };
-  const EXIT2 = new Set(["kiro", "pi", "opencode"]); // these hosts deny by exit code 2 and text
-  const INPROC = new Set(["pi", "opencode"]); // installMode "in-process": ctx_* tools live in the host process, no MCP server
+  const EXIT2 = new Set(["kiro", "pi", "opencode", "omp"]); // these hosts deny by exit code 2 and text
+  const INPROC = new Set(["pi", "opencode", "omp"]); // installMode "in-process": ctx_* tools live in the host process, no MCP server
 
   function run(host, payload, { fault, env = {}, preload } = {}) {
     const home = mkdtempSync(join(root, "home-"));
@@ -2245,7 +2246,7 @@ describe("PRD-v2 section 10: saving decision per host (ADR-0020)", () => {
   // the ctx tool on PreToolUse everywhere else. One effect per host, no fallback.
   const SAVING = {
     "claude-code": "R", codex: "D", gemini: "R", qwen: "D", "copilot-cli": "R",
-    vscode: "D", kiro: "D", zcode: "D", pi: "R", opencode: "R", // opencode R: D-R54-OC-REPLACE-1 (#1347)
+    vscode: "D", kiro: "D", zcode: "D", pi: "R", opencode: "R", omp: "R", // omp R: Pi tool_result rewrite (ADR-0026); opencode R: D-R54-OC-REPLACE-1 (#1347)
   };
   // D-M3-F-9: a hook or detached write keeps its DB handle open by design (A21), and Windows cannot delete
   // an open file, so temp cleanup there is best-effort. The assertions are unchanged.
@@ -2720,7 +2721,7 @@ describe("PRD-v2 section 10: hint throttle", { concurrency: CONC }, () => {
 // serial: tests set process.env.HOME and REQUIRE_SECURITY_ENV
 describe("PRD-v2 section 10: host tool names in hook output", () => {
   // Hook texts name tools the way the host calls them: row.toolNamePrefix + ctx_*. A bare ctx_search on Gemini
-  // (mcp_context-mode_ctx_search) names a tool the model cannot call. Covers the 10 hosts and every hook text
+  // (mcp_context-mode_ctx_search) names a tool the model cannot call. Covers the 11 hosts and every hook text
   // that names a tool: Read deny, parse-error deny, policy-unreadable deny, the replace handle line, the
   // compact state block and the pointer line. DEVIATIONS D-HL-NAMES-1.
   function rmTemp(dir) {
@@ -2746,12 +2747,12 @@ describe("PRD-v2 section 10: host tool names in hook output", () => {
     event: "PreToolUse", agent: row.id, sessionId: "s1", cwd, tool: { name, canonicalName, input },
   });
 
-  test("all 10 hosts: the Read deny names <prefix>ctx_execute", () => {
+  test("all 11 hosts: the Read deny names <prefix>ctx_execute", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "cm-names-"));
     try {
       const big = path.join(dir, "big.log");
       writeFileSync(big, "x".repeat(300 * 1024));
-      assert.equal(ADAPTERS.length, 10);
+      assert.equal(ADAPTERS.length, 11); // ADR-0026 T18: omp is the 11th row
       for (const row of ADAPTERS) {
         const d = decide(ev(row, dir, "Read", "Read", { file_path: big }), row, []);
         assert.equal(d.kind, "deny", row.id);
@@ -2764,7 +2765,7 @@ describe("PRD-v2 section 10: host tool names in hook output", () => {
     }
   });
 
-  test("all 10 hosts: parse-error and policy-unreadable denies name <prefix>ctx_*", () => {
+  test("all 11 hosts: parse-error and policy-unreadable denies name <prefix>ctx_*", () => {
     const old = process.env[REQUIRE_SECURITY_ENV];
     try {
       for (const row of ADAPTERS) {

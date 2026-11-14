@@ -80,7 +80,7 @@ export async function handleHook(agent: AgentId, raw: unknown, env: NodeJS.Proce
   if (nodeTooOld(process.version)) {
     // D-1370-OLDNODE-ALLOW-1 (#1370): the MCP server runs on this same node and is degraded (PRD §13: ctx_doctor only), so a
     // redirect to ctx_execute would block the host. Allow, and keep the stderr and log lines (D5). An in-process host
-    // (Pi, OpenCode) registers its ctx_* tools itself, so its redirect target exists and the D-HNE-GUARD-1 deny stays.
+    // (Pi, OMP, OpenCode) registers its ctx_* tools itself, so its redirect target exists and the D-HNE-GUARD-1 deny stays.
     const err = new CtxError("NODE_TOO_OLD", { v: process.version });
     if (row.installMode === "in-process") return fail("node", err);
     report("node", err);
@@ -101,7 +101,7 @@ export async function handleHook(agent: AgentId, raw: unknown, env: NodeJS.Proce
     // D-HA-PI-PROJECT-1: on pi the entry puts ctx.cwd into the payload, so ev.cwd is the pi:ctx.cwd source.
     // D-HF-VSCODE-PROJECT-1: a VS Code hook has no launch args; its workspace folder is the payload cwd.
     const argv = agent === "vscode" ? [WORKSPACE_FOLDER_FLAG, ev.cwd] : process.argv;
-    project = resolveProject(agent, { env, argv, cwd: ev.cwd, piCwd: agent === "pi" ? ev.cwd : undefined }); // step 3
+    project = resolveProject(agent, { env, argv, cwd: ev.cwd, piCwd: getAdapter(agent).projectSource === "pi:ctx.cwd" ? ev.cwd : undefined }); // step 3 (pi, omp: ADR-0026)
   } catch (err) {
     // D-FU-PS-1 keeps its one stderr line (code first); the decision part is new.
     return fail("project", err, "hooks: no project: " + String((err as { code?: unknown }).code ?? "ERROR") + " " + message(err) + "\n"); // D-HNE-GUARD-1 supersedes D-FU-PS-1: a flooding call is denied, the rest allowed

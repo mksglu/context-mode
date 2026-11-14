@@ -18,6 +18,8 @@ Pi-Bolt (the Pi coding agent compiled to native code) runs Pi extensions unchang
 
 Pi gets the hooks and the skills from the package. Restart Pi after the install.
 
+OMP (oh-my-pi) has its own plugin store and its own commands: `omp plugin install context-mode`. See [OMP](./omp.md).
+
 `npm i -g context-mode` also gives the `context-mode` command for doctor.
 
 Setup is the fallback and the repair for what the native step cannot do:

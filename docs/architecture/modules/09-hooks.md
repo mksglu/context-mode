@@ -174,7 +174,7 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<neve
 |---|---|---|
 | Claude Code, Codex, Qwen, ZCode | `SessionStart(source=compact)` | §4.3 step 1 |
 | Gemini, Copilot CLI, VS Code | `PreCompact` sets the flag; next `UserPromptSubmit` delivers it | §4.7, then §4.4 step 2 |
-| Pi | `session_compact` flag (Pi's own event, mapped by `adapters/pi.ts`'s in-process glue to this module's `PreCompact`/`UserPromptSubmit`-equivalent calls — `pi.ts` is the adapter, this module stays agent-agnostic per §4.7's note) then `before_agent_start` | §4.7-equivalent, then §4.4-equivalent |
+| Pi, OMP | `session_compact` flag (Pi's own event; OMP runs the same path, ADR-0026 decision 14, mapped by `adapters/pi.ts`'s in-process glue to this module's `PreCompact`/`UserPromptSubmit`-equivalent calls — `pi.ts` is the adapter, this module stays agent-agnostic per §4.7's note) then `before_agent_start` | §4.7-equivalent, then §4.4-equivalent |
 | OpenCode 2 | its own cache-stable channel (Q12); mapped the same way as Pi, through `adapters/opencode.ts` | §4.7-equivalent, then §4.4-equivalent |
 | Kiro | none — no compaction signal exists; `dispatch.ts` never receives a `PreCompact`-mapped event for this agent, so §4.7 is simply never reached | not reached (documented gap, ADR-0009 §6) |
 

@@ -8,8 +8,8 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-/** The 10 agent ids (literal copy; GS4 forbids importing src/core/contracts/agents.ts). */
-export const AGENT_IDS = Object.freeze(["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode"]);
+/** The 11 agent ids (literal copy; GS4 forbids importing src/core/contracts/agents.ts). */
+export const AGENT_IDS = Object.freeze(["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode", "omp"]);
 
 const BIN = "context-mode"; // v1 global npm bin name
 const PROJECT_DIR = "project"; // <home>/project: the workspace for VS Code / Kiro project-scope files
@@ -144,7 +144,9 @@ const PLANT = {
   },
   opencode(home) {
     put(path.join(home, ".config", "opencode", "opencode.json"), json({ $schema: "https://opencode.ai/config.json", plugin: [BIN] }));
-  },
+  },  // ADR-0026 History: v1 OMP was MCP-only and wrote no hook or data dir of its own; its v1 footprint is the
+  // shared fake global bin and ~/.context-mode/ content that plantV1Install adds for every agent.
+  omp() {},
 };
 
 /**

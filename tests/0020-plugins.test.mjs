@@ -9,10 +9,12 @@ import { mkdtempSync, mkdirSync, rmSync, realpathSync, readFileSync } from "node
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import piExtension from "../src/entries/pi.ts";
+import * as piEntry from "../src/entries/pi.ts";
 import { resolveProject } from "../src/core/project/resolve.ts";
 import { openDb } from "../src/core/store/db.ts";
 import { readSessionEvents } from "../src/core/journal/read.ts";
 import { INSTRUCTIONS } from "../src/entries/server.ts";
+import { RESUME_HINT } from "../src/core/contracts/constants.ts";
 import { setTimeout as sleep } from "node:timers/promises";
 
 // Serial: opencode-ported, pi-ops-ported and pi-search-whole-line set process.env.HOME in before()/after(); a concurrent describe would see the wrong HOME.
@@ -620,6 +622,24 @@ describe("ADR-0020 plugins", () => {
       assert.ok(out.systemPrompt.startsWith("base"), "the host prompt stays first");
     });
 
+    // T14 / D-OMP-TOOLS-1 (ADR-0026 M3): OMP lists a tool as a top-level tool only with loadMode "essential"
+    // (OMP docs/extensions.md:826); Pi ignores the field. Every other field keeps the fea7780d shape.
+    test("before_agent_start: all 9 ctx_* tools register with loadMode essential, other fields unchanged (OMP M3, T14)", async () => {
+      const { pi, handlers, tools } = fakePi();
+      piExtension(pi);
+      await handlers.get("before_agent_start")({ systemPrompt: "base" }, ctxFor("s-t14"));
+      assert.equal(tools.size, 9);
+      for (const [name, t] of tools) {
+        assert.equal(t.loadMode, "essential", name);
+        const { loadMode, execute, ...rest } = t;
+        assert.equal(typeof execute, "function", name);
+        assert.deepEqual(Object.keys(rest), ["name", "label", "description", "parameters"], name);
+        assert.equal(rest.label, name);
+        assert.equal(typeof rest.description, "string");
+        assert.equal(rest.parameters.type, "object", name);
+      }
+    });
+
     // D-CACHE-PI-1 replaces A24's "a second turn returns nothing": Pi 0.73.1 resets the system prompt to base on
     // a turn without systemPrompt (agent-session.js:791-797), so "nothing" dropped INSTRUCTIONS on turn 2 and
     // broke the cache. Pi replaces, never appends, so the prompt the model sees must hold INSTRUCTIONS exactly once
@@ -881,6 +901,259 @@ describe("ADR-0020 plugins", () => {
       }
       assert.ok(text.includes(FATAL), "the whole FATAL line comes back:\n" + text);
       assert.equal(text.split(FATAL).length - 1, 1, "one hit for one matching line:\n" + text);
+    });
+  });
+
+  describe("ADR-0026 OMP entry (#1332)", () => {
+    // OMP >= 14.7.0 sends before_agent_start systemPrompt as string[] (runner.ts:2682-2686); a string return replaced
+    // every block (#1332). D-OMP-PROMPT-1: an array gets our payload as its last block, once; a string keeps the
+    // fea7780d bytes (Pi, Pi-Bolt, OMP < 14.7.0). The shape picks the return form, so one helper serves both entries.
+    let root;
+    let repo;
+    let oldHome;
+    let n = 0;
+
+    before(() => {
+      root = realpathSync(mkdtempSync(join(tmpdir(), "cm-omp-prompt-")));
+      repo = join(root, "repo");
+      mkdirSync(repo);
+      execFileSync("git", ["init", "-q", repo]);
+      oldHome = process.env.HOME;
+      process.env.HOME = root; process.env.USERPROFILE = root;
+    });
+
+    after(() => {
+      process.env.HOME = oldHome;
+      try { rmSync(root, { recursive: true, force: true, maxRetries: 3 }); } catch (err) { if (process.platform !== "win32") throw err; }
+    });
+
+    // A fresh instance and session per test: the first delivery is INSTRUCTIONS plus the one resume hint.
+    function start(cwd = repo) {
+      const handlers = new Map();
+      piExtension({ on: (name, fn) => handlers.set(name, fn), registerTool() {} });
+      const ctx = { cwd, sessionManager: { getSessionId: () => "omp-prompt-" + ++n } };
+      return { run: (ev) => handlers.get(ev.type)(ev, ctx) };
+    }
+    const turn = (systemPrompt) => ({ type: "before_agent_start", systemPrompt });
+    const FIRST = INSTRUCTIONS + "\n\n" + RESUME_HINT.split("{prefix}").join("");
+    const once = (blocks, part) => blocks.join("\n").split(part).length - 1;
+
+    // Hook failure seam: a project that no longer resolves makes handleHook write its stderr line; a throwing
+    // stderr makes that line throw out of handleHook, which is the entry's "hook throws" path.
+    async function withThrowingHook(fn) {
+      const write = process.stderr.write;
+      process.stderr.write = () => { throw new Error("hook failed"); };
+      try { return await fn(); } finally { process.stderr.write = write; }
+    }
+
+    test("[T1] array: every OMP block stays, in order, and the payload is the last block, once", async () => {
+      const base = ["BASE", "<project-context>AGENTS</project-context>", "OTHER"];
+      const out = await start().run(turn(base));
+      assert.ok(Array.isArray(out.systemPrompt), "an array comes back as an array");
+      assert.equal(out.systemPrompt.length, 4);
+      assert.deepEqual(out.systemPrompt.slice(0, 3), base);
+      assert.equal(out.systemPrompt[3], FIRST);
+      assert.equal(once(out.systemPrompt, INSTRUCTIONS), 1, "INSTRUCTIONS once");
+    });
+
+    test("[T2] string: the bytes equal the fea7780d output (Pi and Pi-Bolt golden)", async () => {
+      assert.equal((await start().run(turn("base"))).systemPrompt, "base\n\n" + FIRST);
+      assert.equal((await start().run(turn(""))).systemPrompt, FIRST);
+      assert.equal((await start().run({ type: "before_agent_start" })).systemPrompt, FIRST, "absent: the payload alone");
+    });
+
+    test("[T3] array, two turns, same base: the same output bytes (D-CACHE-PI-1)", async () => {
+      const s = start();
+      const first = await s.run(turn(["BASE", "OTHER"]));
+      const second = await s.run(turn(["BASE", "OTHER"]));
+      assert.deepEqual(second.systemPrompt, first.systemPrompt);
+      assert.equal(JSON.stringify(second.systemPrompt), JSON.stringify(first.systemPrompt));
+    });
+
+    test("[T4] array, the hook throws after the first delivery: base blocks plus the same payload", async () => {
+      const own = join(root, "repo-t4");
+      mkdirSync(own);
+      execFileSync("git", ["init", "-q", own]);
+      const s = start(own);
+      const first = await s.run(turn(["BASE"]));
+      rmSync(own, { recursive: true, force: true });
+      const out = await withThrowingHook(() => s.run(turn(["BASE", "MORE"])));
+      assert.deepEqual(out.systemPrompt, ["BASE", "MORE", first.systemPrompt[1]]);
+    });
+
+    test("[T5] array, the hook throws before the first delivery: {} so OMP keeps its own array", async () => {
+      const out = await withThrowingHook(() => start(join(root, "missing")).run(turn(["BASE"])));
+      assert.deepEqual(out, {});
+    });
+
+    test("[T6] array, compact turn: base kept, payload is INSTRUCTIONS only, no resume hint (O2a)", async () => {
+      const s = start();
+      await s.run(turn(["BASE"]));
+      assert.equal(await s.run({ type: "session_compact" }), undefined);
+      const out = await s.run(turn(["BASE", "<summary>after compact</summary>"]));
+      assert.deepEqual(out.systemPrompt, ["BASE", "<summary>after compact</summary>", INSTRUCTIONS]);
+    });
+
+    test("[T7] empty array: [payload]", async () => {
+      assert.deepEqual((await start().run(turn([]))).systemPrompt, [FIRST]);
+    });
+
+    // D-OMP-ENTRY-1: one factory, the agent id comes from the entry. omp/index.js calls hostExtension(pi, "omp");
+    // the Pi entry is hostExtension(pi, "pi"). PI_CODING_AGENT_DIR and PI_CONFIG_DIR never pick the id.
+    function hosted(agent, sid) {
+      const handlers = new Map();
+      piEntry.hostExtension({ on: (name, fn) => handlers.set(name, fn), registerTool() {} }, agent);
+      const ctx = { cwd: repo, sessionManager: { getSessionId: () => sid } };
+      return (ev) => handlers.get(ev.type)?.(ev, ctx);
+    }
+    async function promptRows(sid) {
+      const db = await openDb(resolveProject("pi", { env: process.env, argv: [], cwd: repo, piCwd: repo }));
+      let rows = [];
+      for (let i = 0; i < 100 && rows.length === 0; i++) {
+        rows = readSessionEvents(db, sid, "prompt");
+        if (rows.length === 0) await sleep(20);
+      }
+      return rows;
+    }
+    async function stderrOf(fn) {
+      const write = process.stderr.write;
+      let text = "";
+      process.stderr.write = (chunk) => { text += String(chunk); return true; };
+      try { await fn(); } finally { process.stderr.write = write; }
+      return text;
+    }
+    async function withPiEnv(fn) {
+      const keep = { a: process.env.PI_CODING_AGENT_DIR, b: process.env.PI_CONFIG_DIR };
+      process.env.PI_CODING_AGENT_DIR = join(root, ".omp", "agent");
+      process.env.PI_CONFIG_DIR = ".omp";
+      try { return await fn(); } finally {
+        if (keep.a === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = keep.a;
+        if (keep.b === undefined) delete process.env.PI_CONFIG_DIR; else process.env.PI_CONFIG_DIR = keep.b;
+      }
+    }
+
+    test("[T9] the OMP entry hands handleHook omp; the Pi entry (default export) hands it pi", async () => {
+      assert.equal(typeof piEntry.hostExtension, "function");
+      const pi = hosted("pi", "omp-t9-pi");
+      await pi(turn("base"));
+      await pi({ type: "input", text: "hello pi" });
+      assert.deepEqual((await promptRows("omp-t9-pi")).map((r) => r.agent), ["pi"]);
+      // D-OMP-ROW-1 (M4): the omp AgentId writes its own rows.
+      const omp = hosted("omp", "omp-t9-omp");
+      await omp(turn(["BASE"]));
+      await omp({ type: "input", text: "hello omp" });
+      assert.deepEqual((await promptRows("omp-t9-omp")).map((r) => r.agent), ["omp"]);
+    });
+
+    test("[T10] PI_CODING_AGENT_DIR and PI_CONFIG_DIR set: the Pi entry stays pi, the OMP entry stays omp", async () => {
+      await withPiEnv(async () => {
+        const pi = hosted("pi", "omp-t10-pi");
+        await pi(turn("base"));
+        await pi({ type: "input", text: "hello pi" });
+        const omp = hosted("omp", "omp-t10-omp");
+        await omp({ type: "input", text: "x" });
+      });
+      assert.deepEqual((await promptRows("omp-t10-pi")).map((r) => r.agent), ["pi"]);
+      assert.deepEqual((await promptRows("omp-t10-omp")).map((r) => r.agent), ["omp"]);
+      // Default export with the env set: still pi.
+      await withPiEnv(async () => {
+        const handlers = new Map();
+        piExtension({ on: (name, fn) => handlers.set(name, fn), registerTool() {} });
+        const ctx = { cwd: repo, sessionManager: { getSessionId: () => "omp-t10-default" } };
+        await handlers.get("before_agent_start")({ systemPrompt: "base" }, ctx);
+        await handlers.get("input")({ text: "hi" }, ctx);
+      });
+      assert.deepEqual((await promptRows("omp-t10-default")).map((r) => r.agent), ["pi"]);
+    });
+
+    // D-OMP-TURN-1 (O2c): OMP re-runs before_agent_start in one prompt when its base changed during the call
+    // (agent-session.ts:9413-9432). A re-run is the same event.prompt with no input or agent_end in between.
+    // Both entries write prompt rows (D-OMP-ROW-1, M4); the turn numbers show one turn per prompt.
+    test("[T8] a re-run in one prompt with a grown base: new base + payload once, one turn counted", async () => {
+      for (const agent of ["pi", "omp"]) {
+        const sid = "omp-t8-" + agent;
+        const run = hosted(agent, sid);
+        let first;
+        let second;
+        await stderrOf(async () => {
+          await run({ type: "input", text: "p1" });
+          first = await run({ type: "before_agent_start", prompt: "p1", systemPrompt: ["BASE"] });
+          second = await run({ type: "before_agent_start", prompt: "p1", systemPrompt: ["BASE", "TOOLS"] });
+          await run({ type: "agent_end" });
+          await run({ type: "input", text: "p2" });
+        });
+        const payload = first.systemPrompt[1];
+        assert.deepEqual(second.systemPrompt, ["BASE", "TOOLS", payload], agent + ": the new base, then the payload");
+        assert.equal(once(second.systemPrompt, INSTRUCTIONS), 1, agent + ": INSTRUCTIONS once");
+        assert.deepEqual((await promptRows(sid)).map((r) => [r.agent, r.turn]), [[agent, 1], [agent, 2]], agent + ": prompt 2 is turn 2");
+      }
+    });
+
+    test("[T11] the OMP entry registers the 9 tools at load; the Pi entry in the first before_agent_start", async () => {
+      for (const [agent, atLoad] of [["omp", 9], ["pi", 0]]) {
+        const names = [];
+        const handlers = new Map();
+        piEntry.hostExtension({ on: (name, fn) => handlers.set(name, fn), registerTool: (t) => names.push(t.name) }, agent);
+        assert.equal(names.length, atLoad, agent + " at load");
+        const ctx = { cwd: repo, sessionManager: { getSessionId: () => "omp-t11-" + agent } };
+        await stderrOf(() => handlers.get("before_agent_start")({ prompt: "p", systemPrompt: ["BASE"] }, ctx));
+        await stderrOf(() => handlers.get("before_agent_start")({ prompt: "p", systemPrompt: ["BASE", "TOOLS"] }, ctx));
+        assert.equal(names.length, 9, agent + ": 9 tools, each once");
+        assert.equal(new Set(names).size, 9);
+      }
+      const names = [];
+      piExtension({ on() {}, registerTool: (t) => names.push(t.name) });
+      assert.equal(names.length, 0, "the Pi default export registers nothing at load");
+    });
+
+    test("[T12] two prompts: turns 1 and 2 on both entries, also with the same prompt text", async () => {
+      for (const agent of ["pi", "omp"]) {
+        const sid = "omp-t12-" + agent;
+        const run = hosted(agent, sid);
+        await stderrOf(async () => {
+          for (const end of [true, false]) {
+            await run({ type: "input", text: "continue" });
+            await run({ type: "before_agent_start", prompt: "continue", systemPrompt: ["BASE"] });
+            if (end) await run({ type: "agent_end" });
+          }
+        });
+        assert.deepEqual((await promptRows(sid)).map((r) => [r.agent, r.turn]), [[agent, 1], [agent, 2]], agent);
+      }
+    });
+
+    // D-OMP-FILTER-1 (O10): OMP has no getSettings. contextMode.excludeTools comes from api.pi.settings, project
+    // over global, read on each tool_result, never at load. No settings or a bad value gives []. Pi reads getSettings.
+    test("[T13] OMP entry: contextMode.excludeTools from api.pi.settings per call; no settings -> []", async () => {
+      const S = (list) => ({ contextMode: { excludeTools: list } });
+      const omp = (global, project) => ({ pi: { settings: { getGlobalSettings: () => global, getProjectSettings: () => project } } });
+      const of = piEntry.excludedTools;
+      assert.deepEqual(of(omp(S(["read"])), "omp"), ["read"], "global settings");
+      assert.deepEqual(of(omp(S(["read"]), {}), "omp"), ["read"], "a project with no list keeps the global list");
+      assert.deepEqual(of(omp(S(["read"]), S(["bash"])), "omp"), ["bash"], "the project list wins");
+      const empty = [
+        {}, { pi: {} }, { pi: { settings: {} } }, omp(undefined, undefined), omp({ contextMode: null }),
+        omp(S("read")), omp(S([1, null, { name: "read" }])),
+        { pi: { settings: { getGlobalSettings: () => { throw new Error("not bound"); } } } },
+        { getSettings: () => S(["read"]) },
+      ];
+      for (const [i, api] of empty.entries()) assert.deepEqual(of(api, "omp"), [], "omp variant " + i);
+      assert.deepEqual(of({ getSettings: () => S(["read"]), ...omp(S(["bash"])) }, "pi"), ["read"], "Pi reads getSettings only");
+
+      let reads = 0;
+      const handlers = new Map();
+      const api = {
+        on: (name, fn) => handlers.set(name, fn), registerTool() {},
+        pi: { settings: { getGlobalSettings: () => { reads += 1; return S(["read"]); }, getProjectSettings: () => ({}) } },
+      };
+      piEntry.hostExtension(api, "omp");
+      assert.equal(reads, 0, "never read at load");
+      const ctx = { cwd: repo, sessionManager: { getSessionId: () => "omp-t13" } };
+      await stderrOf(async () => {
+        for (const id of ["r1", "r2"]) {
+          await handlers.get("tool_result")({ toolName: "read", toolCallId: id, input: {}, content: [{ type: "text", text: "x" }], isError: false }, ctx);
+        }
+      });
+      assert.equal(reads, 2, "read once per tool_result, so a settings change counts at once");
     });
   });
 });

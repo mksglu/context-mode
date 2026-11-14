@@ -16,13 +16,13 @@ Write them in this order: `types.ts` needs `AgentId` from `agents.ts`; `errors.t
 Exports:
 
 ```ts
-export const AGENT_IDS = ["claude-code","codex","gemini","qwen","copilot-cli","vscode","kiro","zcode","pi","opencode"] as const;
+export const AGENT_IDS = ["claude-code","codex","gemini","qwen","copilot-cli","vscode","kiro","zcode","pi","opencode","omp"] as const; // omp: ADR-0026
 export type AgentId = typeof AGENT_IDS[number];
 ```
 
-Source: PRD-v2 §3 (10-agent table), TECH-SPEC §2, 00-architecture §3.1. Order matches the PRD §3 table top to bottom. No other export. No function: this file is data only.
+Source: PRD-v2 §3 (agent table; ADR-0026 adds omp as the 11th), TECH-SPEC §2, 00-architecture §3.1. Order matches the PRD §3 table top to bottom. No other export. No function: this file is data only.
 
-E2E case: GP1 (install across all 10 adapters reads this exact list). ADR-0017 `covers`: `src/core/contracts/agents.ts`.
+E2E case: GP1 (install across all 11 adapters reads this exact list). ADR-0017 `covers`: `src/core/contracts/agents.ts`.
 
 ## 2. `src/core/contracts/types.ts`
 
@@ -54,7 +54,7 @@ Rules per field, each citing its source:
 
 No type in this file has an optional field that is also used to pick between two runtime paths (P1): optionality here only ever means "this event/host does not carry this field," never "pick path A or B."
 
-E2E case: GP3 (hook payload decode into `CanonicalHookEvent` for all 10 adapters), GP4 (`ToolContext`/`ToolReply` shape), GP6 (`JournalRow`/`NewJournalRow`). ADR-0017 `covers`: `src/core/contracts/types.ts`.
+E2E case: GP3 (hook payload decode into `CanonicalHookEvent` for all 11 adapters), GP4 (`ToolContext`/`ToolReply` shape), GP6 (`JournalRow`/`NewJournalRow`). ADR-0017 `covers`: `src/core/contracts/types.ts`.
 
 ## 3. `src/core/contracts/constants.ts`
 

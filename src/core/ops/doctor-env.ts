@@ -243,7 +243,7 @@ export async function checkNode(i: NodeInput): Promise<DoctorRow> {
 }
 
 // D6: client name and protocol version from the live request. Missing both is UNKNOWN, never FAIL (PRD §13).
-// D-R49-DOCTOR-1339-3 (#1339): an in-process plugin (OpenCode, Pi) has no MCP session; the tool call that built this row
+// D-R49-DOCTOR-1339-3 (#1339): an in-process plugin (OpenCode, Pi, OMP) has no MCP session; the tool call that built this row
 // ran inside the agent, which is the channel it checks, so that is a PASS that says so.
 export function checkMcp(ctx: Pick<ToolContext, "clientInfo" | "protocolVersion">, adapter?: Pick<AdapterRow, "installMode">): DoctorRow {
   const named = ctx.clientInfo !== undefined && ctx.clientInfo.name !== "";
