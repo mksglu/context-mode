@@ -3004,3 +3004,143 @@ describe("ADR-0010 ctx_doctor agent issue path (D-DOCTOR-ISSUE-1)", { concurrenc
     assert.ok(brief.includes("agent-report.yml") && brief.includes("~/.context-mode/reports/doctor-"));
   });
 });
+
+describe("ADR-0026 OMP doctor: agent omp, OMP plugin store, OMP verbs, host-limit info (D-OMP-DOCTOR-1)", { concurrency: CONC }, () => {
+  // ADR-0026 decision 7 and the support matrix rows 11, 19, 23, 25, 28; tests T27-T32, T34, T35 (doctor part of M6).
+  const KEY = "e".repeat(16);
+  const OMP = getAdapter("omp");
+  const PRINT_MODE = "Print mode sends no prompt event. Use omp or omp --mode rpc to keep prompts.";
+  const SCRIPTS = "Add < /dev/null in scripts.";
+  function tmp(t) {
+    const dir = mkdtempSync(path.join(tmpdir(), "cm-omp-doctor-"));
+    t.after(() => rmTempDir(dir));
+    return dir;
+  }
+  function ctxFor(home, agent = "omp", clientInfo = undefined) {
+    const projectDir = path.join(home, ".context-mode", "projects", KEY);
+    return {
+      project: { projectKey: KEY, projectDir, dbPath: path.join(projectDir, "context.db"), worktree: home, containmentRoot: home, agent, source: getAdapter(agent).projectSource },
+      sessionId: "s1", turn: 1, signal: new AbortController().signal, protocolVersion: "2025-06-18", ...(clientInfo ? { clientInfo } : {}),
+    };
+  }
+  const envOf = (home, extra = {}) => ({ HOME: home, USERPROFILE: home, PATH: process.env.PATH ?? "", ...extra });
+  const put = (file, value) => {
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, typeof value === "string" ? value : JSON.stringify(value), "utf8");
+  };
+  const lockFile = (home) => path.join(home, ".omp", "plugins", "omp-plugins.lock.json");
+  const pkgFile = (home) => path.join(home, ".omp", "plugins", "package.json");
+  function install(home, { enabled = true, dep = true } = {}) {
+    put(lockFile(home), { plugins: { "context-mode": { version: "2.1.10", enabled } }, settings: {} });
+    put(pkgFile(home), { name: "omp-plugins", private: true, ...(dep ? { dependencies: { "context-mode": "2.1.10" } } : {}) });
+  }
+  async function reply(home, agent = "omp", extra = {}, clientInfo = undefined) {
+    const { doctorReply } = await import("../src/core/tools/doctor.ts");
+    return doctorReply(ctxFor(home, agent, clientInfo), { env: envOf(home, extra), bundleDir: path.join(home, "no-bundle"), piCwd: undefined });
+  }
+  const runLine = (text) => text.split("\n").find((l) => l.startsWith(C.REPORT_COMMAND_PREFIX));
+
+  test("[ADR-0026 T27] lock and package.json name context-mode, enabled: D3 PASS names the lock file; reply says agent omp; no line names ~/.pi", async (t) => {
+    const home = tmp(t);
+    install(home);
+    const d3 = checkHostConfig(OMP, envOf(home), home);
+    assert.equal(d3.status, "PASS", JSON.stringify(d3));
+    assert.equal(d3.detail, lockFile(home));
+    const r = await reply(home);
+    assert.ok(r.text.includes("agent omp"), r.text);
+    assert.equal(r.text.includes(path.join(home, ".pi")), false, r.text);
+    assert.equal(r.text.includes("~/.pi"), false, r.text);
+    assert.equal(r.text.includes("context-mode doctor --agents omp") || r.text.includes("context-mode setup --agents omp"), false, r.text);
+    assert.ok(["omp plugin list", "omp plugin install context-mode"].map((c) => C.REPORT_COMMAND_PREFIX + c).includes(runLine(r.text)), runLine(r.text));
+  });
+
+  test("[ADR-0026 T28] no lock entry, or no package.json dependency: D3 FAIL, fix omp plugin install context-mode", (t) => {
+    const empty = tmp(t);
+    const a = checkHostConfig(OMP, envOf(empty), empty);
+    assert.equal(a.status, "FAIL");
+    assert.equal(a.fixCommand, "omp plugin install context-mode");
+    const noDep = tmp(t);
+    install(noDep, { dep: false });
+    const b = checkHostConfig(OMP, envOf(noDep), noDep);
+    assert.equal(b.status, "FAIL", JSON.stringify(b));
+    assert.equal(b.fixCommand, "omp plugin install context-mode");
+    assert.ok(b.detail.includes(pkgFile(noDep)), b.detail);
+  });
+
+  test("[ADR-0026 T29] lock says enabled false: D3 FAIL, fix omp plugin enable context-mode; the closing line names it", async (t) => {
+    const home = tmp(t);
+    install(home, { enabled: false });
+    const d3 = checkHostConfig(OMP, envOf(home), home);
+    assert.equal(d3.status, "FAIL");
+    assert.equal(d3.fixCommand, "omp plugin enable context-mode");
+    assert.ok(d3.detail.includes(lockFile(home)), d3.detail);
+    const r = await reply(home);
+    assert.equal(runLine(r.text), C.REPORT_COMMAND_PREFIX + "omp plugin enable context-mode");
+  });
+
+  test("[ADR-0026 M6] old context-mode version: D1 update line is omp plugin upgrade context-mode", () => {
+    assert.equal(d1UpdateCommand("omp", {}, undefined), "omp plugin upgrade context-mode");
+    assert.equal(d1UpdateCommand("omp", { PI_CODING_AGENT_DIR: "/x/pi-agent" }, undefined), "omp plugin upgrade context-mode");
+  });
+
+  test("[ADR-0026 T30] OMP 14.6.6 gets the floor line with omp update; 18.20.0 and an unknown version do not", async (t) => {
+    const { ompInfoLines } = await import("../src/core/ops/doctor-config.ts");
+    const home = tmp(t);
+    const floor = "OMP 14.6.6 is older than the tested floor 14.7.0. Update it with: omp update";
+    assert.ok(ompInfoLines(envOf(home), "14.6.6").includes(floor));
+    assert.equal(ompInfoLines(envOf(home), "18.20.0").some((l) => l.includes("tested floor")), false);
+    assert.equal(ompInfoLines(envOf(home), undefined).some((l) => l.includes("tested floor")), false);
+    install(home);
+    const r = await reply(home, "omp", {}, { name: "omp", version: "14.6.6" });
+    assert.ok(r.text.includes(floor), r.text);
+  });
+
+  test("[ADR-0026 rows 11, 28] the OMP reply names the print-mode host limit and the script line", async (t) => {
+    const { ompInfoLines } = await import("../src/core/ops/doctor-config.ts");
+    const home = tmp(t);
+    const lines = ompInfoLines(envOf(home), "18.20.0");
+    assert.ok(lines.includes(PRINT_MODE), lines.join("\n"));
+    assert.ok(lines.includes(SCRIPTS), lines.join("\n"));
+    install(home);
+    const r = await reply(home);
+    assert.ok(r.text.includes(PRINT_MODE) && r.text.includes(SCRIPTS), r.text);
+  });
+
+  test("[ADR-0026 T34] MCP import on and disabledServers without context-mode: info line names mcp.json and the fix; off or listed: no line", async (t) => {
+    const { ompInfoLines } = await import("../src/core/ops/doctor-config.ts");
+    const home = tmp(t);
+    const mcp = path.join(home, ".omp", "agent", "mcp.json");
+    put(path.join(home, ".omp", "agent", "config.yml"), "enabledProviders: [claude]\n");
+    put(path.join(home, ".claude.json"), { mcpServers: { "context-mode": { command: "context-mode" } } });
+    put(mcp, { mcpServers: {} });
+    const on = ompInfoLines(envOf(home), "18.20.0").filter((l) => l.includes(mcp));
+    assert.equal(on.length, 1, ompInfoLines(envOf(home), "18.20.0").join("\n"));
+    assert.ok(on[0].includes("disabledServers") && on[0].includes(path.join(home, ".claude.json")), on[0]);
+    put(mcp, { disabledServers: ["context-mode"] });
+    assert.equal(ompInfoLines(envOf(home), "18.20.0").some((l) => l.includes("disabledServers")), false);
+    put(mcp, { mcpServers: {} });
+    put(path.join(home, ".omp", "agent", "config.yml"), "disabledProviders: [claude]\n");
+    assert.equal(ompInfoLines(envOf(home), "18.20.0").some((l) => l.includes("disabledServers")), false);
+  });
+
+  test("[ADR-0026 T31, T32] PI_CODING_AGENT_DIR alone and Pi-Bolt stay Pi: no OMP line, Pi's own commands", async (t) => {
+    for (const [extra, client] of [[{ PI_CODING_AGENT_DIR: "pi-agent" }, undefined], [{ PI_BOLT: "1" }, { name: "pi-bolt", version: "1.0.0" }]]) {
+      const home = tmp(t);
+      const env = Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, k === "PI_CODING_AGENT_DIR" ? path.join(home, v) : v]));
+      const r = await reply(home, "pi", env, client);
+      assert.equal(r.text.includes("agent omp"), false, r.text);
+      assert.equal(r.text.includes("OMP") || r.text.includes("omp plugin") || r.text.includes(".omp"), false, r.text);
+      assert.ok(["pi list", "pi install npm:context-mode"].map((c) => C.REPORT_COMMAND_PREFIX + c).includes(runLine(r.text)), runLine(r.text));
+      assert.equal(d1UpdateCommand("pi", envOf(home, env), undefined), "pi update --extensions");
+    }
+  });
+
+  test("[ADR-0026 T35] Pi doctor reply keeps its rows and lines: same row ids, Pi D3 file, no OMP text", async (t) => {
+    const home = tmp(t);
+    const r = await reply(home, "pi");
+    const d3 = checkHostConfig(getAdapter("pi"), envOf(home), home);
+    assert.equal(d3.fixCommand, "pi install npm:context-mode");
+    assert.ok(d3.detail.includes(path.join(home, ".pi", "agent", "settings.json")), d3.detail);
+    assert.equal(r.text.includes("OMP") || r.text.includes("omp "), false, r.text);
+  });
+});
