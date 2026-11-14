@@ -187,4 +187,4 @@ jobs:
       - run: node build/build.mjs --generated-only
         name: src/prompt/_generated.ts
       - run: node e2e/checks/windows-hosts.mjs
-        name: 10 agents x setup, doctor, hook, MCP handshake from the packed package
+        name: 11 agents x setup, doctor, hook, MCP handshake from the packed package
