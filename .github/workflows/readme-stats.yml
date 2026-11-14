@@ -48,6 +48,7 @@ jobs:
             for i in 1 2 3; do git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME" && break; sleep 5; done
           fi
   readme-stats:
+    needs: capture
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -80,5 +81,6 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add stats.json docs/assets/readme
             git commit -m "docs(readme): update stats, star chart and npm downloads grid"
-            git push
+            # D-README-STATS-PUSH-1: capture pushed the history file to main in this run, so rebase before each push.
+            for i in 1 2 3; do git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME" && break; sleep 5; done
           fi

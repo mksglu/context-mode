@@ -2165,6 +2165,10 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     const capture = y.slice(y.indexOf("\n  capture:"), y.indexOf("\n  readme-stats:"));
     assert.ok(capture.includes("GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}"), "gh api reads traffic with TRAFFIC_TOKEN");
     assert.ok(capture.includes("git add \"$F\"") && !capture.includes("README") && !capture.includes("git add ."), "capture commits the history file only");
+    // D-README-STATS-PUSH-1: capture pushes first in the same run, so the README job must rebase before it pushes.
+    const readmeJob = y.slice(y.indexOf("\n  readme-stats:"));
+    assert.ok(readmeJob.includes('git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"'), "README job rebases on main before each push");
+    assert.ok(readmeJob.includes("for i in 1 2 3; do"), "README job retries the push 3 times");
     const ignore = y.slice(y.indexOf("paths-ignore:"), y.indexOf("workflow_dispatch:"));
     assert.ok(ignore.includes("docs/assets/readme/data/adoption-history.json"), "its own output starts no run");
     assert.ok(y.split("\n").slice(0, 8).join("\n").includes("default branch"), "header: scheduled jobs run only on the default branch");
