@@ -32,6 +32,8 @@ export interface PiTool {
   label: string;
   description: string;
   parameters: unknown;
+  /** OMP: "essential" lists the tool as a top-level tool (OMP docs/extensions.md:826). Pi ignores the field. */
+  loadMode?: "essential" | "discoverable";
   execute(toolCallId: string, params: unknown, signal?: AbortSignal): Promise<PiToolResult>;
 }
 
@@ -182,6 +184,7 @@ export function hostExtension(pi: PiApi, host: PiHostId = "pi"): void {
       label: tool.name,
       description: tool.description,
       parameters: z.toJSONSchema(tool.schema),
+      loadMode: "essential",
       execute: async (_toolCallId, params, signal) => toPi(await runTool(tool, params, signal)),
     };
   }
