@@ -13,6 +13,7 @@ import { resolveProject } from "../src/core/project/resolve.ts";
 import { openDb } from "../src/core/store/db.ts";
 import { readSessionEvents } from "../src/core/journal/read.ts";
 import { INSTRUCTIONS } from "../src/entries/server.ts";
+import { RESUME_HINT } from "../src/core/contracts/constants.ts";
 import { setTimeout as sleep } from "node:timers/promises";
 
 // Serial: opencode-ported, pi-ops-ported and pi-search-whole-line set process.env.HOME in before()/after(); a concurrent describe would see the wrong HOME.
@@ -881,6 +882,101 @@ describe("ADR-0020 plugins", () => {
       }
       assert.ok(text.includes(FATAL), "the whole FATAL line comes back:\n" + text);
       assert.equal(text.split(FATAL).length - 1, 1, "one hit for one matching line:\n" + text);
+    });
+  });
+
+  describe("ADR-0026 OMP entry (#1332)", () => {
+    // OMP >= 14.7.0 sends before_agent_start systemPrompt as string[] (runner.ts:2682-2686); a string return replaced
+    // every block (#1332). D-OMP-PROMPT-1: an array gets our payload as its last block, once; a string keeps the
+    // fea7780d bytes (Pi, Pi-Bolt, OMP < 14.7.0). The shape picks the return form, so one helper serves both entries.
+    let root;
+    let repo;
+    let oldHome;
+    let n = 0;
+
+    before(() => {
+      root = realpathSync(mkdtempSync(join(tmpdir(), "cm-omp-prompt-")));
+      repo = join(root, "repo");
+      mkdirSync(repo);
+      execFileSync("git", ["init", "-q", repo]);
+      oldHome = process.env.HOME;
+      process.env.HOME = root; process.env.USERPROFILE = root;
+    });
+
+    after(() => {
+      process.env.HOME = oldHome;
+      try { rmSync(root, { recursive: true, force: true, maxRetries: 3 }); } catch (err) { if (process.platform !== "win32") throw err; }
+    });
+
+    // A fresh instance and session per test: the first delivery is INSTRUCTIONS plus the one resume hint.
+    function start(cwd = repo) {
+      const handlers = new Map();
+      piExtension({ on: (name, fn) => handlers.set(name, fn), registerTool() {} });
+      const ctx = { cwd, sessionManager: { getSessionId: () => "omp-prompt-" + ++n } };
+      return { run: (ev) => handlers.get(ev.type)(ev, ctx) };
+    }
+    const turn = (systemPrompt) => ({ type: "before_agent_start", systemPrompt });
+    const FIRST = INSTRUCTIONS + "\n\n" + RESUME_HINT.split("{prefix}").join("");
+    const once = (blocks, part) => blocks.join("\n").split(part).length - 1;
+
+    // Hook failure seam: a project that no longer resolves makes handleHook write its stderr line; a throwing
+    // stderr makes that line throw out of handleHook, which is the entry's "hook throws" path.
+    async function withThrowingHook(fn) {
+      const write = process.stderr.write;
+      process.stderr.write = () => { throw new Error("hook failed"); };
+      try { return await fn(); } finally { process.stderr.write = write; }
+    }
+
+    test("[T1] array: every OMP block stays, in order, and the payload is the last block, once", async () => {
+      const base = ["BASE", "<project-context>AGENTS</project-context>", "OTHER"];
+      const out = await start().run(turn(base));
+      assert.ok(Array.isArray(out.systemPrompt), "an array comes back as an array");
+      assert.equal(out.systemPrompt.length, 4);
+      assert.deepEqual(out.systemPrompt.slice(0, 3), base);
+      assert.equal(out.systemPrompt[3], FIRST);
+      assert.equal(once(out.systemPrompt, INSTRUCTIONS), 1, "INSTRUCTIONS once");
+    });
+
+    test("[T2] string: the bytes equal the fea7780d output (Pi and Pi-Bolt golden)", async () => {
+      assert.equal((await start().run(turn("base"))).systemPrompt, "base\n\n" + FIRST);
+      assert.equal((await start().run(turn(""))).systemPrompt, FIRST);
+      assert.equal((await start().run({ type: "before_agent_start" })).systemPrompt, FIRST, "absent: the payload alone");
+    });
+
+    test("[T3] array, two turns, same base: the same output bytes (D-CACHE-PI-1)", async () => {
+      const s = start();
+      const first = await s.run(turn(["BASE", "OTHER"]));
+      const second = await s.run(turn(["BASE", "OTHER"]));
+      assert.deepEqual(second.systemPrompt, first.systemPrompt);
+      assert.equal(JSON.stringify(second.systemPrompt), JSON.stringify(first.systemPrompt));
+    });
+
+    test("[T4] array, the hook throws after the first delivery: base blocks plus the same payload", async () => {
+      const own = join(root, "repo-t4");
+      mkdirSync(own);
+      execFileSync("git", ["init", "-q", own]);
+      const s = start(own);
+      const first = await s.run(turn(["BASE"]));
+      rmSync(own, { recursive: true, force: true });
+      const out = await withThrowingHook(() => s.run(turn(["BASE", "MORE"])));
+      assert.deepEqual(out.systemPrompt, ["BASE", "MORE", first.systemPrompt[1]]);
+    });
+
+    test("[T5] array, the hook throws before the first delivery: {} so OMP keeps its own array", async () => {
+      const out = await withThrowingHook(() => start(join(root, "missing")).run(turn(["BASE"])));
+      assert.deepEqual(out, {});
+    });
+
+    test("[T6] array, compact turn: base kept, payload is INSTRUCTIONS only, no resume hint (O2a)", async () => {
+      const s = start();
+      await s.run(turn(["BASE"]));
+      assert.equal(await s.run({ type: "session_compact" }), undefined);
+      const out = await s.run(turn(["BASE", "<summary>after compact</summary>"]));
+      assert.deepEqual(out.systemPrompt, ["BASE", "<summary>after compact</summary>", INSTRUCTIONS]);
+    });
+
+    test("[T7] empty array: [payload]", async () => {
+      assert.deepEqual((await start().run(turn([]))).systemPrompt, [FIRST]);
     });
   });
 });
