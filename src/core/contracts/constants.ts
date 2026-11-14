@@ -788,7 +788,7 @@ export function D5_SLOW_DETAIL(ms: number, bound: number = HOOK_P95_MS): string 
 export function D5_SLOW_START_DETAIL(ms: number, bare: number, bound: number): string {
   return `hook adds ${ms} ms to a ${bare} ms node start, inside ${bound} ms (half a start): node starts slowly on this machine`;
 }
-// #1350: OpenCode and Pi run hooks inside the host process; D5 checks the shape, a tool call pays no node start.
+// #1350: OpenCode, Pi and OMP run hooks inside the host process; D5 checks the shape, a tool call pays no node start.
 export const D5_IN_PROCESS_DETAIL = "native shape ok; hooks run inside the host process, so a tool call pays no node start";
 // D-1323-CODEX-STOP-1 (#1323): the Codex Stop probe (rust-v0.166.0 stop.command.input) failed or wrote a hook-errors.log line.
 export const D5_STOP_DETAIL = "Codex Stop event: the hook did not give an empty or Codex Stop reply, or it logged a hook error";

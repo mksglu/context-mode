@@ -20,7 +20,7 @@ export const AGENT_IDS = ["claude-code","codex","gemini","qwen","copilot-cli","v
 export type AgentId = typeof AGENT_IDS[number];
 ```
 
-Source: PRD-v2 §3 (10-agent table), TECH-SPEC §2, 00-architecture §3.1. Order matches the PRD §3 table top to bottom. No other export. No function: this file is data only.
+Source: PRD-v2 §3 (agent table; ADR-0026 adds omp as the 11th), TECH-SPEC §2, 00-architecture §3.1. Order matches the PRD §3 table top to bottom. No other export. No function: this file is data only.
 
 E2E case: GP1 (install across all 11 adapters reads this exact list). ADR-0017 `covers`: `src/core/contracts/agents.ts`.
 

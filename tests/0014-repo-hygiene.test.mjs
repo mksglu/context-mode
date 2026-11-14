@@ -2726,6 +2726,10 @@ describe("ADR-0014 issue flow: fixed-on-main label on push, close on release (D-
     assert.equal(agentOf(issue(1350)), "opencode");
     assert.equal(agentOf({ title: "[claude-code] hook fails", body: "" }), "claude-code");
     assert.equal(agentOf({ title: "Pi: search is slow", body: "" }), "pi");
+    // ADR-0026: OMP is the 11th agent; its issues get the OMP update command, never the Pi one.
+    assert.equal(agentOf({ title: "OMP: hook does not fire", body: "" }), "omp");
+    assert.equal(agentOf({ title: "[oh-my-pi] doctor fails", body: "" }), "omp");
+    assert.equal(agentOf({ title: "x", body: "### Agent\n\nomp\n\n### Problem\n\ny" }), "omp");
     assert.equal(agentOf({ title: "OpenCode plugin does not load", body: "" }), "opencode");
     assert.equal(agentOf({ title: "x", body: "### Agent\n\ngemini\n\n### Problem\n\ny" }), "gemini");
     assert.equal(agentOf({ title: "ctx_search misses a file", body: "### Agent config\n\n_No response_" }), null);

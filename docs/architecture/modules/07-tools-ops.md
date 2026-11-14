@@ -33,7 +33,7 @@ export function resolvePluginRoot(adapter: AdapterRow, env: NodeJS.ProcessEnv): 
 ```
 
 ### Purpose
-Single function that finds the on-disk root of the installed plugin/extension for one agent. Called by install, `ctx_upgrade`, and `ctx_doctor`'s D1/D4/D7 checks — never a per-adapter copy (ADR-0010 "one path per install mode, no fallback"; TECH-SPEC §3.11 generalizes v1's Codex-only fix #771 to all 10 agents).
+Single function that finds the on-disk root of the installed plugin/extension for one agent. Called by install, `ctx_upgrade`, and `ctx_doctor`'s D1/D4/D7 checks — never a per-adapter copy (ADR-0010 "one path per install mode, no fallback"; TECH-SPEC §3.11 generalizes v1's Codex-only fix #771 to all 11 agents).
 
 ### Inputs
 - `adapter: AdapterRow` — from `getAdapter(id)` (module `adapters`).

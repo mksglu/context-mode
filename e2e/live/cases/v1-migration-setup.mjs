@@ -8,7 +8,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-/** The 10 agent ids (literal copy; GS4 forbids importing src/core/contracts/agents.ts). */
+/** The 11 agent ids (literal copy; GS4 forbids importing src/core/contracts/agents.ts). */
 export const AGENT_IDS = Object.freeze(["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode", "pi", "opencode", "omp"]);
 
 const BIN = "context-mode"; // v1 global npm bin name

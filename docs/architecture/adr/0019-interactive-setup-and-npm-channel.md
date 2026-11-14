@@ -88,7 +88,7 @@ Non-interactive (no TTY, or `--yes`): same steps, no prompts, `--agents a,b`, `-
 - `context-mode setup` lists every detected agent with one of: **full** (MCP + hooks), **MCP only**, **not supported**, each with the reason.
 - `context-mode setup --list` prints the same table for all supported agents without touching anything.
 - A detected MCP-capable agent that is not in the adapter table is shown as "not supported yet" with an offer to open a support request (same consent rule).
-- A v1 entry for an agent not in the v2 table (v1 wrote entries for cursor, jetbrains-copilot, antigravity, antigravity-cli, kimi, omp, openclaw, zed, kilo; S-V1) is shown as "v1 entry, agent not supported in v2"; setup offers removal only, with a diff and consent.
+- A v1 entry for an agent not in the v2 table (v1 wrote entries for cursor, jetbrains-copilot, antigravity, antigravity-cli, kimi, omp, openclaw, zed, kilo; S-V1; omp is a supported v2 agent since ADR-0026) is shown as "v1 entry, agent not supported in v2"; setup offers removal only, with a diff and consent.
 - README carries the same table, generated from the adapter table at build time.
 
 ### 7. Instruction files

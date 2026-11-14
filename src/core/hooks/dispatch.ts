@@ -80,7 +80,7 @@ export async function handleHook(agent: AgentId, raw: unknown, env: NodeJS.Proce
   if (nodeTooOld(process.version)) {
     // D-1370-OLDNODE-ALLOW-1 (#1370): the MCP server runs on this same node and is degraded (PRD §13: ctx_doctor only), so a
     // redirect to ctx_execute would block the host. Allow, and keep the stderr and log lines (D5). An in-process host
-    // (Pi, OpenCode) registers its ctx_* tools itself, so its redirect target exists and the D-HNE-GUARD-1 deny stays.
+    // (Pi, OMP, OpenCode) registers its ctx_* tools itself, so its redirect target exists and the D-HNE-GUARD-1 deny stays.
     const err = new CtxError("NODE_TOO_OLD", { v: process.version });
     if (row.installMode === "in-process") return fail("node", err);
     report("node", err);

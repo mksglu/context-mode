@@ -301,7 +301,7 @@ export async function checkHookRoundTrip(i: HookCheckInput): Promise<DoctorRow> 
     await runProcess([node.file, "-e", ""], { cwd: i.bundleDir, env: node.env, signal: i.signal, timeoutMs });
     return performance.now() - t;
   });
-  // #1350: an in-process host (OpenCode, Pi) never spawns node for a hook, so one run checks the shape and nothing is timed.
+  // #1350: an in-process host (OpenCode, Pi, OMP) never spawns node for a hook, so one run checks the shape and nothing is timed.
   const inProcess = getAdapter(i.agent).installMode === "in-process";
   const hookWalls: number[] = [];
   const bareWalls: number[] = [];
