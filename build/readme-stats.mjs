@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { fmtK } from "./npm-downloads.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE = "context-mode";
@@ -46,6 +47,20 @@ export function statsJson({ npmDownloads, stars, readAt }) {
   if (!Number.isInteger(stars) || stars < 0) throw new Error(`stars is not a count: ${String(stars)}`);
   if (!isDay(readAt)) throw new Error(`read_at is not a YYYY-MM-DD day: ${String(readAt)}`);
   return { npm_downloads: npmDownloads, stars, read_at: readAt };
+}
+
+/** README counts line (D-README-STATS-PUSH-1): the bold "<n> GitHub stars · <n> npm downloads" part and its read day
+ *  follow stats.json. String search only; throws when the README has no counts line. */
+const COUNTS_HEAD = "**";
+const COUNTS_MID = " GitHub stars · ";
+const COUNTS_TAIL = ", [stats.json](stats.json))";
+export function readmeCountsLine(readme, stats) {
+  const mid = readme.indexOf(COUNTS_MID);
+  const head = mid < 0 ? -1 : readme.lastIndexOf(COUNTS_HEAD, mid);
+  const tail = mid < 0 ? -1 : readme.indexOf(COUNTS_TAIL, mid);
+  if (head < 0 || tail < 0) throw new Error("README has no counts line");
+  const line = `**${fmtK(stats.stars)} GitHub stars · ${fmtK(stats.npm_downloads)} npm downloads** (read ${stats.read_at}`;
+  return readme.slice(0, head) + line + readme.slice(tail);
 }
 
 // ---- Adoption history (D-README-HISTORY-1) ----
@@ -261,6 +276,8 @@ async function main() {
   console.log(`timeline: ${timeline.length} points, first ${timeline[0][0]}, last ${timeline[timeline.length - 1][0]} = ${total}; stargazer rows read: ${starredAt.length}`);
   if (dry) return;
   writeFileSync(path.join(REPO_ROOT, "stats.json"), JSON.stringify(stats, null, 2) + "\n");
+  const readmePath = path.join(REPO_ROOT, "README.md");
+  writeFileSync(readmePath, readmeCountsLine(readFileSync(readmePath, "utf8"), stats));
   writeFileSync(path.join(REPO_ROOT, "docs", "assets", "readme", "src", "star-data.js"),
     `// Written by build/readme-stats.mjs. Do not edit.\nvar STARS=${total},READ_AT=${JSON.stringify(readAt)},D=${JSON.stringify(timeline)};\n`);
 }

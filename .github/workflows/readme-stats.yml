@@ -74,12 +74,12 @@ jobs:
         run: node docs/assets/readme/src/render.mjs star-history npm-downloads
       - name: commit only if a file changed
         run: |
-          if git diff --quiet -- stats.json docs/assets/readme; then
+          if git diff --quiet -- stats.json README.md docs/assets/readme; then
             echo "No change"
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add stats.json docs/assets/readme
+            git add stats.json README.md docs/assets/readme
             git commit -m "docs(readme): update stats, star chart and npm downloads grid"
             # D-README-STATS-PUSH-1: capture pushed the history file to main in this run, so rebase before each push.
             for i in 1 2 3; do git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME" && break; sleep 5; done

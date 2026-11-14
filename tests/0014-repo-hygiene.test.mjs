@@ -2110,6 +2110,17 @@ describe("ADR-0015 repo: README stats job and brand (D-README-STATS-1)", () => {
     assert.throws(() => statsJson({ npmDownloads: 1, stars: 1, readAt: "yesterday" }), /read_at/);
   });
 
+  test("readmeCountsLine: the README counts line follows stats.json every day (D-README-STATS-PUSH-1)", async () => {
+    const { readmeCountsLine } = await import("../build/readme-stats.mjs");
+    const before = "# x\n\n**33K GitHub stars · 683K npm downloads** (read 2026-11-01, [stats.json](stats.json)) · on the Hacker News front page\nend\n";
+    const after = readmeCountsLine(before, { npm_downloads: 835027, stars: 34066, read_at: "2026-11-14" });
+    assert.equal(after, "# x\n\n**34K GitHub stars · 835K npm downloads** (read 2026-11-14, [stats.json](stats.json)) · on the Hacker News front page\nend\n");
+    assert.equal(readmeCountsLine(after, { npm_downloads: 835027, stars: 34066, read_at: "2026-11-14" }), after, "same counts: same bytes");
+    assert.throws(() => readmeCountsLine("no counts line\n", { npm_downloads: 1, stars: 1, read_at: "2026-11-14" }), /counts line/);
+    const y = readRepo(".github/workflows/readme-stats.yml");
+    assert.ok(y.includes("git diff --quiet -- stats.json README.md docs/assets/readme") && y.includes("git add stats.json README.md docs/assets/readme"), "the README job commits README.md too");
+  });
+
   test("adoption history: v1 counts, traffic days, npm version split, merge by day keeps every old day (D-README-HISTORY-1)", async () => {
     // Owner 2026-11-03: "claude code kurulumunda hic npm e gerek yoksa biz claude code kurulumunlarinin stats ini nasil alacagiz?"
     // GitHub keeps traffic for 14 days only, so each day the job does not save is gone; the file keeps every day it ever read.
