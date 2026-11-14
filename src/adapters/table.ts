@@ -120,7 +120,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     eventMap: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
     compactDelivery: "pi-flag", compactSummary: "none", hookTimeoutMs: IN_PROCESS_TIMEOUT_MS, denyChannel: "deny-reason",
     hookChannel: { kind: "in-process", path: "omp/index.js" }, skillChannel: { kind: "package", path: "skills" }, // D-OMP-SKILLS-1
-    decode: pi.decode, encode: pi.encode, checkPermission: pi.checkPermission,
+    decode: pi.decodeOmp, encode: pi.encode, checkPermission: pi.checkPermission, // D-OMP-FIRE-1: agent omp in rows
   },
 ] satisfies Row[]);
 
