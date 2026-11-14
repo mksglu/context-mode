@@ -40,6 +40,8 @@ export interface PiApi {
   on(event: string, handler: (event: Record<string, unknown>, ctx?: PiContext) => unknown): void;
   registerTool(tool: PiTool): void;
   getSettings?(): unknown;
+  /** OMP: the coding-agent module (loader.ts:218-220); its `settings` holds the raw global and project layers. */
+  readonly pi?: { settings?: { getGlobalSettings?(): unknown; getProjectSettings?(): unknown } };
 }
 
 /** The tool_result patch: Pi keeps a field the patch omits, except structuredContent on a content change. */
@@ -78,15 +80,21 @@ function field(v: unknown, key: string): unknown {
 // D-R54-PI-META-1 (#1352): contextMode.excludeTools in Pi settings, exact tool names whose result stays whole.
 // Read on each call, so a settings change counts at once. A missing or malformed value, a Pi with no getSettings
 // (0.73.1) or a throw (runtime not bound yet) is the empty list: the default replace.
-function excludedTools(pi: PiApi): readonly string[] {
-  let settings: unknown;
+// D-OMP-FILTER-1 (O10): OMP has no getSettings; the same key comes from api.pi.settings, the project list over the
+// global list (OMP's own layer order). The Pi entry reads getSettings only, so the Pi path is unchanged.
+function listOf(settings: unknown): string[] | undefined {
+  const list = field(field(settings, "contextMode"), "excludeTools");
+  return Array.isArray(list) ? list.filter((n): n is string => typeof n === "string") : undefined;
+}
+
+export function excludedTools(pi: PiApi, host: PiHostId = "pi"): readonly string[] {
   try {
-    settings = pi.getSettings?.();
+    if (host === "pi") return listOf(pi.getSettings?.()) ?? [];
+    const settings = pi.pi?.settings;
+    return listOf(settings?.getProjectSettings?.()) ?? listOf(settings?.getGlobalSettings?.()) ?? [];
   } catch {
     return [];
   }
-  const list = field(field(settings, "contextMode"), "excludeTools");
-  return Array.isArray(list) ? list.filter((n): n is string => typeof n === "string") : [];
 }
 
 function errorReply(err: unknown): ToolReply {
@@ -241,7 +249,7 @@ export function hostExtension(pi: PiApi, host: PiHostId = "pi"): void {
     const out = await hook({
       type: "tool_result", toolName: event.toolName, toolCallId: event.toolCallId, input: event.input,
       content: textOf(event.content), isError: event.isError === true,
-      keep: excludedTools(pi).includes(str(event.toolName)),
+      keep: excludedTools(pi, host).includes(str(event.toolName)),
     }, turn);
     if (out.stdout === "") return undefined;
     const patch: PiResultPatch = { content: [{ type: "text", text: out.stdout }] };
