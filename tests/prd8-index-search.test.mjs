@@ -3407,6 +3407,93 @@ describe("PRD-v2 section 8 / safeFetch", () => {
     }));
   });
 
+  // ---- #1380 (D-1380-FETCH-UA-1): every request names itself like v1 did (v1 undici sent user-agent and accept) ----
+  // The local server acts like en.wikipedia.org: 403 for a request without a user-agent, else 200 and the headers it
+  // got as JSON. _parity-net-shim moves only the last hop (docs.parity.test -> 127.0.0.1); the SSRF check still runs.
+  const UA_PREFIX = "context-mode/";
+  const UA_SUFFIX = " (+https://github.com/mksglu/context-mode)";
+  function assertNamed(h, where) {
+    const ua = h["user-agent"] ?? "";
+    assert.ok(ua.startsWith(UA_PREFIX) && ua.endsWith(UA_SUFFIX) && ua.length > UA_PREFIX.length + UA_SUFFIX.length, where + ": user-agent " + JSON.stringify(ua));
+    assert.equal(h.accept, "*/*", where + ": accept");
+  }
+  async function uaServer(onReq) {
+    const seen = [];
+    const srv = createServer((req, res) => {
+      seen.push({ method: req.method, url: req.url, headers: req.headers });
+      if (onReq && onReq(req, res, srv)) return;
+      if (!req.headers["user-agent"]) { res.writeHead(403); res.end("forbidden"); return; }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(req.headers));
+    });
+    srv.on("connect", (req, sock) => {
+      seen.push({ method: "CONNECT", url: req.url, headers: req.headers });
+      sock.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+    });
+    await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+    return { srv, seen, port: srv.address().port, close: () => new Promise((r) => srv.close(r)) };
+  }
+
+  test("#1380: a direct request sends user-agent and accept, so a host that needs them answers 200", async () => {
+    const s = await uaServer();
+    try {
+      const out = await withEnv({}, () => safeFetch("http://docs.parity.test:" + s.port + "/wiki/Node.js", AbortSignal.timeout(5000)));
+      assertNamed(JSON.parse(out.body.toString("utf8")), "direct");
+      assert.equal(s.seen.length, 1);
+    } finally { await s.close(); }
+  });
+
+  test("#1380: a redirect hop sends the same user-agent and accept", async () => {
+    const s = await uaServer((req, res) => {
+      if (req.url !== "/start") return false;
+      res.writeHead(301, { location: "/final" });
+      res.end();
+      return true;
+    });
+    try {
+      const out = await withEnv({}, () => safeFetch("http://docs.parity.test:" + s.port + "/start", AbortSignal.timeout(5000)));
+      assert.ok(out.finalUrl.endsWith("/final"), out.finalUrl);
+      assert.deepEqual(s.seen.map((x) => x.url), ["/start", "/final"]);
+      for (const x of s.seen) assertNamed(x.headers, "hop " + x.url);
+    } finally { await s.close(); }
+  });
+
+  test("#1380: through HTTP_PROXY the proxied request sends user-agent and accept", async () => {
+    const s = await uaServer();
+    try {
+      const proxy = "http://docs.parity.test:" + s.port;
+      const out = await withEnv({ HTTP_PROXY: proxy }, () => safeFetch("http://origin.example/page", AbortSignal.timeout(5000)));
+      assert.equal(s.seen[0].url, "http://origin.example/page", "the proxy got the absolute URL");
+      assertNamed(JSON.parse(out.body.toString("utf8")), "http proxy");
+    } finally { await s.close(); }
+  });
+
+  test("#1380: through HTTPS_PROXY the CONNECT request sends user-agent and accept", async () => {
+    const s = await uaServer();
+    try {
+      const proxy = "http://docs.parity.test:" + s.port;
+      await withEnv({ HTTPS_PROXY: proxy }, () => assert.rejects(safeFetch("https://origin.example/page", AbortSignal.timeout(5000)), (err) => {
+        assert.equal(err.code, "FETCH_FAILED");
+        return true;
+      }));
+      const connect = s.seen.find((x) => x.method === "CONNECT");
+      assert.ok(connect, "the proxy got a CONNECT");
+      assert.equal(connect.url, "origin.example:443");
+      assertNamed(connect.headers, "CONNECT");
+    } finally { await s.close(); }
+  });
+
+  test("#1380: a non-2xx reply names the status and the host in one line", async () => {
+    const s = await uaServer((req, res) => { res.writeHead(403); res.end("forbidden"); return true; });
+    try {
+      await withEnv({}, () => assert.rejects(safeFetch("http://docs.parity.test:" + s.port + "/wiki/x", AbortSignal.timeout(5000)), (err) => {
+        assert.equal(err.code, "FETCH_FAILED");
+        assert.equal(err.message, "Fetch failed: 403 from docs.parity.test. Fix: check the URL or proxy.");
+        return true;
+      }));
+    } finally { await s.close(); }
+  });
+
   test("an IP-literal private origin is blocked even when a proxy is set (B57 hop rule)", async () => {
     await withEnv({ HTTP_PROXY: "http://127.0.0.1:9" }, () =>
       assert.rejects(safeFetch("http://169.254.169.254/latest/meta-data", new AbortController().signal), (err) => {
