@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import { spawn, execFileSync, spawnSync } from "node:child_process";
 import { openSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { devNull, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { runDoctor, runSetup } from "../src/setup/index.ts";
 
@@ -340,7 +340,7 @@ describe("ADR-0020 fire, plugin and extension hosts", { concurrency: CONC }, () 
 
     /** Print mode, stdin from /dev/null. */
     const print = (s, prompt) => new Promise((resolveRun) => {
-      const c = spawn("omp", ["-p", "--no-session", "--model", "faketools/fake", prompt], { cwd: s.work, env: s.env, stdio: [openSync("/dev/null", "r"), "ignore", "ignore"] });
+      const c = spawn("omp", ["-p", "--no-session", "--model", "faketools/fake", prompt], { cwd: s.work, env: s.env, stdio: [openSync(devNull, "r"), "ignore", "ignore"] });
       const k = setTimeout(() => c.kill("SIGKILL"), RUN_MS);
       c.on("close", () => { clearTimeout(k); resolveRun(); });
     });
