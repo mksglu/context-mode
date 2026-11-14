@@ -24,7 +24,7 @@ function defaultWrite(file: string, text: string): void {
 
 /** The host config file ctx_upgrade regenerates for `agent` (D-M5-U5-1). OpenCode: the .json base name;
  *  readHostConfig picks a sibling .jsonc (#849). Copilot CLI has no host config entry (its hook file ships
- *  with the release, D-M5-O1-4): null. */
+ *  with the release, D-M5-O1-4) and OMP (ADR-0026, D-OMP-UPGRADE-1) have none: null. */
 export function hostConfigPath(agent: AgentId, home: string, env: NodeJS.ProcessEnv): string | null {
   const own = OWN_MCP_ENTRY[agent];
   if (own !== undefined) return ownMcpFileOf(agent, own.file, env, home);
@@ -33,6 +33,7 @@ export function hostConfigPath(agent: AgentId, home: string, env: NodeJS.Process
     case "pi": return join(piAgentDirOf(env, home), SETTINGS_FILE);
     case "gemini": return join(geminiDirOf(env, home), SETTINGS_FILE); // D-R38-GEMINI-HOME-1
     case "copilot-cli": return null;
+    case "omp": return null; // ADR-0026 decision 8 (D-OMP-UPGRADE-1): OMP loads the plugin from its own store; no MCP entry, nothing under ~/.pi
     default: return join(home, ...AGENT_HOME_DIR[agent], SETTINGS_FILE);
   }
 }

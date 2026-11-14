@@ -4,7 +4,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  AGENT_HOME_DIR, CLAUDE_PLUGIN_ROOT_ENV, CLAUDE_PROJECT_DIR_ENV, DATA_PLUGINS_DIR_NAME, DEFAULT_PLUGIN_SCOPE, ENABLED_PLUGINS_KEY, HOST_CONFIG_DIR_NAME,
+  AGENT_HOME_DIR, CLAUDE_PLUGIN_ROOT_ENV, D1_PACKAGE_FILE, CLAUDE_PROJECT_DIR_ENV, DATA_PLUGINS_DIR_NAME, DEFAULT_PLUGIN_SCOPE, ENABLED_PLUGINS_KEY, HOST_CONFIG_DIR_NAME,
   PLUGIN_SCOPE_RANK, PROJECT_PLUGIN_SCOPES, SETTINGS_FILE, SETTINGS_LOCAL_FILE, EXTENSIONS_DIR_NAME, HOST_PLUGINS_DIR_NAME, INSTALLED_PLUGINS_FILE,
   MCP_ARGS_FIELD, OWN_MCP_ENTRY, PLUGIN_CACHE_DIR_NAME, PLUGIN_CURRENT_LINK, PLUGIN_KEY_SEPARATOR, PLUGIN_NAME, SERVER_ENTRY_FILE, SERVER_KEY,
 } from "../contracts/constants.ts";
@@ -170,6 +170,17 @@ function configEntryRoot(adapter: RootInput, env: NodeJS.ProcessEnv): string {
   return dirname(script);
 }
 
+/** ADR-0026 decision 8 (D-OMP-UPGRADE-1): an in-process host loads <pkg>/pi/index.js or <pkg>/omp/index.js, the server
+ *  runs <pkg>/server.mjs; all are one install. The root is the nearest dir at or above `dir` that holds package.json. */
+function packageDirOf(dir: string): string {
+  for (let cur = dir; ; ) {
+    if (existsSync(join(cur, D1_PACKAGE_FILE))) return cur;
+    const up = dirname(cur);
+    if (up === cur) return dir;
+    cur = up;
+  }
+}
+
 function candidate(adapter: RootInput, env: NodeJS.ProcessEnv, worktree?: string): string {
   switch (adapter.installMode) {
     case "marketplace":
@@ -184,7 +195,7 @@ function candidate(adapter: RootInput, env: NodeJS.ProcessEnv, worktree?: string
     case "plugin":
       return join(resolveConfigDir(env), DATA_PLUGINS_DIR_NAME, adapter.id, PLUGIN_CURRENT_LINK);
     case "in-process":
-      return dirname(fileURLToPath(import.meta.url));
+      return packageDirOf(dirname(fileURLToPath(import.meta.url)));
   }
 }
 
