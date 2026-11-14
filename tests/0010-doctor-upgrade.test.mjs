@@ -35,6 +35,7 @@ import { buildReport } from "../src/core/ops/report.ts";
 import { verifySums } from "../src/core/ops/verify-sums.ts";
 import { ctxDoctor, d1UpdateCommand, runDoctorChecks } from "../src/core/tools/doctor.ts";
 import { ctxUpgrade, runUpgrade } from "../src/core/tools/upgrade.ts";
+import { resolvePluginRoot as resolvePluginRootOf } from "../src/core/ops/plugin-root.ts"; // ADR-0026 decision 8
 import { detectV1 } from "../src/core/ops/detect-v1.ts";
 import { buildRegistry, hookRunsCheck, runSetup } from "../src/setup/index.ts";
 import { codexRunDirOf, codexSetupHomeOf } from "../src/core/project/config-dir.ts";
@@ -3142,5 +3143,76 @@ describe("ADR-0026 OMP doctor: agent omp, OMP plugin store, OMP verbs, host-limi
     assert.equal(d3.fixCommand, "pi install npm:context-mode");
     assert.ok(d3.detail.includes(path.join(home, ".pi", "agent", "settings.json")), d3.detail);
     assert.equal(r.text.includes("OMP") || r.text.includes("omp "), false, r.text);
+  });
+});
+
+describe("ADR-0026 OMP upgrade: omp plugin upgrade, no write under ~/.pi, one plugin root per package (D-OMP-UPGRADE-1)", () => {
+  // ADR-0026 decision 8 and support matrix rows 16, 20; test T33 (upgrade part of M6). Serial: the tests set process.argv[1].
+  const REPO = realpathSync.native(path.resolve(import.meta.dirname, ".."));
+  function tmp(t) {
+    const dir = realpathSync.native(mkdtempSync(path.join(tmpdir(), "cm-omp-upgrade-")));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    return dir;
+  }
+  const envOf = (home, extra = {}) => ({ HOME: home, USERPROFILE: home, PATH: process.env.PATH ?? "", ...extra });
+  const deps = (home, agent, extra = {}) => ({ project: { projectKey: "0123456789abcdef", worktree: path.join(home, "repo"), agent }, env: envOf(home, extra), signal: new AbortController().signal });
+  // The running bundle is the package dir: argv[1] = <pkg>/server.mjs, as when the host starts the server.
+  async function withArgv(file, fn) {
+    const was = process.argv[1];
+    process.argv[1] = file;
+    try { return await fn(); } finally { process.argv[1] = was; }
+  }
+  function tree(dir) {
+    const out = [];
+    const walk = (d) => { for (const e of readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else out.push(path.relative(dir, p) + "=" + sha256(readFileSync(p))); } };
+    if (existsSync(dir)) walk(dir);
+    return out.sort();
+  }
+  function installOmp(home) {
+    const dir = path.join(home, ".omp", "plugins");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "omp-plugins.lock.json"), JSON.stringify({ plugins: { "context-mode": { version: "2.1.10", enabled: true } }, settings: {} }), "utf8");
+    writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "omp-plugins", private: true, dependencies: { "context-mode": "2.1.10" } }), "utf8");
+  }
+
+  test("[ADR-0026 T33] hostConfigPath(omp) is null: OMP has no MCP entry from context-mode", async () => {
+    const { hostConfigPath } = await import("../src/core/ops/host-write.ts");
+    assert.equal(hostConfigPath("omp", "/h", {}), null);
+    assert.equal(hostConfigPath("omp", "/h", { PI_CODING_AGENT_DIR: "/p" }), null);
+  });
+
+  test("[ADR-0026 T33] ctx_upgrade on OMP: host row omp plugin upgrade context-mode; no plugin-root row; home tree unchanged, nothing under ~/.pi", async (t) => {
+    const home = tmp(t);
+    installOmp(home);
+    const before = tree(home);
+    const reply = await withArgv(path.join(REPO, "server.mjs"), () => runUpgrade({ mode: "upgrade" }, deps(home, "omp")));
+    assert.equal(reply.isError, false);
+    assert.ok(reply.text.includes(C.UPGRADE_HOST_AREA) && reply.text.includes("omp plugin upgrade context-mode"), reply.text);
+    assert.equal(reply.text.includes(C.UPGRADE_PLUGIN_ROOT_AREA), false, reply.text);
+    assert.equal(reply.text.includes(".pi"), false, reply.text);
+    assert.equal(reply.text.includes("pi update"), false, reply.text);
+    assert.deepEqual(tree(home), before);
+    assert.equal(existsSync(path.join(home, ".pi")), false);
+  });
+
+  test("[ADR-0026 T31] ctx_upgrade on OMP with PI_CODING_AGENT_DIR set writes nothing there", async (t) => {
+    const home = tmp(t);
+    installOmp(home);
+    const piDir = path.join(home, "pi-agent");
+    const reply = await withArgv(path.join(REPO, "server.mjs"), () => runUpgrade({ mode: "upgrade" }, deps(home, "omp", { PI_CODING_AGENT_DIR: piDir })));
+    assert.ok(reply.text.includes("omp plugin upgrade context-mode"), reply.text);
+    assert.equal(existsSync(piDir), false);
+  });
+
+  test("[ADR-0026 decision 8] the in-process plugin root is the package dir (the dir of package.json), so <pkg>/omp, <pkg>/pi and <pkg> are one install", () => {
+    for (const id of ["omp", "pi", "opencode"]) assert.equal(resolvePluginRootOf(getAdapter(id), envOf(tmpdir())), REPO, id);
+  });
+
+  test("[ADR-0026 decision 8] ctx_upgrade on Pi: no plugin-root row when the bundle is the package dir; Pi keeps pi update", async (t) => {
+    const home = tmp(t);
+    const reply = await withArgv(path.join(REPO, "server.mjs"), () => runUpgrade({ mode: "upgrade" }, deps(home, "pi")));
+    assert.ok(reply.text.includes(C.UPGRADE_HOST_COMMAND.pi), reply.text);
+    assert.equal(reply.text.includes(C.UPGRADE_PLUGIN_ROOT_AREA), false, reply.text);
+    assert.equal(reply.text.includes("omp "), false, reply.text);
   });
 });
