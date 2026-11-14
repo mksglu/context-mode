@@ -37,7 +37,7 @@ import { ctxDoctor, d1UpdateCommand, runDoctorChecks } from "../src/core/tools/d
 import { ctxUpgrade, runUpgrade } from "../src/core/tools/upgrade.ts";
 import { resolvePluginRoot as resolvePluginRootOf } from "../src/core/ops/plugin-root.ts"; // ADR-0026 decision 8
 import { detectV1 } from "../src/core/ops/detect-v1.ts";
-import { buildRegistry, hookRunsCheck, runSetup } from "../src/setup/index.ts";
+import { buildRegistry, hookRunsCheck, runDoctor, runSetup } from "../src/setup/index.ts";
 import { codexRunDirOf, codexSetupHomeOf } from "../src/core/project/config-dir.ts";
 import { generateManifests } from "../build/manifests.ts";
 import { fakeCodexBin, trustedToml } from "./_lib/codex-fake.mjs";
@@ -3143,6 +3143,27 @@ describe("ADR-0026 OMP doctor: agent omp, OMP plugin store, OMP verbs, host-limi
     assert.equal(d3.fixCommand, "pi install npm:context-mode");
     assert.ok(d3.detail.includes(path.join(home, ".pi", "agent", "settings.json")), d3.detail);
     assert.equal(r.text.includes("OMP") || r.text.includes("omp "), false, r.text);
+  });
+
+  test("[ADR-0026 P5] context-mode doctor --agents omp spawns `omp plugin list` once per doctor call (D-OMP-DOCTOR-PERF-1)", { skip: process.platform === "win32" && "the fake omp is a sh script" }, async (t) => {
+    const home = tmp(t);
+    install(home);
+    const bin = path.join(home, "bin");
+    const pkgDir = path.join(home, "pkg");
+    const log = path.join(home, "omp.log");
+    mkdirSync(bin, { recursive: true });
+    mkdirSync(pkgDir, { recursive: true });
+    for (const f of ["server.mjs", "hook.mjs"]) writeFileSync(path.join(pkgDir, f), "process.exit(0);\n");
+    writeFileSync(path.join(bin, "omp"), `#!/bin/sh\necho "$@" >> "${log}"\ncase "$1 $2" in "plugin list") echo "context-mode 2.1.10" ;; esac\nexit 0\n`);
+    chmodSync(path.join(bin, "omp"), 0o755);
+    const env = envOf(home, { PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}` });
+    const lists = () => (existsSync(log) ? readFileSync(log, "utf8") : "").split("\n").filter((l) => l === "plugin list").length;
+    for (const call of [1, 2]) {
+      const res = await runDoctor({ home, pkgDir, env, cwd: home, agents: ["omp"] });
+      // the verify checks ran (a list check is there), so a skipped verify cannot pass this test
+      assert.ok(res.agents[0].checks.some((c) => c.name === "list" && c.ok), JSON.stringify(res.agents[0]));
+      assert.equal(lists(), call, `doctor call ${call}: omp plugin list ran ${lists()} times in total`);
+    }
   });
 });
 
