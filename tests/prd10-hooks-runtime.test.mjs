@@ -1896,7 +1896,7 @@ describe("PRD-v2 section 10: PreToolUse module load set", { concurrency: CONC },
 describe("PRD-v2 section 10: hook never errors (D-HNE-GUARD-1)", () => {
   // D-HNE-GUARD-1 (owner decision 2026-10-29): a hook never errors. On any internal failure it exits 0 with a valid decision
   // for its host: own ctx_* tools allowed, flooding tools denied with the redirect plus "run ctx_doctor", and the error with
-  // its stack in <HOME>/.context-mode/hook-errors.log. Runs the built bundle for all 10 hosts (CM_HNE_BUNDLE overrides it).
+  // its stack in <HOME>/.context-mode/hook-errors.log. Runs the built bundle for all 11 hosts (CM_HNE_BUNDLE overrides it).
   const REPO = join(import.meta.dirname, "..");
   let root;
   let bundle;
@@ -1934,9 +1934,10 @@ describe("PRD-v2 section 10: hook never errors (D-HNE-GUARD-1)", () => {
     zcode: { pay: (t, i) => SNAKE("PreToolUse", t, i), shell: "Bash", own: "mcp__context-mode__ctx_execute", safe: "TodoWrite" },
     pi: { pay: (t, i) => ({ type: "tool_call", sessionId: "s1", cwd: repo, toolName: t, input: i }), shell: "bash", own: "ctx_execute", safe: "todo" },
     opencode: { pay: (t, i) => ({ type: "execute.before", sessionID: "s1", directory: repo, tool: t, args: i }), shell: "bash", own: "context-mode_ctx_execute", safe: "todowrite" },
+    omp: { pay: (t, i) => ({ type: "tool_call", sessionId: "s1", cwd: repo, toolName: t, input: i }), shell: "bash", own: "ctx_execute", safe: "todo" }, // ADR-0026: the Pi wire
   };
-  const EXIT2 = new Set(["kiro", "pi", "opencode"]); // these hosts deny by exit code 2 and text
-  const INPROC = new Set(["pi", "opencode"]); // installMode "in-process": ctx_* tools live in the host process, no MCP server
+  const EXIT2 = new Set(["kiro", "pi", "opencode", "omp"]); // these hosts deny by exit code 2 and text
+  const INPROC = new Set(["pi", "opencode", "omp"]); // installMode "in-process": ctx_* tools live in the host process, no MCP server
 
   function run(host, payload, { fault, env = {}, preload } = {}) {
     const home = mkdtempSync(join(root, "home-"));
@@ -2720,7 +2721,7 @@ describe("PRD-v2 section 10: hint throttle", { concurrency: CONC }, () => {
 // serial: tests set process.env.HOME and REQUIRE_SECURITY_ENV
 describe("PRD-v2 section 10: host tool names in hook output", () => {
   // Hook texts name tools the way the host calls them: row.toolNamePrefix + ctx_*. A bare ctx_search on Gemini
-  // (mcp_context-mode_ctx_search) names a tool the model cannot call. Covers the 10 hosts and every hook text
+  // (mcp_context-mode_ctx_search) names a tool the model cannot call. Covers the 11 hosts and every hook text
   // that names a tool: Read deny, parse-error deny, policy-unreadable deny, the replace handle line, the
   // compact state block and the pointer line. DEVIATIONS D-HL-NAMES-1.
   function rmTemp(dir) {
@@ -2764,7 +2765,7 @@ describe("PRD-v2 section 10: host tool names in hook output", () => {
     }
   });
 
-  test("all 10 hosts: parse-error and policy-unreadable denies name <prefix>ctx_*", () => {
+  test("all 11 hosts: parse-error and policy-unreadable denies name <prefix>ctx_*", () => {
     const old = process.env[REQUIRE_SECURITY_ENV];
     try {
       for (const row of ADAPTERS) {

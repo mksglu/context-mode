@@ -12,7 +12,7 @@ import { REGRESSIONS } from "./_lib/hook-fuzz-regressions.mjs";
 
 describe("PRD-v2 section 10: seeded hook fuzz on every host", () => {
   // Property test for the built hook bundle (owner decision 2026-10-29: a hook never errors).
-  // For each of the 10 hosts: seeded random payloads plus named regression cases are piped into release-out/hook.mjs
+  // For each of the 11 hosts: seeded random payloads plus named regression cases are piped into release-out/hook.mjs
   // (a fresh child per case, temp HOME). Invariants per call:
   //   1. the process exits 0 (kiro, pi and opencode may exit 2 only for a deny that carries its reason text);
   //   2. stdout is empty or in the documented shape of that host (JSON object with the host's keys, or plain text
@@ -103,6 +103,8 @@ describe("PRD-v2 section 10: seeded hook fuzz on every host", () => {
     pi: { keys: [{ event: "type", session: "sessionId", tool: "toolName", input: "input", result: "content", prompt: "message", cwd: "cwd" }], events: ["session_start", "session_compact", "input", "tool_call", "tool_result"] },
     opencode: { keys: [{ event: "type", session: "sessionID", tool: "tool", input: "args", result: "output", prompt: "message", cwd: "directory" }], events: ["context", "prompt", "execute.before", "execute.after", "compaction", "step-finish"] },
   };
+  SPEC.omp = SPEC.pi; // ADR-0026 (D-OMP-ROW-1): OMP sends the Pi wire
+  const PLAIN = new Set(["kiro", "pi", "opencode", "omp"]); // plain text hosts: deny by exit code 2 and text
   const PRE_TOOL = new Set(["PreToolUse", "preToolUse", "BeforeTool", "tool_call", "execute.before"]);
 
   // Own ctx_* tool names on the wire of each host (what the host sends for this server's tools).
@@ -179,7 +181,7 @@ describe("PRD-v2 section 10: seeded hook fuzz on every host", () => {
     if (k === 3) return "{\"command\":\"" + "q".repeat(200000 + Math.floor(r() * 200000));
     if (k === 4) return deep(1000);
     if (k === 5) return value(r);
-    return host === "pi" || host === "opencode" ? base : JSON.stringify(JSON.stringify(base));
+    return host === "pi" || host === "omp" || host === "opencode" ? base : JSON.stringify(JSON.stringify(base));
   }
 
   function toolName(r, host, pre) {
@@ -343,7 +345,7 @@ describe("PRD-v2 section 10: seeded hook fuzz on every host", () => {
   // The documented stdout shape of each host. Returns a problem text, or "" when fine.
   function shapeProblem(host, stdout) {
     if (stdout === "") return "";
-    if (host === "kiro" || host === "pi" || host === "opencode") return ""; // plain text hosts
+    if (PLAIN.has(host)) return ""; // plain text hosts
     let j;
     try { j = JSON.parse(stdout); } catch { return "stdout is not JSON: " + stdout.slice(0, 120); }
     if (!isObj(j)) return "stdout JSON is not an object";
@@ -364,7 +366,7 @@ describe("PRD-v2 section 10: seeded hook fuzz on every host", () => {
   function isDeny(host, res) {
     if (res.status === 2) return true;
     if (res.stdout === "") return false;
-    if (host === "kiro" || host === "pi" || host === "opencode") return false;
+    if (PLAIN.has(host)) return false;
     try {
       const j = JSON.parse(res.stdout);
       return j.decision === "deny" || j.permissionDecision === "deny" || j.hookSpecificOutput?.permissionDecision === "deny";
@@ -393,7 +395,7 @@ describe("PRD-v2 section 10: seeded hook fuzz on every host", () => {
     if (res.spawnError) out.push("spawn error " + res.spawnError);
     if (res.timedOut) out.push("timed out after " + HOOK_TIMEOUT_MS + " ms");
     else if (res.signal) out.push("killed by " + res.signal);
-    const deny2 = res.status === 2 && (host === "kiro" || host === "pi" || host === "opencode") && (res.stdout !== "" || res.stderr !== "");
+    const deny2 = res.status === 2 && (PLAIN.has(host)) && (res.stdout !== "" || res.stderr !== "");
     if (res.status !== 0 && !deny2 && !res.timedOut && !res.signal) out.push("exit " + res.status);
     const shape = shapeProblem(host, res.stdout);
     if (shape !== "") out.push(shape);
@@ -516,7 +518,7 @@ describe("PRD-v2 section 10: seeded hook fuzz on every host", () => {
       const bad = [];
       for (const [label, cwd, env] of broken) {
         const res = await runHook(host, JSON.stringify(floodPayload(host, keys, found, cwd)), { PATH: process.env.PATH, ...env }, spaceDir);
-        if (!isDeny(host, res) || res.status !== (host === "kiro" || host === "pi" || host === "opencode" ? 2 : 0)) bad.push({ label, status: res.status, stdout: res.stdout.slice(0, 100), stderr: res.stderr.slice(0, 160) });
+        if (!isDeny(host, res) || res.status !== (PLAIN.has(host) ? 2 : 0)) bad.push({ label, status: res.status, stdout: res.stdout.slice(0, 100), stderr: res.stderr.slice(0, 160) });
       }
       assert.equal(bad.length, 0, host + " fails open on an internal failure: " + JSON.stringify(bad, null, 1));
     });

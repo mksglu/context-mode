@@ -2680,7 +2680,7 @@ describe("ADR-0010 doctor: setup then doctor round trip (GP11)", () => {
 
   const REPO = path.resolve(import.meta.dirname, "..");
   const SKILLS = ["ctx-doctor", "ctx-stats", "ctx-upgrade"];
-  const HOSTS = ["claude-code", "codex", "copilot-cli", "gemini", "kiro", "opencode", "pi", "qwen", "vscode", "zcode"];
+  const HOSTS = ["claude-code", "codex", "copilot-cli", "gemini", "kiro", "omp", "opencode", "pi", "qwen", "vscode", "zcode"]; // ADR-0026: omp is the 11th
   const FILE_HOSTS = ["codex", "copilot-cli", "kiro", "opencode", "vscode", "zcode"]; // setup runs for these
   const ENTRY_HOSTS = ["codex", "kiro", "opencode", "vscode", "zcode"]; // setup writes the MCP/plugin entry into a host config file (copilot-cli: the entry ships in the plugin manifest)
 
@@ -2817,7 +2817,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
     assert.equal(readFileSync(toml, "utf8").includes(tomlBefore.slice(tomlBefore.indexOf("[mcp_servers.context-mode.tools"))), true);
   });
 
-  test("[D-DOC-RT-1] all 10 hosts: after setup, D4 is clean and D3 names no MCP entry for a host whose entry setup wrote", async (t) => {
+  test("[D-DOC-RT-1] all 11 hosts: after setup, D4 is clean and D3 names no MCP entry for a host whose entry setup wrote", async (t) => {
     const s = sandbox(t);
     mkdirSync(s.tmp, { recursive: true });
     const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: FILE_HOSTS, runId: "r1" });
@@ -2829,7 +2829,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
       const row = getAdapter(id);
       const d4 = checkV1Leftovers(id, s.home, { tmp: s.tmp, project });
       if (d4.status !== "PASS") bad.push(`${id} D4 ${d4.detail}`);
-      if (!ENTRY_HOSTS.includes(id)) continue; // claude-code, gemini, qwen, copilot-cli, pi: the host's own CLI installs the entry, D4 only
+      if (!ENTRY_HOSTS.includes(id)) continue; // claude-code, gemini, qwen, copilot-cli, pi, omp: the host's own CLI installs the entry, D4 only
       const d3 = await asServer(s.pkgDir, () => checkHostConfig(row, s.env, project));
       if (d3Parts(d3).includes("MCP entry")) bad.push(`${id} D3 ${d3.detail}`);
     }
