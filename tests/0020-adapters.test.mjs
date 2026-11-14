@@ -54,6 +54,7 @@ describe("ADR-0020 adapters", () => {
       kiro: ["mcp-entry", "arg:--agent+cwd", "mcp_context_mode_", "none", "none", 5000, "hint-only"], // D-R33-KIRO-NAMES-1
       zcode: ["hooks+mcp", "spawn-cwd", "mcp__context-mode__", "sessionstart", "none", 5000, "deny-reason"],
       pi: ["in-process", "pi:ctx.cwd", "", "pi-flag", "none", 0, "deny-reason"],
+      omp: ["in-process", "pi:ctx.cwd", "", "pi-flag", "none", 0, "deny-reason"], // ADR-0026 D-OMP-ROW-1
       opencode: ["in-process", "spawn-cwd", "", "opencode-cache", "none", 0, "deny-reason"],
     };
 
@@ -70,6 +71,7 @@ describe("ADR-0020 adapters", () => {
       kiro: { shell: ["execute_bash", "execute_pwsh", "shell"] }, // D-HF-KIRO-SHELL-1, D-N7-KIRO-1
       zcode: CLAUDE_NATIVE,
       pi: { shell: ["bash", "powershell"], read: ["read"] }, // D-HA-PI-NAMES-1, D-R38-PI-PWSH-1
+      omp: { shell: ["bash", "powershell"], read: ["read"] }, // ADR-0026: Pi tool names
       opencode: { shell: ["bash"], read: ["read"] }, // D-HF-OPENCODE-SHELL-1, D-R44-OC-READ-1
     };
 
@@ -85,6 +87,7 @@ describe("ADR-0020 adapters", () => {
       kiro: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
       zcode: CLAUDE_EVENTS,
       pi: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
+      omp: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
       // Usage: OpenCode step-finish cost row (DEVIATIONS D-M5-arch-2).
       opencode: { SessionStart: "context", UserPromptSubmit: "prompt", PreToolUse: "execute.before", PostToolUse: "execute.after", PreCompact: "compaction", Usage: "step-finish" },
     };
@@ -254,6 +257,7 @@ describe("ADR-0020 adapters", () => {
       kiro: { kind: "home-file", path: ".kiro/hooks/context-mode.json" },
       zcode: { kind: "home-file", path: ".zcode/cli/config.json" },
       pi: { kind: "in-process", path: "pi/index.js" },
+      omp: { kind: "in-process", path: "omp/index.js" },
       opencode: { kind: "in-process", path: "opencode/plugin.js" },
     };
     const SKILL_CHANNEL = {
@@ -266,6 +270,7 @@ describe("ADR-0020 adapters", () => {
       kiro: { kind: "home-dir", path: ".kiro/skills" },
       zcode: { kind: "home-dir", path: ".zcode/skills" },
       pi: { kind: "package", path: "pi/skills" },
+      omp: { kind: "package", path: "skills" }, // D-OMP-SKILLS-1
       opencode: { kind: "home-dir", path: ".config/opencode/skills" },
     };
 
@@ -323,6 +328,7 @@ describe("ADR-0020 adapters", () => {
         kiro: ["mcp-entry", "arg:--agent+cwd", "mcp_context_mode_", "none", "none", "hint-only"], // D-R33-KIRO-NAMES-1
         zcode: ["hooks+mcp", "spawn-cwd", "mcp__context-mode__", "sessionstart", "none", "deny-reason"],
         pi: ["in-process", "pi:ctx.cwd", "", "pi-flag", "none", "deny-reason"],
+        omp: ["in-process", "pi:ctx.cwd", "", "pi-flag", "none", "deny-reason"],
         opencode: ["in-process", "spawn-cwd", "", "opencode-cache", "none", "deny-reason"],
       };
       for (const r of ADAPTERS) {

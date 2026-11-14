@@ -94,14 +94,14 @@ describe("ADR-0018 build: release-out tree", () => {
 
   // Skills fix: gemini loads <extension>/skills and pi loads package.json pi.skills unrendered, so the build writes
   // each host's copy from the one skills/ source with that host's real tool names (split/join, D-HQ-SKILLS-1).
-  test("[M6] build/command-skills: gemini skills/ and pi pi/skills are the 3 skills rendered with the host tool names", async (t) => {
+  test("[M6] build/command-skills: gemini and omp skills/ (D-OMP-SKILLS-1) and pi pi/skills are the 3 skills rendered with the host tool names", async (t) => {
     const { renderSkill } = await import("../src/setup/registry.ts");
     const { getAdapter } = await import("../src/adapters/table.ts");
     const { out, status, stderr } = build(t);
     assert.equal(status, 0, stderr);
     // D-HQ-SKILLS-3: qwen reads the same <extension>/skills dir as gemini, so that dir names both tools.
     // D-R33-CC-SKILLS-1: Claude Code always loads <plugin>/skills too, so that dir names its tool first.
-    for (const [id, dir, stats, prefixes] of [["gemini", "skills", "mcp__plugin_context-mode_context-mode__ctx_stats or mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats", ["mcp__plugin_context-mode_context-mode__", "mcp_context-mode_", "mcp__context-mode__"]], ["pi", "pi/skills", "ctx_stats", [""]]]) {
+    for (const [id, dir, stats, prefixes] of [["gemini", "skills", "mcp__plugin_context-mode_context-mode__ctx_stats or mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats or ctx_stats", ["mcp__plugin_context-mode_context-mode__", "mcp_context-mode_", "mcp__context-mode__", ""]], ["omp", "skills", "mcp__plugin_context-mode_context-mode__ctx_stats or mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats or ctx_stats", ["mcp__plugin_context-mode_context-mode__", "mcp_context-mode_", "mcp__context-mode__", ""]], ["pi", "pi/skills", "ctx_stats", [""]]]) {
       assert.equal(getAdapter(id).skillChannel.path, dir, id + " skill channel is the build dir");
       assert.deepEqual(readdirSync(path.join(out, dir)).sort(), [...SKILLS].sort(), dir);
       for (const s of SKILLS) {
@@ -699,7 +699,7 @@ describe("ADR-0019 build: host skills", () => {
   // N5 (2.0.0-next.5 live runs): codex ctx-stats said "mcp_context-mode_mcp__context_mode__ctx_stats". Setup rendered the
   // home-dir skills from the package skills/ dir, which build.mjs already rendered with Gemini's prefix, so the prefix
   // doubled. Expected names: each host's real tool name as the host lists it (adapters TOOL_NAME_PREFIX, D-HQ-COPILOT-NAMES-2).
-  const SHARED_STATS = "mcp__plugin_context-mode_context-mode__ctx_stats or mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats";
+  const SHARED_STATS = "mcp__plugin_context-mode_context-mode__ctx_stats or mcp_context-mode_ctx_stats or mcp__context-mode__ctx_stats or ctx_stats"; // omp reads skills/ too (D-OMP-SKILLS-1)
   const CTX_STATS_NAME = {
     // D-HQ-SKILLS-3, D-R33-CC-SKILLS-1: claude-code, gemini and qwen share <plugin>/skills
     "claude-code": SHARED_STATS,
@@ -712,6 +712,7 @@ describe("ADR-0019 build: host skills", () => {
     zcode: "mcp__context-mode__ctx_stats",
     pi: "ctx_stats",
     opencode: "ctx_stats",
+    omp: SHARED_STATS, // D-OMP-SKILLS-1: <plugin>/skills, bare ctx_stats
   };
 
   test("[D-N5-SKILL-1] the built package's ctx-stats skill names each host's real tool once, never a doubled prefix", () => {
@@ -733,12 +734,13 @@ describe("ADR-0019 build: host skills", () => {
     for (const name of SKILLS) {
       let rest = readFileSync(path.join(out, "skills", name, "SKILL.md"), "utf8");
       for (const tool of toolsIn(SOURCE[name])) {
-        for (const p of [ADAPTERS.find((a) => a.id === "claude-code").toolNamePrefix, gemini.toolNamePrefix, qwen.toolNamePrefix]) {
+        // D-OMP-SKILLS-1: omp reads <plugin>/skills too, so the bare name is last (after the prefixed names are cut out).
+        for (const p of [ADAPTERS.find((a) => a.id === "claude-code").toolNamePrefix, gemini.toolNamePrefix, qwen.toolNamePrefix, getAdapter("omp").toolNamePrefix]) {
           assert.ok(rest.includes(p + tool), `${name} names ${p + tool}`);
           rest = rest.split(p + tool).join("");
         }
       }
-      assert.equal(rest.includes("ctx_"), false, `${name} names a tool that is not claude-code's, gemini's or qwen's: ${rest}`);
+      assert.equal(rest.includes("ctx_"), false, `${name} names a tool that is not claude-code's, gemini's, qwen's or omp's: ${rest}`);
     }
   });
 

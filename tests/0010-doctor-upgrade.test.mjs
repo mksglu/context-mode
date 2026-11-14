@@ -723,6 +723,7 @@ describe("ADR-0010 doctor D3 fix: setup fixes a wrong or missing MCP entry (D-D3
       assert.equal(d3.status, "FAIL", row.id);
       // D-R38-PI-D3-1: Pi's fix is its own install command (owner rule: each agent's native install).
       if (row.id === "pi") assert.equal(d3.fixCommand, "pi install npm:context-mode", d3.detail);
+      else if (row.id === "omp") assert.equal(d3.fixCommand, "omp plugin install context-mode", d3.detail); // ADR-0026 T28
       else if (d3.detail.includes("MCP entry")) assert.equal(d3.fixCommand, `context-mode setup --agents ${row.id}`, row.id + ": " + d3.detail);
       else assert.ok(d3.fixCommand === "run ctx_upgrade" || d3.fixCommand.startsWith("context-mode setup"), row.id + ": " + d3.fixCommand);
     });

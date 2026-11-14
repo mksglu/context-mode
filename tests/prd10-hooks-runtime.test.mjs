@@ -1140,7 +1140,7 @@ describe("PRD-v2 section 10: compaction delivery, recall and decision rows (GP6)
       const out = r.encode(ev, { kind: "hint", text: "RECALL-PROBE", onceKey: "recall" });
       assert.equal(hasRecall(r), JSON.stringify(out).includes("RECALL-PROBE"), r.id);
     }
-    assert.deepEqual(ADAPTERS.filter((r) => !hasRecall(r)).map((r) => r.id), ["pi", "opencode"]); // D-R33-KIRO-RECALL-1
+    assert.deepEqual(ADAPTERS.filter((r) => !hasRecall(r)).map((r) => r.id), ["pi", "opencode", "omp"]); // D-R33-KIRO-RECALL-1; omp keeps the Pi compact path
   });
 
   // ---------- decision rows (ADR-0009 §8.2) ----------
@@ -2245,7 +2245,7 @@ describe("PRD-v2 section 10: saving decision per host (ADR-0020)", () => {
   // the ctx tool on PreToolUse everywhere else. One effect per host, no fallback.
   const SAVING = {
     "claude-code": "R", codex: "D", gemini: "R", qwen: "D", "copilot-cli": "R",
-    vscode: "D", kiro: "D", zcode: "D", pi: "R", opencode: "R", // opencode R: D-R54-OC-REPLACE-1 (#1347)
+    vscode: "D", kiro: "D", zcode: "D", pi: "R", opencode: "R", omp: "R", // omp R: Pi tool_result rewrite (ADR-0026); opencode R: D-R54-OC-REPLACE-1 (#1347)
   };
   // D-M3-F-9: a hook or detached write keeps its DB handle open by design (A21), and Windows cannot delete
   // an open file, so temp cleanup there is best-effort. The assertions are unchanged.

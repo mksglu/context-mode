@@ -404,6 +404,7 @@ export function checkHostConfig(row: AdapterRow, env: NodeJS.ProcessEnv, worktre
     if ("installs" in choice) return fail("D3", D3_ROOT_DETAIL(choice.installs.map((r) => r.installPath)), D3_ROOT_FIX(choice.installs));
   }
   if (row.id === "pi") return checkPiInstall(env, home, worktree);
+  if (row.id === "omp") return checkOmpInstall(home);
   const parts: D3Part[] = [...(mcpWrong(row, home, env, worktree) ? [PART_MCP] : []), ...hookParts(row, home, env, worktree)];
   if (parts.length === 0) return pass("D3");
   const detail = D3_DETAIL(parts);
@@ -419,6 +420,16 @@ function checkPiInstall(env: NodeJS.ProcessEnv, home: string, worktree: string):
   const found = piInstalledIn(env, home, ownBundleDir(), worktree);
   if (found !== undefined) return { ...pass("D3"), detail: found };
   return fail("D3", D3_DETAIL([PART_MCP]) + D4_REASON_JOIN + join(piAgentDirOf(env, home), SETTINGS_FILE), NATIVE_INSTALL.pi[0]);
+}
+
+// ADR-0026 decision 7: OMP records its plugins in ~/.omp/plugins/omp-plugins.lock.json; context-mode must be there and enabled.
+const OMP_LOCK_FILE = ["plugins", "omp-plugins.lock.json"] as const;
+function checkOmpInstall(home: string): DoctorRow {
+  const file = join(home, ...AGENT_HOME_DIR.omp, ...OMP_LOCK_FILE);
+  let entry: unknown;
+  try { entry = (JSON.parse(readFileSync(file, "utf8")) as { plugins?: Record<string, unknown> }).plugins?.[SERVER_KEY]; } catch { entry = undefined; }
+  const on = typeof entry === "object" && entry !== null && (entry as { enabled?: unknown }).enabled === true;
+  return on ? { ...pass("D3"), detail: file } : fail("D3", D3_DETAIL([PART_MCP]) + D4_REASON_JOIN + file, NATIVE_INSTALL.omp[0]);
 }
 
 /** D4 — old entries: every finding's reason in one row, joined "; ". */

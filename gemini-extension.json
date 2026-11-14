@@ -1,5 +1,5 @@
 {
-  "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
+  "description": "Context window saver for 11 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
   "mcpServers": {
     "context-mode": {
       "args": [

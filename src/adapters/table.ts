@@ -112,6 +112,16 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     hookChannel: { kind: "in-process", path: "opencode/plugin.js" }, skillChannel: { kind: "home-dir", path: ".config/opencode/skills" }, // ADR-0020
     decode: opencode.decode, encode: opencode.encode, toCanonicalTool: opencode.toCanonicalTool,
   },
+  {
+    // ADR-0026 (D-OMP-ROW-1): OMP runs the Pi extension API in-process, so the row reuses the Pi decode, encode and
+    // permission check; tool names stay bare. Only the entry path and the skills folder are its own.
+    id: "omp", installMode: "in-process", projectSource: "pi:ctx.cwd", toolNamePrefix: pi.TOOL_NAME_PREFIX,
+    nativeTools: { shell: ["bash", "powershell"], read: ["read"] }, execReadOnlyHint: false,
+    eventMap: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
+    compactDelivery: "pi-flag", compactSummary: "none", hookTimeoutMs: IN_PROCESS_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "in-process", path: "omp/index.js" }, skillChannel: { kind: "package", path: "skills" }, // D-OMP-SKILLS-1
+    decode: pi.decode, encode: pi.encode, checkPermission: pi.checkPermission,
+  },
 ] satisfies Row[]);
 
 const BY_ID = new Map<AgentId, AdapterRow>(ADAPTERS.map((r) => [r.id, r]));
@@ -122,7 +132,7 @@ const BY_ID = new Map<AgentId, AdapterRow>(ADAPTERS.map((r) => [r.id, r]));
 // gemini: AfterTool decision deny + reason replaces the result (D-HA-GEMINI-REPLACE-1).
 // opencode: the plugin sets result.content (2.x) or output.output (1.19) in-process; both hosts read that object back
 // after the hook (D-R54-OC-REPLACE-1, #1347). Not in DUMP_REPLACE_ROWS: execute.before can deny a large cat first.
-const REPLACE_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "gemini", "copilot-cli", "pi", "opencode"]);
+const REPLACE_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "gemini", "copilot-cli", "pi", "opencode", "omp"]); // omp: the Pi tool_result rewrite (ADR-0026)
 
 export function hasReplace(row: AdapterRow): boolean {
   return REPLACE_ROWS.has(row.id);
@@ -131,7 +141,7 @@ export function hasReplace(row: AdapterRow): boolean {
 // D-HA-GEMINI-DUMP-1: rows where a one-file shell dump over the cap runs and PostToolUse replaces it (D-M7-RR-1).
 // gemini is out: its BeforeTool deny stops the tool before it runs (gemini-cli docs/hooks/reference.md BeforeTool),
 // so a large `cat` is denied with the Read redirect, as on every other deny host.
-const DUMP_REPLACE_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "copilot-cli", "pi"]);
+const DUMP_REPLACE_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "copilot-cli", "pi", "omp"]);
 
 export function dumpRunsThenReplaces(row: AdapterRow): boolean {
   return DUMP_REPLACE_ROWS.has(row.id) && hasReplace(row);

@@ -2,7 +2,7 @@
   "name": "context-mode",
   "version": "2.1.10",
   "type": "module",
-  "description": "Context window saver for 10 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
+  "description": "Context window saver for 11 coding agents. Local and free: sandboxed code execution, FTS5 search, session continuity.",
   "author": "Mert Koseoglu",
   "license": "Elastic-2.0",
   "keywords": [
@@ -16,6 +16,7 @@
     "pi",
     "kiro",
     "zcode",
+    "omp",
     "mcp",
     "context-window",
     "sandbox",

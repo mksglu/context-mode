@@ -148,5 +148,18 @@
       },
       "directory": "/tmp/project"
     }
+  },
+  "omp": {
+    "event": "PreToolUse",
+    "payload": {
+      "type": "tool_call",
+      "toolCallId": "call_bbbbbbbb",
+      "toolName": "bash",
+      "input": {
+        "command": "echo gp3-fixture-probe"
+      },
+      "sessionId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "cwd": "/tmp/project"
+    }
   }
 }

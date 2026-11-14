@@ -245,6 +245,8 @@ function cliFor(ctx: SetupContext, id: AgentId): CliPlan | undefined {
     case "qwen": return { bin: "qwen", install: [["extensions", "link", ctx.pkgDir]], remove: [["extensions", "uninstall", SERVER_KEY]], input: "y\n" };
     case "copilot-cli": return { bin: "copilot", install: [["mcp", "add", SERVER_KEY, "--", ...s]], remove: [["mcp", "remove", SERVER_KEY]] };
     case "pi": return { bin: "pi", install: [["install", ctx.pkgDir]], remove: [["remove", ctx.pkgDir]] };
+    // ADR-0026 decision 4: OMP installs from its own plugin store by name (T23, T24).
+    case "omp": return { bin: "omp", install: [["plugin", "install", SERVER_KEY]], remove: [["plugin", "uninstall", SERVER_KEY]] };
     default: return undefined;
   }
 }
@@ -265,6 +267,7 @@ const LIST: Partial<Record<AgentId, { bin: string; args: string[] }>> = {
   qwen: { bin: "qwen", args: ["extensions", "list"] },
   "copilot-cli": { bin: "copilot", args: ["mcp", "list"] },
   pi: { bin: "pi", args: ["list"] },
+  omp: { bin: "omp", args: ["plugin", "list"] }, // ADR-0026
   // D-HF-OPENCODE-LIST-1: --pure skips external plugins, so a fresh HOME does not wait on the @opencode-ai/plugin install.
   opencode: { bin: "opencode", args: ["mcp", "list", "--pure"] },
 };

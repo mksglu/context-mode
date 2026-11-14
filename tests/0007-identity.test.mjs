@@ -1288,7 +1288,8 @@ describe("ADR-0007: project dir cases ported from v1", () => {
     switch (agent) {
       case "claude-code": return { env: { ...env, CLAUDE_PROJECT_DIR: dir }, argv: [], cwd: other };
       case "vscode": return { env, argv: ["--workspace-folder", dir], cwd: other };
-      case "pi": return { env, argv: [], cwd: other, piCwd: dir };
+      case "pi":
+      case "omp": return { env, argv: [], cwd: other, piCwd: dir }; // ADR-0026: OMP passes ctx.cwd like Pi
       default: return { env, argv: ["--agent", agent], cwd: dir };
     }
   }

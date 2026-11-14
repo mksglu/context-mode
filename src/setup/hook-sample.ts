@@ -51,6 +51,7 @@ export function hookSample(id: AgentId, cwd: string, text: string): HookSample {
       // D-HQ-COPILOT-EVENT-1: the documented payload names no event; toolArgs is a JSON string.
       return { effect, payload: { sessionId: SAMPLE_SESSION, timestamp: Date.now(), cwd, toolName: tool, toolArgs: JSON.stringify(command), toolResult: { resultType: "success", textResultForLlm: text } } };
     case "pi":
+    case "omp": // ADR-0026: same Pi extension payload
       return { effect, payload: { type: event, sessionId: SAMPLE_SESSION, cwd, toolName: tool, input: command, content: text, isError: false } };
     case "opencode":
       // D-R54-OC-REPLACE-1 (#1347): a replace row gets execute.after with the output the plugin passes on.
