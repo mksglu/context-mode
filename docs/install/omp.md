@@ -89,6 +89,7 @@ These come from how OMP works:
 - Print mode (`omp -p`) sends no prompt event. Use `omp` or `omp --mode rpc` to keep prompts.
 - OMP 14.7.0 is the tested floor. On an older OMP, doctor prints the version and the fix: `omp update`.
 - In a script, `omp -p` reads stdin. Add `< /dev/null` in scripts.
+- OMP can import MCP servers from other agents, such as Claude Code. Then it would load context-mode twice. Setup adds `context-mode` to `disabledServers` in OMP's `mcp.json`, and doctor prints that fix when the entry is missing.
 
 ## Report a problem
 
@@ -104,4 +105,4 @@ Run on macOS (arm64) with OMP 18.20.0 (the latest OMP on 2026-11-13), in a clean
 | `omp plugin uninstall context-mode` | 18.20.0 | 2026-11-13 | Pass: `Uninstalled context-mode`, plugin store empty, data kept |
 | `omp plugin disable` and `enable context-mode` | 18.20.0 | 2026-11-13 | Pass |
 
-The CI job installs OMP 18.20.0 with its own script on Linux, macOS and Windows and runs `omp --version` and the OMP tests (D-OMP-CI-1). Evidence: [ADR-0026](../architecture/adr/0026-omp-host.md), [DEVIATIONS](../architecture/modules/DEVIATIONS.md).
+The CI job installs OMP 18.20.0 with its own script on Linux, macOS and Windows and runs `omp --version` and the OMP tests (D-OMP-CI-1). It runs on each push to `main`, so the merge of OMP support is its first 3-OS run. Evidence: [ADR-0026](../architecture/adr/0026-omp-host.md), [DEVIATIONS](../architecture/modules/DEVIATIONS.md).

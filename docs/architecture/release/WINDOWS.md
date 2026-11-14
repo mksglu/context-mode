@@ -1,7 +1,7 @@
 # Windows host matrix
 
 Job: `windows hosts` in `.github/workflows/ci.yml`, script `e2e/checks/windows-hosts.mjs`. It runs on windows-latest, ubuntu-latest and macos-latest.
-Per OS it packs the build, runs `npm i -g` into a prefix with a space in the path, installs each host CLI that npm can install without login, then for each of the 10 agents (own HOME with a space) runs: setup, doctor, the host's hook payload for a 200 KB shell `cat` through the platform shell, and an MCP initialize + tools/list from the written host config.
+Per OS it packs the build, runs `npm i -g` into a prefix with a space in the path, installs each host CLI that npm can install without login, then for each of the 11 agents (own HOME with a space) runs: setup, doctor, the host's hook payload for a 200 KB shell `cat` through the platform shell, and an MCP initialize + tools/list from the written host config.
 
 Last green windows-latest run: CI run 40590253825 (head c3039618), job `windows hosts (windows-latest)`: 10 agents x 5 steps, 0 fail. ubuntu-latest: green on the same run. macos-latest: see the CI run of the head commit (the macOS runner queue was slow when this file was written).
 

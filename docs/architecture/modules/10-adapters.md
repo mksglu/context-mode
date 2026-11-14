@@ -185,7 +185,7 @@ export function encode(ev: CanonicalHookEvent, d: Decision, extra?: string): Hoo
 
 1. Switch on `d.kind`:
    - `"allow"`: native stdout = `""` (or, for agents whose plain-text hook requires silence on `PromptSubmit`/`UserPromptSubmit`, exactly `""` — Kiro, GP3 fixture) exit `0`.
-   - `"hint"`: write `d.text` into this agent's hint field (table below) if one exists; else (Gemini, Pi, OpenCode 2 lack a PreToolUse hint field, PRD §10.1/ADR-0001 Consequences) drop it — the hint reaches the model only through tool descriptions, never a second mechanism.
+   - `"hint"`: write `d.text` into this agent's hint field (table below) if one exists; else (Gemini, Pi, OMP, OpenCode 2 lack a PreToolUse hint field, PRD §10.1/ADR-0001 Consequences) drop it — the hint reaches the model only through tool descriptions, never a second mechanism.
    - `"deny"`: write `d.reason` (prefixed with the rewritten command when `d.rewritten` is set) into this agent's deny field (table below); exit `2`. Never `allow` + an input-rewrite field (ADR-0001 Decision 1, PRD §10.2 — `updatedInput` is never used).
    - `"replace"`: only valid on `PostToolUse`; write `d.output` into this agent's output-replace field if one exists (Claude Code: `updatedToolOutput`); else no-op (case C has no substitute on an agent with no such field — ADR-0016 table, Q23 Kiro row: "no rewrite/replace channel either way").
 2. Return `{ stdout, exitCode }`.

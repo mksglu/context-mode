@@ -60,7 +60,7 @@ No other agent ships in v2.0. No CLI and no `cli.mjs` entry (ADR-0002, ADR-0010)
    core/journal.append (one shared context.db per project)
    adapter.encode
 
- in-process plugin agents (Pi, OpenCode 2)
+ in-process plugin agents (Pi, OpenCode 2, OMP)
    plugin adapter -> same core/policy, core/journal, core/tools (no spawn, no MCP hop)
 ```
 
@@ -68,7 +68,7 @@ Three layers, one build (esbuild, static imports only):
 
 1. **core/** — knows no agent: tools, sandbox, store, project, journal, policy, stats, lifecycle.
 2. **adapters/** — pure translation plus install/doctor data. No business logic.
-3. **entries/** — `server.mjs`, `hook.mjs`, one plugin entry each for Pi and OpenCode 2.
+3. **entries/** — `server.mjs`, `hook.mjs`, one plugin entry each for Pi and OpenCode 2; OMP runs the Pi entry through the `omp/index.js` wrapper (ADR-0026).
 
 ### 3.1 Module map
 
@@ -326,7 +326,7 @@ The server never imports `node:sqlite` statically: if Node or `node:sqlite` fail
 
 Bun and `bun:sqlite`, better-sqlite3, `ensure-deps` and every heal script, `start.mjs`'s chdir/heal flow, snapshot injection, the `<context_window_protection>` block, per-agent `AGENTS.md`/`CLAUDE.md` templates, the routing `SKILL.md` and the maintainer-only ops skill, statusline, `ctx_insight`, HTTP daemon mode, the lifetime stats timer and all-DB scan, `ps` liveness, the global MCP-ready sentinel, the search call-rate throttle (`flood-guard.ts`, dropped and not replaced — it would re-trip on legitimate fan-out from concurrent subagents), runtime `npm install`, and the `web/` marketing site (deleted, not moved elsewhere).
 
-Removed agents: Cursor, JetBrains Copilot, Kimi, Codex Desktop, OpenClaw, OMP (Oh-My-Pi), Antigravity/agy, OpenCode 1.x, Zed. Every file for a removed agent is deleted from the repo, not only from the release tree; a CI check fails if any of those paths reappear.
+Removed agents: Cursor, JetBrains Copilot, Kimi, Codex Desktop, OpenClaw, Antigravity/agy, OpenCode 1.x, Zed. Every file for a removed agent is deleted from the repo, not only from the release tree; a CI check fails if any of those paths reappear. OMP (oh-my-pi) is back as the 11th agent through the Pi entry (ADR-0026); its v1 files (`configs/omp/`, `src/adapters/omp/`) stay removed.
 
 ## 18. Milestones
 
@@ -347,6 +347,7 @@ The module structure, dependency rules, constants, and per-module file map for i
 
 ## 19. Changes
 
+- 2026-11-14 (ADR-0026): OMP (oh-my-pi) is the 11th agent, with its own install command `omp plugin install context-mode`.
 - 2026-10-22 (ADR-0019): the 2026-10-13 "no npm, no CLI" rule is replaced. npm is the user channel and `context-mode setup|doctor|upgrade` is the CLI. See `PRD-setup.md`.
 - 2026-10-13: dropped the v1.x line (fixes land only in v2); no skills beyond the 3 commands; Antigravity/agy removed; v2.0 scope fixed at 10 agents.
 - 2026-10-14 (r3, `https://github.com/mksglu/context-mode/blob/274600e2ffab843e89c1dfa09b0d649e650c962f/docs/v2/review/DECISIONS-r3.md`): accepted Q1–Q24 and D1 — output cap, timeout value, deny scope and mechanism, Node minimum, project-source rule, search default, uninstall mode, and the rest, folded into §4–§16 above.

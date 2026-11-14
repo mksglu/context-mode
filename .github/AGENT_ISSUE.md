@@ -2,7 +2,7 @@
 
 Your user asked you to report a context-mode problem. Write the issue so a maintainer's agent can replay it in one pass: the facts, the smallest repro from a fresh project, the exact output, and the cause when you found it. Follow the rules below in order. A GitHub Action scores every new issue against them, labels it `repro-ready` or `needs-info`, and keeps one comment with a checklist of what is still missing. Edit the issue body to fill that checklist; the comment updates itself.
 
-One person maintains context-mode for 10 agents on 3 operating systems. A fix starts from the doctor report and a repro that runs in a fresh directory.
+One person maintains context-mode for 11 agents on 3 operating systems. A fix starts from the doctor report and a repro that runs in a fresh directory.
 
 Security problems go to https://github.com/mksglu/context-mode/security/advisories/new as a private advisory.
 

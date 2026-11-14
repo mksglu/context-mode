@@ -47,6 +47,7 @@ This is the map. Start here, then follow the links.
 | 0018 | One architecture contract (`docs/architecture/modules/00-architecture.md`), one file per module; implementers follow `docs/architecture/modules/` file by file. | Accepted |
 | 0019 | One interactive `context-mode setup`; npm (`context-mode`, dist-tag `next`) is the user channel; the git `release` branch stays for the Claude Code marketplace. | Accepted |
 | 0025 | Stored source enters the `ctx_execute` sandbox (#1325); the open 2.1.4 blockers (#1321, #1322, #1323, #1324) and Copilot host audit rows ship in one patch. ADR and PRD in one file. | Proposed |
+| 0026 | OMP (oh-my-pi) is the 11th agent: it runs the Pi entry through `omp/index.js` and installs with `omp plugin install context-mode`. ADR and PRD in one file. | Accepted (2026-11-14) |
 
 ## 2a. Glossary
 
@@ -54,9 +55,9 @@ GS = global success gate (TECH-SPEC §1). G = gap row (TECH-SPEC §9). Q = DECIS
 
 GS6 = hook budget: `HOOK_P95_MS` 40, `HOOK_CPU_OVER_NODE_MS` 20, `HOOK_COMBINED_P95_MS` 60.
 
-## 3. Agents (10)
+## 3. Agents (11)
 
-Claude Code, Codex CLI, Gemini CLI, Qwen Code, Copilot CLI, VS Code Copilot, Kiro, ZCode, Pi, OpenCode 2.
+Claude Code, Codex CLI, Gemini CLI, Qwen Code, Copilot CLI, VS Code Copilot, Kiro, ZCode, Pi, OpenCode 2, OMP. OMP is the 11th agent (ADR-0026).
 
 ## 4. Tools (9) and skills (3)
 

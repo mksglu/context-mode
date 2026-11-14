@@ -1,6 +1,6 @@
 # ADR-0026: OMP (oh-my-pi) as a supported host
 
-- Status: Proposed (2026-11-13).
+- Status: Accepted (2026-11-14). Owner, 2026-11-14: "omp suresi onemli degil ok, omp yi main e gonder". P5 (doctor wall with OMP on PATH) stays over its +10% line after D-OMP-DOCTOR-PERF-1 (one `omp plugin list` per doctor call): main 571 ms, lane 850 ms median. The rest is the OMP row's own verify checks (plugin list, hook run, MCP check) that every CLI host row runs. The owner accepts this result.
 - Scope: one ADR (Part 1) and one PRD (Part 2) in one file, as the owner asked ("tek bir md istiyorum ama senden adr pdr birlesik").
 - Keeps: ADR-0010 (doctor tells the truth), ADR-0019 (setup), ADR-0020 (hooks and skills on every agent), ADR-0021 (prompt-cache safety, D-CACHE-PI-1), ADR-0023 (each agent's own native install), ADR-0024 (tests grouped by ADR).
 - Issue: [#1332](https://github.com/mksglu/context-mode/issues/1332).
@@ -150,7 +150,7 @@ Counts: 28 rows; supported 24, host limit 4, unverified 0.
 - OMP users see `ctx_*` as normal tools; each request carries +8,177 B of tool schema (cached prefix).
 - Pi and Pi-Bolt send the same bytes and install the same way. Golden tests pin this.
 - One bundle serves both hosts; `omp/index.js` is a wrapper.
-- About 20 places pin "10 agents" or the unsupported list; they change in M4.
+- About 20 places pin "10 agents" or the unsupported list; they change in M4 and in the docs sweep (D-OMP-DOCS-2).
 - A live OMP fire test in CI on 3 OS guards the event shapes on each OMP pin bump.
 
 ## Alternatives rejected
@@ -317,7 +317,7 @@ Method: median of 50 runs (p90 too), same machine, temp HOME, warm cache, runs i
 | P2 | OMP startup Total delta vs `--no-extensions` | same | +64 ms (402.0 vs 337.6) | <= +70 ms |
 | P3 | `before_agent_start` in OMP's runtime | probe that imports our entry, 50 calls | median 0.23 ms, first 12-15 ms | median <= 0.5 ms |
 | P4 | `before_agent_start` on Pi, string path | same probe under Pi | M0 measures | within noise (<= +5%) |
-| P5 | `context-mode doctor` wall, OMP present | `node cli.mjs doctor < /dev/null` | 630 ms (p90 763) | <= +10% |
+| P5 | `context-mode doctor` wall, OMP present | `node cli.mjs doctor < /dev/null` | 630 ms (p90 763) | <= +10%; result 850 ms after D-OMP-DOCTOR-PERF-1, accepted by the owner on 2026-11-14 (see Status) |
 | P6 | Bytes: `pi/index.js`, `omp/index.js`, request size | `wc -c`; saved requests | 2,230,634 B; Pi request 14,014 B; OMP tools 17,537 B | Pi request equal; OMP tools 25,714 B; wrapper < 1 KB |
 | P7 | Wall time of edited test files and full suite once | `node --test` | `0020-plugins` 2.0 s, `0010-doctor-upgrade` 12.9 s, `0019-setup-engine` 34.5 s [cm `docs/architecture/TEST-LAYOUT.md:51,58,61`] | <= +10% per file |
 

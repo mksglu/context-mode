@@ -5,7 +5,7 @@
 
 ## Context
 
-v2 supports 10 agents (README §3). Their hook events, payloads and decision fields differ; `spike-hooks-verified.md` has one row per agent. v1 handled these differences inside each adapter with runtime fallbacks, so a bug could not be traced to a single code path.
+v2 supports 11 agents (README §3; OMP since ADR-0026). Their hook events, payloads and decision fields differ; `spike-hooks-verified.md` has one row per agent. v1 handled these differences inside each adapter with runtime fallbacks, so a bug could not be traced to a single code path.
 
 ## Decision
 

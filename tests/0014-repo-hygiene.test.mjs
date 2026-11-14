@@ -1072,7 +1072,7 @@ describe("ADR-0015 repo: README agent lines", () => {
       assert.ok(!/in[- ]process/i.test(text), `${rel} still says in-process / in process`);
     }
     assert.ok(README.includes("Hooks reach each agent in one of three ways"), "the README sentence stays");
-    assert.ok(README.includes("plugin inside the agent (OpenCode, Pi)"), "the README sentence names the plugin inside the agent");
+    assert.ok(README.includes("plugin inside the agent (OpenCode, Pi, OMP)"), "the README sentence names the plugin inside the agent");
   });
 
   test("readme-agents: each install block ends with one generated line: Hooks ✓ · MCP ✓ · Skills ✓ with the host detail in plain words; the agent table is gone (D-README-AGENT-LINES-1, D-README-DWELL-1)", () => {
@@ -1905,7 +1905,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.ok(live, "README has the real-binary line");
     for (const n of ["Claude Code", "Codex", "Gemini CLI", "Qwen Code", "Pi", "OpenCode", "Copilot CLI", "ZCode"]) assert.ok(live.includes(n), `real-binary line names ${n}`);
     assert.ok(!live.includes("logged out") && !live.includes(" our "), "the real-binary line reads plain");
-    // Install (D-README-DWELL-1, replaces the open blocks of D-README-FIX-1): all 10 blocks closed; one short "pick your agent" line sits before them.
+    // Install (D-README-DWELL-1, replaces the open blocks of D-README-FIX-1): all 11 blocks closed; one short "pick your agent" line sits before them.
     const firstBlock = readme.indexOf("<details id=\"install-");
     assert.ok(firstBlock > 0, "the first install block is closed");
     const head = readme.slice(readme.indexOf("\n## Install\n"), firstBlock);

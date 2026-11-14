@@ -20,7 +20,7 @@ Every link in this file and in each module file is relative to the file it is wr
 | `09-hooks.md` | hooks | hook entry, dispatch per canonical event |
 | `10-adapters.md` | adapters | `adapters/table.ts` and 10 decode/encode files |
 | `11-server.md` | server | MCP server entry, lifecycle, prompt delivery |
-| `12-plugins.md` | plugins | Pi and OpenCode 2 in-process entries |
+| `12-plugins.md` | plugins | Pi, OMP and OpenCode 2 in-process entries |
 | `13-build-release.md` | build-release | esbuild, manifests, CI, `release.yml`, `/release` skill |
 | `14-tests.md` | tests | `e2e/` harness, GP1–GP11, live cases, KEEP-PASS runner |
 | `14a-issue-cases.md` | tests | 147 issue-row cases (Given/When/Then) that close the ADR-0003 exit gate |
