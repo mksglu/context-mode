@@ -24,6 +24,7 @@ import { detectV1 } from "../core/ops/detect-v1.ts";
 import { isNativeOpencodeEntry, OPENCODE_PACKAGE_DIR_HINT, opencodeDirPlugin, opencodeDirPlugins, opencodePluginDirs, opencodeProjectDir } from "../core/ops/doctor-config.ts";
 import { atomicWriteFile, renameWithRetry, unlinkWithRetry } from "../core/ops/atomic-file.ts";
 import { editHostConfigText, hostConfigValueAt, parseHostConfig } from "../core/ops/host-config.ts";
+import { OMP_DISABLED_SERVERS_KEY, ompImportFiles, ompImportsUs } from "../core/ops/omp-import.ts";
 import { hostLayout, hostText, withLayout } from "../core/ops/host-text.ts";
 import { AGENT_FLAG, BACKUP_DIR, COMMAND_SKILLS, HOOK_BUNDLE, SERVER_BUNDLE, LOCK_FILE, SKILL_FILE, assertWritable, buildRegistry, configEdits, hookCommandString, renderSkill } from "./registry.ts";
 import type { CheckRow, HookFile, HookInstall, NativePlugin, SetupContext } from "./registry.ts";
@@ -385,6 +386,17 @@ function planSkills(row: CheckRow, edits: FileEdit[]): void {
     const before = readRaw(f.file);
     if (before !== after) edits.push({ plain: true, file: f.file, before, after, changes: [{ file: f.file, path: f.name, before: before === undefined ? null : "old", after: "SKILL.md" }] });
   }
+}
+
+/** ADR-0026 decision 11 (D-OMP-SETUP-1): when OMP imports a context-mode server from ~/.claude.json, OMP's own
+ *  denylist `disabledServers` in ~/.omp/agent/mcp.json gets our name (merge, every other key stays). Import off: no write. */
+function planOmpImport(row: CheckRow, edits: FileEdit[], ctx: SetupContext): void {
+  const files = ompImportFiles(ctx.home);
+  if (!ompImportsUs(files, ctx.env)) return;
+  planJsonKeys(row, edits, files.mcp, "json", (doc) => {
+    const cur = Array.isArray(doc[OMP_DISABLED_SERVERS_KEY]) ? doc[OMP_DISABLED_SERVERS_KEY] as unknown[] : [];
+    return cur.includes(SERVER_KEY) ? [] : [[[OMP_DISABLED_SERVERS_KEY], [...cur, SERVER_KEY]]];
+  });
 }
 
 function planRow(row: CheckRow, listed: boolean, stale: boolean, env: SetupContext["env"], disabled = false): Plan {
@@ -1312,6 +1324,7 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
     if (ls.broken) return { ...res, status: "SKIPPED", reason: ls.broken };
     const listed = ls.check?.ok === true;
     plan = planRow(row, listed, copyCheck(row, ctx.pkgDir)?.ok === false, ctx.env, listed && ls.status === "disabled");
+    if (row.id === "omp") planOmpImport(row, plan.edits, ctx);
   } catch (e) { return { ...res, status: "FAIL", reason: (e as Error).message }; }
   // The config entry is current when the plan changes nothing in that file but codex trust entries.
   const configEdited = (file: string): boolean => plan.edits.some((e) => e.file === file && e.changes.some((c) => !isTrust(row, c)));
