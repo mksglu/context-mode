@@ -298,6 +298,86 @@ describe("ADR-0002: openDb and the single DB", { concurrency: CONC }, () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  // #1385 (D-M2-CI-3 follow-up): Android/f2fs and some mounts deny hard links, so link() throws
+  // EACCES or EPERM. A fresh context.db must still be published there, complete and never
+  // overwritten. Each child replaces fs.linkSync BEFORE it loads db.ts (db.ts binds node:fs at load).
+  function linkDeniedChild(dbUrl, project, code, tag) {
+    return `import fs from "node:fs";
+    fs.linkSync = () => { const e = new Error(${JSON.stringify(code)} + ": operation not permitted, link"); e.code = ${JSON.stringify(code)}; e.syscall = "link"; throw e; };
+    const { openDb, closeDb, withWrite } = await import(${JSON.stringify(dbUrl)});
+    process.stdout.write("ready\\n");
+    process.stdin.once("data", async () => {
+      const db = await openDb(${JSON.stringify(project)});
+      withWrite(db, (h) => h.raw.prepare("INSERT INTO meta(key, value) VALUES (?, '1')").run(${JSON.stringify(tag)} + process.pid));
+      closeDb(db);
+      process.exit(0);
+    });`;
+  }
+
+  async function runLinkDenied(project, code, n, tag) {
+    const { spawn } = await import("node:child_process");
+    const dbUrl = new URL("../src/core/store/db.ts", import.meta.url).href;
+    const child = linkDeniedChild(dbUrl, project, code, tag);
+    const kids = Array.from({ length: n }, () => {
+      const c = spawn(process.execPath, ["--input-type=module", "-e", child], { stdio: ["pipe", "pipe", "pipe"] });
+      let err = "";
+      c.stderr.on("data", (d) => { err += d; });
+      const ready = new Promise((resolve) => c.stdout.once("data", resolve));
+      const done = new Promise((resolve) => c.on("exit", (exitCode) => resolve({ exitCode, err })));
+      return { c, ready, done };
+    });
+    await Promise.all(kids.map((k) => k.ready));
+    for (const k of kids) k.c.stdin.write("go\n");
+    return Promise.all(kids.map((k) => k.done));
+  }
+
+  function assertPublished(project, tag, writers) {
+    const raw = new DatabaseSync(project.dbPath, { readOnly: true });
+    try {
+      assert.equal(raw.prepare("PRAGMA journal_mode").get().journal_mode, "wal");
+      assert.equal(raw.prepare("PRAGMA user_version").get().user_version, SCHEMA_VERSION);
+      // Every writer's row is in the published file: no second creator replaced the winner's file.
+      const rows = raw.prepare("SELECT count(*) AS n FROM meta WHERE key LIKE ?").get(tag + "%").n;
+      assert.equal(rows, writers);
+    } finally {
+      raw.close();
+    }
+  }
+
+  for (const code of ["EACCES", "EPERM"]) {
+    test(`openDb on a fresh project where link() throws ${code} (#1385): context.db is published, schema current, no temp files`, async () => {
+      const { readdirSync } = await import("node:fs");
+      const root = mkdtempSync(join(tmpdir(), "cm-db-nolink-"));
+      try {
+        const project = fakeProject(root, "e".repeat(15) + code.length);
+        mkdirSync(project.projectDir, { recursive: true });
+        const [r] = await runLinkDenied(project, code, 1, "solo-");
+        assert.equal(r.exitCode, 0, r.err);
+        assertPublished(project, "solo-", 1);
+        assert.deepEqual(readdirSync(project.projectDir).filter((n) => n.includes(".tmp")), []);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+  }
+
+  test("openDb from 8 processes at once where link() throws EACCES (#1385): all succeed, no write lost, no temp files", async () => {
+    const { readdirSync } = await import("node:fs");
+    const root = mkdtempSync(join(tmpdir(), "cm-db-nolink-race-"));
+    try {
+      for (let round = 0; round < 5; round += 1) {
+        const project = fakeProject(root, "f" + String(round).padStart(15, "0"));
+        mkdirSync(project.projectDir, { recursive: true });
+        const results = await runLinkDenied(project, "EACCES", 8, "race-");
+        for (const r of results) assert.equal(r.exitCode, 0, r.err);
+        assertPublished(project, "race-", 8);
+        assert.deepEqual(readdirSync(project.projectDir).filter((n) => n.includes(".tmp")), []);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("ADR-0002: DB platform cases, ported from v1", { concurrency: CONC }, () => {
