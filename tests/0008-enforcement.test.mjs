@@ -407,6 +407,21 @@ describe("ADR-0008 shell unwrap", { concurrency: CONC }, () => {
     assert.deepEqual(view("FOO=1 curl -s x"), [["curl", []]]);
   });
 
+  // #1388: rtk (rtk-ai/rtk) runs the inner command as-is under `proxy` / `bypass`; the policy must see that command.
+  test("#1388: rtk proxy and rtk bypass unwrap to the inner command, wrapper recorded", () => {
+    for (const cmd of ['rtk proxy cat "large log.txt"', '/opt/homebrew/bin/rtk proxy /bin/cat "large log.txt"',
+      'rtk bypass cat "large log.txt"', 'rtk bypass --skip-env -- cat "large log.txt"', 'rtk proxy -- cat "large log.txt"']) {
+      const [c] = run(cmd);
+      assert.deepEqual([c.argv0, c.args, c.wrappedBy], ["cat", ["large log.txt"], ["rtk"]], cmd);
+    }
+    assert.deepEqual(curlOf("rtk proxy curl -s https://x.io/a.json").wrappedBy, ["rtk"]);
+    assert.deepEqual(curlOf(`zsh -lc 'rtk proxy curl -s x'`).wrappedBy, ["zsh -c", "rtk"]);
+    assert.deepEqual(view("rtk proxy --help"), [["rtk", []]]);
+    assert.deepEqual(view("rtk proxy"), [["rtk", []]]);
+    assert.deepEqual(view("rtk cat log.txt"), [["rtk", []]]);
+    assert.deepEqual(view("rtk gain"), [["rtk", []]]);
+  });
+
   test("wrapper options are skipped", () => {
     assert.deepEqual(curlOf("sudo -u bob -E curl -s x").args, ["-s", "x"]);
     assert.deepEqual(curlOf("env -i -u HOME A=1 B=2 curl -s x").args, ["-s", "x"]);
@@ -1146,6 +1161,18 @@ describe("ADR-0008 decide rule table and golden rows", () => {
     for (const cmd of [`cd ${dir.split(sep).join("/")} && cat big.log`, "cat big.log; echo done", "ls && cat big.log", "echo ---; cat big.log",
       `zsh -lc "cat ${p}"`, `/bin/zsh -lc 'cat big.log'`, "true || cat big.log"]) {
       assert.deepEqual(bash(cmd, CODEX), want, cmd);
+    }
+  });
+  // #1388: `rtk proxy` / `rtk bypass` ran a 219,600-byte cat with no deny while the plain cat was denied (Codex, rtk 1.2.0).
+  test("#1388: an rtk proxy / bypass dump over OUTPUT_CAP is denied as the plain cat; bounded and small reads are not", () => {
+    const want = { kind: "deny", reason: READ_DENY_MESSAGE(big, 300 * 1024, CODEX.toolNamePrefix) };
+    for (const cmd of ["rtk proxy cat big.log", "rtk proxy /bin/cat big.log", "rtk bypass cat big.log", "rtk bypass --skip-env -- cat big.log",
+      `zsh -lc 'rtk proxy cat big.log'`, "ls && rtk proxy cat big.log"]) {
+      assert.deepEqual(bash(cmd, CODEX), want, cmd);
+    }
+    for (const cmd of ["rtk proxy head -n 5 big.log", "rtk bypass --skip-env -- head -n 5 big.log", "rtk proxy cat big.log | grep x",
+      "rtk proxy cat small.txt", "rtk bypass cat small.txt", "rtk cat big.log", "rtk gain"]) {
+      assert.notEqual(bash(cmd, CODEX).kind, "deny", cmd);
     }
   });
   test("D-CDX-CAT-1: a dump that feeds a pipe, a file or a bound is not denied; claude-code (Read tool) is unchanged", () => {
