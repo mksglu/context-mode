@@ -12,7 +12,7 @@ A cache hit needs an identical prefix: tools, system prompt, then history in ord
 Rules the code follows:
 
 1. `tools/list` and `initialize` are byte-identical across starts. The server never sends `list_changed`. Tool text and instructions are build-time literals with no dynamic tokens.
-2. Between two compactions, the system prompt a host sees is byte-identical on every turn. Pi returns `base + payload` each turn, never `{}`.
+2. Between two compactions, the system prompt a host sees is byte-identical on every turn. Pi returns `base + payload` each turn, never `{}`. Amended (#1384, D-PI-SECTIONS-1): on Pi >= 1.5, which passes `systemPromptOptions.sections` and turns a returned `systemPrompt` into a forced prompt with no sections, the same payload goes into the named section `context_mode` each turn and the return carries no `systemPrompt`; the section bytes repeat, so Pi sends no diff and the prefix stays byte-identical.
 3. Hook text is static per session. It goes through the host append channel (tool result or user turn). Where a host has only a system prompt channel, text is appended once and never edits earlier bytes.
 4. A compaction in one session does not change the system payload of another session. Pending-compact markers are keyed by session id.
 5. A compact turn may rewrite the prefix. It is exempt; the next call is measured and recorded.

@@ -68,6 +68,25 @@ function appendPayload(base: unknown, payload: string): string | unknown[] {
   return text === "" ? payload : text + "\n\n" + payload;
 }
 
+// D-PI-SECTIONS-1 (#1384): Pi >= 1.5 passes systemPromptOptions.sections (runner.js:1129-1171) and turns a returned
+// systemPrompt into forceSystemPrompt, which renders no sections (system-prompt.js:125-129), so builtin:mcp's
+// <mcp_servers> would be lost. There the payload is our own named section and the return carries no systemPrompt;
+// the section bytes repeat each turn, so Pi sends no diff and the prefix stays stable (ADR-0021). A host with no
+// sections channel (Pi 0.73.1, Pi-Bolt, OMP), or a prompt another extension already forced, gets base + payload.
+const SECTION = "context_mode";
+
+function deliver(event: PiEvent, payload: string): { systemPrompt?: string | unknown[] } {
+  const options = event.systemPromptOptions;
+  const sections = field(options, "sections");
+  if (typeof sections === "object" && sections !== null && !Array.isArray(sections) && field(options, "forceSystemPrompt") === undefined) {
+    const named = sections as Record<string, unknown>;
+    if (payload === "") delete named[SECTION];
+    else named[SECTION] = payload;
+    return {};
+  }
+  return payload === "" ? {} : { systemPrompt: appendPayload(event.systemPrompt, payload) };
+}
+
 // Pi tool_result content is a list of parts; the text parts are the result text.
 function textOf(content: unknown): string {
   if (typeof content === "string") return content;
@@ -207,7 +226,7 @@ export function hostExtension(pi: PiApi, host: PiHostId = "pi"): void {
     openPrompt = prompt;
     if (!rerun) turn += 1;
     registerTools();
-    const withPayload = (): { systemPrompt: string | unknown[] } => ({ systemPrompt: appendPayload(event.systemPrompt, payload) });
+    const withPayload = (): { systemPrompt?: string | unknown[] } => deliver(event, payload);
     if (rerun && payload !== "") return withPayload(); // the new base + the same payload, once
     let out: HookOutput;
     try {
@@ -215,7 +234,7 @@ export function hostExtension(pi: PiApi, host: PiHostId = "pi"): void {
     } catch {
       // §3.3 step 8: retry next turn. Before a first delivery there is nothing to keep; after it, the same
       // payload keeps the prefix stable (D-CACHE-PI-1), and compactPending stays set for the retry.
-      return payload === "" ? {} : withPayload();
+      return withPayload();
     }
     const compactTurn = compactPending;
     compactPending = false; // A27: the very next before_agent_start reads and clears the flag
