@@ -477,6 +477,30 @@ exit 0`;
     assert.ok(res.agents[0].v1.length > 0, "the temp finding is still reported");
   });
 
+  // #1383: v1.0.169 wrote ~/.claude/context-mode/sessions/stats-pid-<n>.json. Setup keeps user data (ADR-0017 R6: nothing
+  // is deleted without a prompt), so doctor names the folder as a note and the agent that setup set up stays PASS.
+  // A v1 hook is a form setup owns: it still fails doctor.
+  test("[M7] setup/doctor #1383: a v1 data dir setup keeps is a doctor note, not a FAIL; a v1 hook still fails", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const { runDoctor } = await import("../src/setup/index.ts");
+    const s = sandbox(t);
+    fakeClaude(s.root, s.bin, CLAUDE_FAKE(path.join(s.root, "claude.state")));
+    const sessions = path.join(s.home, ".claude", "context-mode", "sessions");
+    put(path.join(sessions, "stats-pid-1.json"), JSON.stringify({ version: "1.0.169" }));
+    const opts = { home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["claude-code"] };
+    const set = await runSetup({ ...opts, runId: "r" });
+    assert.equal(set.agents[0].status, "PASS", JSON.stringify(set.agents[0], null, 2));
+    const doc = await runDoctor(opts);
+    assert.equal(doc.agents[0].status, "PASS", JSON.stringify(doc.agents[0], null, 2));
+    assert.equal(doc.exitCode, 0);
+    assert.ok(doc.agents[0].v1.some((f) => f.file === sessions), "doctor still names the kept data dir");
+    assert.ok(existsSync(path.join(sessions, "stats-pid-1.json")), "setup keeps the user's data");
+    // Control: a v1 hook command in settings.json is an old form, so doctor fails and names setup.
+    put(path.join(s.home, ".claude", "settings.json"), JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ type: "command", command: "node /x/context-mode/hooks/pretooluse.mjs" }] }] } }));
+    const hook = await runDoctor(opts);
+    assert.equal(hook.agents[0].status, "FAIL");
+    assert.equal(hook.agents[0].reason, "old context-mode entry, run: context-mode setup");
+  });
+
   test("whichBin: on Windows only PATHEXT names match (npm's <bin>.cmd shim), PATH key in any case", (t) => {
     const s = sandbox(t);
     writeFileSync(path.join(s.bin, "claude"), "#!/bin/sh\n"); // npm also writes an sh script cmd.exe cannot run
