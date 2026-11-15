@@ -696,6 +696,31 @@ process.on("exit", () => {
     assert.ok(out.length < 18892, "replaced, not a passthrough");
     assert.ok(out.includes("mcp__plugin_context-mode_context-mode__ctx_search({queries:["), out);
   });
+
+  // #1382 (ADR-0016 lines 11 and 16): the reporter's WebFetch of a 66 KB page. claude-code-guide and web-fetch have no
+  // ctx tool, no shell and no ranged Read, so they get the page whole; the built-in claude (tools ["*"]) gets ctx_search.
+  const subFetch = (repo, sid, type, n) => ({
+    session_id: sid, cwd: repo, hook_event_name: "PostToolUse", agent_id: "a-wf-" + n, agent_type: type, tool_name: "WebFetch",
+    tool_input: { url: "https://code.claude.com/docs/en/statusline", prompt: "List every field inside context_window." }, tool_use_id: "toolu_gp3_wf_" + n,
+    tool_response: { bytes: 66464, code: 200, codeText: "OK", result: Array.from({ length: 1500 }, (_, i) => "field-" + i + " of context_window in the statusline JSON").join("\n"), durationMs: 900, url: "https://code.claude.com/docs/en/statusline" },
+  });
+
+  test("[R79] GP3/subagent-no-route-whole: claude-code-guide and web-fetch get the WebFetch page whole (#1382)", (t) => {
+    const f = fixture(t);
+    let n = 0;
+    for (const type of ["claude-code-guide", "web-fetch"]) {
+      const r = f.hook(subFetch(f.repo, "gp3-wf-" + n, type, n++));
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(r.stdout, "", type + " got a replace it cannot follow: " + r.stdout.slice(0, 400));
+    }
+  });
+
+  test("[R79] GP3/subagent-no-route-whole: the built-in claude subagent gets the callable ctx_search pointer (#1382)", (t) => {
+    const f = fixture(t);
+    const r = f.hook(subFetch(f.repo, "gp3-wf-claude", "claude", 9));
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(r.stdout.includes("ctx_search({queries:["), r.stdout.slice(0, 400));
+  });
 }
 
 // GP3: hook on a Node below 24.15 (#1370, D-1370-OLDNODE-ALLOW-1)
