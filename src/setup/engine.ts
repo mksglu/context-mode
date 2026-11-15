@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { claudeDirOf, codexDirOf, codexPluginHomeOf, copilotDirOf, dataRootOf, geminiDirOf, kiroDirOf, opencodeDirOf } from "../core/project/config-dir.ts";
-import { AGENT_HOME_DIR, D2_NODE_DETAIL, D2_NODE_FIX, D2_SQLITE_DETAIL, D2_SQLITE_FIX, DB_FILE_NAME, MCP_ENV_FIELD, MCP_ENV_VARS_FIELD, MCP_TOOLS_FIELD, SETUP_MANIFEST_FILE, NATIVE_INSTALL, OPENCODE_CONFIG_FILES, OPENCODE_PLUGIN_KEY, OPENCODE_PLUGINS_KEY, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, D2_NODE_DETAIL, D2_NODE_FIX, D2_SQLITE_DETAIL, D2_SQLITE_FIX, DB_FILE_NAME, MCP_ENV_FIELD, MCP_ENV_VARS_FIELD, MCP_TOOLS_FIELD, SETUP_MANIFEST_FILE, NATIVE_INSTALL, OPENCODE_CONFIG_FILES, OPENCODE_PLUGIN_KEY, OPENCODE_PLUGINS_KEY, OPENCODE_PLUGIN_PATH, PROJECTS_DIR_NAME, SERVER_KEY, TOOL_ORDER, UPGRADE_KEEP_ASIDE_REASONS, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError, formatError } from "../core/contracts/errors.ts";
 import { nodeTooOld } from "../core/hooks/fallback.ts";
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
@@ -1410,7 +1410,9 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
     if (gone.length) { res.status = "FAIL"; res.checks = [...gone, ...res.checks]; res.reason = gone.map((c) => `${c.name}: ${c.detail}`).join("; "); }
     if (res.status === "PASS") {
       // Report-only findings (shared temp file, user data dir) are never changed by setup, so they cannot be fixed by it.
-      if (res.v1.some((f) => !UPGRADE_REPORT_ONLY_REASONS.includes(f.reason))) { res.status = "FAIL"; res.reason = V1_FORM_REASON; }
+      // #1383 D-1383-DOCTOR-V1-DATA-1: a v1 data dir is user data setup keeps (ADR-0017 R6; ctx_upgrade moves it aside,
+      // D-SEC-V1-ASIDE-1), so doctor lists it in res.v1 as a note; only old forms (hooks, MCP entries) fail and name setup.
+      if (res.v1.some((f) => !UPGRADE_REPORT_ONLY_REASONS.includes(f.reason) && !UPGRADE_KEEP_ASIDE_REASONS.includes(f.reason))) { res.status = "FAIL"; res.reason = V1_FORM_REASON; }
       else if (res.changes.length && !onlyTrust(row, res.changes) && !hasPluginIssue(row)) { res.status = "FAIL"; res.reason = notSetUpReason(row, res, ctx.env); }
       else {
         res.checks = await verifyRow(row, ctx, list);

@@ -492,7 +492,7 @@ exit 0`;
     const doc = await runDoctor(opts);
     assert.equal(doc.agents[0].status, "PASS", JSON.stringify(doc.agents[0], null, 2));
     assert.equal(doc.exitCode, 0);
-    assert.ok(doc.agents[0].v1.some((f) => f.file === sessions), "doctor still names the kept data dir");
+    assert.ok(doc.agents[0].v1.some((f) => f.file === path.dirname(sessions)), "doctor still names the kept data dir");
     assert.ok(existsSync(path.join(sessions, "stats-pid-1.json")), "setup keeps the user's data");
     // Control: a v1 hook command in settings.json is an old form, so doctor fails and names setup.
     put(path.join(s.home, ".claude", "settings.json"), JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ type: "command", command: "node /x/context-mode/hooks/pretooluse.mjs" }] }] } }));
