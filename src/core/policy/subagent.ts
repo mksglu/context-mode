@@ -28,14 +28,19 @@ type AgentDef = { tools: string[] | null; disallowed: string[] };
 
 // D-CC-POINTER-3 (#1342, ADR-0016 line 22, LV8 from the Claude Code 2.1.322 binary): the built-in agent types of the
 // claude-code row. tools null = all tools (tools:["*"]); Explore and Plan drop their disallowedTools and keep MCP.
-// claude-code-guide, statusline-setup and unknown names are not here: they stay null -> case C.
+// D-1382-NO-ROUTE-1 (#1382, binary 2.1.273 strings): claude has tools:["*"]; claude-code-guide, statusline-setup and
+// web-fetch have fixed lists with no ctx tool and no shell. Unknown names are not here: they stay null -> case C.
 // Binary: disallowedTools:[ft,...Y9,ny,lt,Xt,Zs] = Agent, the four Artifact tools, ExitPlanMode, Edit, Write, NotebookEdit.
 const CC_READ_ONLY_DENY = Object.freeze(["Agent", "Artifact", "ArtifactComments", "ArtifactData", "ArtifactCheck", "ExitPlanMode", "Edit", "Write", "NotebookEdit"]);
 const CLAUDE_CODE_BUILT_INS: Readonly<Record<string, AgentDef>> = Object.freeze({
   "general-purpose": { tools: null, disallowed: [] },
   fork: { tools: null, disallowed: [] },
+  claude: { tools: null, disallowed: [] },
   Explore: { tools: null, disallowed: [...CC_READ_ONLY_DENY] },
   Plan: { tools: null, disallowed: [...CC_READ_ONLY_DENY] },
+  "claude-code-guide": { tools: ["Glob", "Grep", "Read", "WebFetch", "WebSearch"], disallowed: [] },
+  "statusline-setup": { tools: ["Read", "Edit"], disallowed: [] },
+  "web-fetch": { tools: ["WebFetch"], disallowed: [] },
 });
 const BUILT_IN_AGENT = "claude-code";
 

@@ -488,6 +488,9 @@ async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
     const has = (names: readonly string[]): boolean => set !== null && names.some((n) => set.includes(n));
     caller = { ctx: subCase === "A", shell: has(row.nativeTools.shell),
       read: RANGE_READ_TOOLS.includes(tool.canonicalName) && has(row.nativeTools.read ?? []) };
+    // D-1382-NO-ROUTE-1 (#1382, ADR-0016 lines 11 and 16): a known tool set with no ctx tool, no shell and no ranged
+    // Read has no call that opens the handle, so the replace is a dead end: the output reaches it whole.
+    if (set !== null && !caller.ctx && !caller.shell && !caller.read) return ALLOW;
     label = SUBAGENT_SOURCE_PREFIX + tool.canonicalName + ":" + (tool.callId ?? String(ev.turn ?? 0));
   } else {
     label = mainLabel(tool, ev);

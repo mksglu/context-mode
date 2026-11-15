@@ -192,8 +192,8 @@ describe("ADR-0016: subagent policy cases", { concurrency: CONC }, () => {
   });
 
   // #1342 (LV8 filled from the Claude Code 2.1.322 binary): general-purpose and fork have tools ["*"]; Explore and
-  // Plan have all tools minus their disallowedTools (no MCP removal). claude-code-guide and statusline-setup keep a
-  // fixed list with no ctx tool; an unknown name stays null -> C.
+  // Plan have all tools minus their disallowedTools (no MCP removal). claude-code-guide and statusline-setup have a
+  // fixed list with no ctx tool (D-1382-NO-ROUTE-1, so never A); an unknown name stays null -> C.
   test("#1342 built-in Claude Code types: general-purpose, fork, Explore, Plan -> ctx tools -> A", () => {
     const f = fixture();
     try {
