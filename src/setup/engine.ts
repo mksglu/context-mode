@@ -475,7 +475,13 @@ function opencodeListCheck(bin: string, major: number, env: SetupContext["env"])
   const first = (s: unknown) => `${s}`.trim().split("\n")[0] ?? "";
   let out: unknown;
   try { out = JSON.parse(`${r.stdout}`); } catch { out = undefined; }
-  if (r.status !== 0) return { name: "list", ok: false, detail: `${what} exited ${r.status}: ${first(r.stderr)}` };
+  // #1386 D-1386-OC-LIST-EXIT-1: the host command itself did not run (OpenCode 2.2.6 on Termux exits 1 with "ERROR" and
+  // the reason on the next line). It says nothing about our entry, so the install checks on the files decide; the list
+  // check is a WARN that quotes the host's own lines (D-1378-GEMINI-DISK-1). A list that runs without our entry stays red.
+  if (r.status !== 0) {
+    const host = `${r.stderr}`.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 3).join(" ");
+    return { name: "list", ok: true, warn: true, detail: `${what} exited ${r.status}: ${host}; doctor checked the entry and hooks on disk` };
+  }
   if (major >= 2) {
     if (!Array.isArray(out)) return { name: "list", ok: false, detail: `${what} printed no config list: ${first(r.stdout)}` };
     const listed = out.some((d) => isObj(d) && isObj(d.info) && isObj(d.info.mcp) && isObj(d.info.mcp.servers) && isObj(d.info.mcp.servers[SERVER_KEY]));
