@@ -526,6 +526,45 @@ describe("ADR-0021 Pi cache break guard", () => {
     };
   }
 
+  // #1384: the Pi >= 1.5 host. emitBeforeAgentStart (runner.js:1129-1171) passes systemPromptOptions with named
+  // sections; a returned systemPrompt becomes forceSystemPrompt, and a forced prompt has no sections
+  // (system-prompt.js:125-129). builtin:mcp loads last (resource-loader.js:587-590), so it writes
+  // sections.mcp_servers after our handler. Each turn builds the options anew from Pi's base.
+  function fakeHost15(sid) {
+    const handlers = new Map();
+    const pi = { on: (name, fn) => handlers.set(name, fn), registerTool: () => {} };
+    piExtension(pi);
+    const ctx = { cwd: repo, sessionManager: { getSessionId: () => sid } };
+    const base = "BASE SYSTEM PROMPT";
+    return {
+      async turn() {
+        const options = { sections: {} };
+        const event = { type: "before_agent_start", prompt: "p", systemPrompt: base, systemPromptOptions: options };
+        const r = await handlers.get("before_agent_start")(event, ctx);
+        if (r?.systemPrompt !== undefined) options.forceSystemPrompt = r.systemPrompt;
+        options.sections.mcp_servers = "<server name=\"codemode\"/>"; // builtin:mcp, mcp/index.js:1036-1044
+        if (options.forceSystemPrompt !== undefined) return options.forceSystemPrompt;
+        const rendered = Object.entries(options.sections).map(([name, text]) => `<${name}>\n${text}\n</${name}>`);
+        return [base, ...rendered].join("\n\n");
+      },
+      async input(text) {
+        await handlers.get("input")({ text }, ctx);
+      },
+    };
+  }
+
+  test("pi 1.5 cache: the prompt keeps <mcp_servers> and INSTRUCTIONS, byte-identical on turns 1..4 (#1384)", async () => {
+    const host = fakeHost15("cache-1384");
+    const seen = [];
+    for (let i = 0; i < 4; i++) {
+      await host.input("prompt " + i);
+      seen.push(await host.turn());
+    }
+    assert.ok(seen[0].includes("<mcp_servers>"), "the builtin:mcp section reaches the model");
+    assert.equal(seen[0].split(INSTRUCTIONS).length - 1, 1, "INSTRUCTIONS exactly once");
+    for (let i = 1; i < seen.length; i++) assert.equal(seen[i], seen[0], "turn " + (i + 1) + " system prompt differs from turn 1");
+  });
+
   test("pi cache: the system prompt is byte-identical on turns 1..4 and keeps INSTRUCTIONS (no turn-2 break)", async () => {
     const host = fakeHost("cache-s1");
     const seen = [];

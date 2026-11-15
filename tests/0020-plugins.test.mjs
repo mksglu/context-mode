@@ -655,6 +655,29 @@ describe("ADR-0020 plugins", () => {
       assert.equal(second.systemPrompt.split(INSTRUCTIONS).length - 1, 1, "INSTRUCTIONS exactly once on turn 2");
     });
 
+    // #1384: Pi >= 1.5 (runner.js:1154-1155) turns a returned systemPrompt into forceSystemPrompt, and a forced
+    // prompt renders no sections (system-prompt.js:125-129), so builtin:mcp's <mcp_servers> section is dropped.
+    // On the sections channel our payload is one named section and the return carries no systemPrompt.
+    test("before_agent_start: on Pi >= 1.5 the payload goes into a named section and no systemPrompt is returned, so other sections stay (#1384)", async () => {
+      const { pi, handlers } = fakePi();
+      piExtension(pi);
+      const sections = { mcp_servers: "<server name=\"codemode\"/>" };
+      const event = { type: "before_agent_start", prompt: "p", systemPrompt: "base", systemPromptOptions: { sections } };
+      const out = await handlers.get("before_agent_start")(event, ctxFor("s-1384"));
+      assert.equal(out?.systemPrompt, undefined, "no systemPrompt, so Pi does not force the prompt");
+      assert.equal(sections.mcp_servers, "<server name=\"codemode\"/>", "another extension's section stays as it was");
+      assert.equal(typeof sections.context_mode, "string", "the payload is a named section");
+      assert.equal(sections.context_mode.split(INSTRUCTIONS).length - 1, 1, "INSTRUCTIONS exactly once in the section");
+    });
+
+    test("before_agent_start: a host with no sections channel (Pi 0.73.1, OMP) still gets base + payload as systemPrompt (#1384)", async () => {
+      const { pi, handlers } = fakePi();
+      piExtension(pi);
+      const out = await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: "p", systemPrompt: "base" }, ctxFor("s-1384b"));
+      assert.equal(typeof out.systemPrompt, "string");
+      assert.ok(out.systemPrompt.startsWith("base\n\n") && out.systemPrompt.includes(INSTRUCTIONS));
+    });
+
     test("before_agent_start: a registerTool failure is retried on the next turn (#1098)", async () => {
       const { pi, handlers, tools } = fakePi({ failRegister: { n: 1 } });
       piExtension(pi);
