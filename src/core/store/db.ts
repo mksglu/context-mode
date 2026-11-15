@@ -5,6 +5,7 @@
 const { existsSync, linkSync, mkdirSync, renameSync, rmSync, statSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import type { DatabaseSync } from "node:sqlite";
 import {
+  DB_CLAIM_BUSY_CODES,
   DB_LINK_DENIED_CODES,
   DB_PUBLISH_CLAIM_SUFFIX,
   DB_PUBLISH_POLL_MS,
@@ -83,7 +84,7 @@ function publishWithoutLink(tmp: string, path: string): void {
     try {
       mkdirSync(claim);
     } catch (err) {
-      if (errCode(err) !== "EEXIST") throw err;
+      if (!DB_CLAIM_BUSY_CODES.includes(errCode(err))) throw err;
       if (Date.now() - start < DB_TIMEOUT_MS) {
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, DB_PUBLISH_POLL_MS);
         continue;
