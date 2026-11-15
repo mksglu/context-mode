@@ -841,6 +841,47 @@ exit 0`);
     assert.match(doc.agents[0].reason, /mcp\.servers\.context-mode.*\/elsewhere\/opencode/);
   });
 
+  // #1386 (Android arm64, Termux, OpenCode 2): "list: opencode debug config --standalone exited 1: ERROR" (rolled back),
+  // while parse, mcp, hook-registered, hook-runs and skills passed. Real opencode 2.2.6 exits 1 with "ERROR" on the first
+  // stderr line and the reason after it (an XDG data dir it cannot write: PermissionDenied FileSystem.makeDirectory .../log).
+  // ADR-0019 verify + D-SETUP-HOST-BROKEN-1 + D-1378-GEMINI-DISK-1: a host CLI that cannot run its own list command keeps a
+  // working install; the list check is a WARN that quotes the host's own reason, and doctor names no setup loop.
+  const OC_HOST_ERR = "PlatformError: PermissionDenied: FileSystem.makeDirectory (/data/data/com.termux/files/home/.local/share/opencode/log)";
+  function fakeOpencode2Broken(s) {
+    fakeBin(s.root, "opencode", `case "$1 $2" in
+  "--version ") echo "opencode v2.2.6" ;;
+  "debug config") printf 'ERROR\\n${OC_HOST_ERR}\\n' >&2; exit 1 ;;
+esac
+exit 0`);
+    return path.join(s.home, ".config", "opencode", "opencode.json");
+  }
+
+  test("[#1386] setup: OpenCode 2 whose debug config --standalone exits 1 keeps the working install; list is a WARN with the host's reason, no rollback", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = sandbox(t);
+    const file = fakeOpencode2Broken(s);
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"], runId: "r" });
+    const a = res.agents[0];
+    assert.equal(a.rolledBack, undefined, JSON.stringify(a, null, 2));
+    assert.equal(a.status, "PASS", JSON.stringify(a, null, 2));
+    assert.equal(res.exitCode, 0);
+    const list = a.checks.find((c) => c.name === "list");
+    assert.ok(list && list.ok && list.warn && `${list.detail}`.includes("debug config --standalone") && `${list.detail}`.includes(OC_HOST_ERR), JSON.stringify(a.checks, null, 2));
+    for (const n of ["mcp", "hook-registered", "hook-runs"]) assert.ok(a.checks.some((c) => c.name === n && c.ok), `${n}: ${JSON.stringify(a.checks, null, 2)}`);
+    assert.ok(JSON.parse(readFileSync(file, "utf8")).mcp, "the MCP entry setup wrote stays on disk");
+  });
+
+  test("[#1386] doctor: OpenCode 2 whose debug config --standalone exits 1 passes the install checks with a WARN that quotes the host's reason, no setup fix line", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = sandbox(t);
+    fakeOpencode2Broken(s);
+    await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"], runId: "r" });
+    const doc = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"] });
+    const a = doc.agents[0];
+    assert.equal(a.status, "PASS", JSON.stringify(a, null, 2));
+    assert.equal(a.fix, undefined, JSON.stringify(a, null, 2));
+    const list = a.checks.find((c) => c.name === "list");
+    assert.ok(list && list.ok && list.warn && `${list.detail}`.includes(OC_HOST_ERR), JSON.stringify(a.checks, null, 2));
+  });
+
   // D-SETUP-HOST-BROKEN-1 (#1308): "copilot mcp add ... exited 1: GitHub Copilot CLI: no platform package found.
   // Reinstall with `npm install -g @github/copilot`". The Copilot install itself is broken: setup reports SKIPPED with the
   // host's own fix line first, writes nothing, rolls nothing back, and the run does not fail on it.
