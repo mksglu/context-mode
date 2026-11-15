@@ -2,9 +2,12 @@
 // metaGet/metaSet/metaTake (DEVIATIONS D-M1-7), ADR-0002 decisions 2-3, impl/02 A-S3,
 // DEVIATIONS D-M1-T5-1.
 // D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
-const { existsSync, linkSync, mkdirSync, rmSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
+const { existsSync, linkSync, mkdirSync, renameSync, rmSync, statSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import type { DatabaseSync } from "node:sqlite";
 import {
+  DB_LINK_DENIED_CODES,
+  DB_PUBLISH_CLAIM_SUFFIX,
+  DB_PUBLISH_POLL_MS,
   DB_SHM_SUFFIX,
   DB_TIMEOUT_MS,
   DB_TMP_SUFFIX,
@@ -62,6 +65,42 @@ function readUserVersion(raw: DatabaseSync): number {
   return row.user_version;
 }
 
+function errCode(err: unknown): string {
+  return (err as NodeJS.ErrnoException).code ?? "";
+}
+
+// D-1385-NOLINK-1: publish for a file system with no hard links (Android f2fs: link() is EACCES).
+// mkdir is atomic everywhere, so one creator holds `<db>.publish`; it alone renames its finished temp
+// file into place, and only while context.db is still missing. A creator that lost the claim waits
+// (bounded by DB_TIMEOUT_MS, like the busy handler) until the file is there or the claim is free.
+// A claim older than the whole wait is left by a killed creator: remove it and fail this one open;
+// the next open publishes. So a second creator never replaces the file another server has open.
+function publishWithoutLink(tmp: string, path: string): void {
+  const claim = path + DB_PUBLISH_CLAIM_SUFFIX;
+  const start = Date.now();
+  for (;;) {
+    if (existsSync(path)) return;
+    try {
+      mkdirSync(claim);
+    } catch (err) {
+      if (errCode(err) !== "EEXIST") throw err;
+      if (Date.now() - start < DB_TIMEOUT_MS) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, DB_PUBLISH_POLL_MS);
+        continue;
+      }
+      const held = statSync(claim, { throwIfNoEntry: false });
+      if (held !== undefined && held.mtimeMs < start) rmSync(claim, { recursive: true, force: true });
+      throw new Error(`context.db was not published within ${DB_TIMEOUT_MS} ms: ${claim} was held; open again`);
+    }
+    try {
+      if (!existsSync(path)) renameSync(tmp, path);
+    } finally {
+      rmSync(claim, { recursive: true, force: true });
+    }
+    return;
+  }
+}
+
 // D-M2-CI-3: a missing DB is built under a private temp name (WAL switch + DDL, no other
 // connection can see it), then published with linkSync, which fails with EEXIST if another server
 // won. `PRAGMA journal_mode = WAL` needs an exclusive lock that SQLite takes without calling the
@@ -80,7 +119,9 @@ function createAtomically(sqlite: SqliteModule, path: string): void {
     try {
       linkSync(tmp, path);
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+      const code = errCode(err);
+      if (DB_LINK_DENIED_CODES.includes(code)) publishWithoutLink(tmp, path);
+      else if (code !== "EEXIST") throw err;
     }
   } finally {
     for (const suffix of ["", DB_WAL_SUFFIX, DB_SHM_SUFFIX]) rmSync(tmp + suffix, { force: true });

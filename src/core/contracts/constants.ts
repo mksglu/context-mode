@@ -128,6 +128,10 @@ export const DB_TIMEOUT_MS = 5000; // ADR-0002, PRD §4
 export const DB_WAL_SUFFIX = "-wal"; // impl/02 §6.1 step 4, DEVIATIONS D-M1-T5-1: WAL sibling of context.db
 export const DB_SHM_SUFFIX = "-shm"; // impl/02 §6.1 step 4, DEVIATIONS D-M1-T5-1: shared-memory sibling of context.db
 export const DB_TMP_SUFFIX = ".tmp"; // DEVIATIONS D-M2-CI-3: private build name of a new context.db before linkSync publishes it
+// DEVIATIONS D-1385-NOLINK-1: link() codes that mean "this file system has no hard links" (Android f2fs, some FUSE/SMB mounts).
+export const DB_LINK_DENIED_CODES: readonly string[] = ["EACCES", "EPERM", "ENOSYS", "ENOTSUP", "EOPNOTSUPP"];
+export const DB_PUBLISH_CLAIM_SUFFIX = ".publish"; // D-1385-NOLINK-1: mkdir claim; its holder alone renames the temp DB into place
+export const DB_PUBLISH_POLL_MS = 5; // D-1385-NOLINK-1: a creator that lost the claim checks for the published file this often
 export const SQLITE_PRIMARY_CODE_MASK = 255; // DEVIATIONS D-M1-T5-1: extended result code -> primary code (low byte)
 export const SQLITE_CORRUPT_CODE = 11; // impl/02 §6.1 error cases: SQLITE_CORRUPT -> DB_CORRUPT
 export const SQLITE_NOTADB_CODE = 26; // DEVIATIONS D-M1-T5-1: SQLITE_NOTADB (garbage file) -> DB_CORRUPT
