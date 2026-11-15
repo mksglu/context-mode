@@ -176,7 +176,8 @@ dotted field path (`.a.b.c`, letters/digits/underscore per segment), `length`, o
 1. `sudo <rest>`, `env [NAME=val ...] <rest>`, `time <rest>`, `nice [-n N] <rest>`, `timeout <dur> <rest>`,
    `command <rest>` → drop the wrapper word (and, for `env`, every leading `NAME=val` arg; for `nice`, a leading
    `-n N`; for `timeout`, the leading duration) and re-point `argv0`/`args` at `<rest>`. Record the wrapper name in
-   `wrappedBy`.
+   `wrappedBy`. `rtk proxy <rest>` / `rtk bypass [--skip-env] [--] <rest>` (rtk-ai/rtk runs `<rest>` as-is) unwrap
+   the same way, recorded as `rtk`; any other rtk subcommand (`rtk cat`, `rtk gain`) stays `rtk` (#1388).
 2. `xargs ... <cmd>`: if the last word is a command name (not an xargs flag), treat `<cmd>` as the wrapped
    command — `xargs curl -s https://x` is caught this way (ADR-0008 GP3 "wrapper: xargs"); a bare `xargs` with no
    trailing command word (reading argv from stdin with no visible target) is left unwrapped (argv0 stays `xargs`).
@@ -193,7 +194,7 @@ allows it through to the hint-only path — matching "no new deny categories" in
 
 **Constants used:** none.
 
-**Covers:** GP3 rows for `sudo`, `env`, `time`, `nice`, `timeout`, `xargs`, `command`, `bash -c`, `sh -c`, `$( )`,
+**Covers:** GP3 rows for `sudo`, `env`, `time`, `nice`, `timeout`, `xargs`, `command`, `rtk proxy`, `rtk bypass`, `bash -c`, `sh -c`, `$( )`,
 backticks (ADR-0008 "New scope beyond v1 parity", Q5). `covers: src/core/policy/unwrap.ts`.
 
 ## 4. `user-deny.ts` — user `permissions.deny`

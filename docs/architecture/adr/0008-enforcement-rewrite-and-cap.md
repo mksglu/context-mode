@@ -88,7 +88,7 @@ HTTP/build rules (`impl/08-enforcement.md` §2.2, §2.3). GP3 lists every code a
 
 ## New scope beyond v1 parity (Q5)
 
-v1 only detected curl/wget directly (`routing.mjs:735-765`). v2 unwraps `sudo`, `env`, `time`, `nice`, `timeout`, `xargs`, `command`, `bash -c`/`sh -c` strings and `$( )`/backticks before it reads argv0, so curl/wget behind any of those wrappers is also caught. The #166 silent/verbose curl checks stay (v1 `routing.mjs:745-765`). User `permissions.deny` also checks `ctx_execute`/`ctx_execute_file`/`ctx_batch_execute` input.
+v1 only detected curl/wget directly (`routing.mjs:735-765`). v2 unwraps `sudo`, `env`, `time`, `nice`, `timeout`, `xargs`, `command`, `rtk proxy`/`rtk bypass` (#1388), `bash -c`/`sh -c` strings and `$( )`/backticks before it reads argv0, so curl/wget behind any of those wrappers is also caught. The #166 silent/verbose curl checks stay (v1 `routing.mjs:745-765`). User `permissions.deny` also checks `ctx_execute`/`ctx_execute_file`/`ctx_batch_execute` input.
 
 ## Golden cases (GP3)
 

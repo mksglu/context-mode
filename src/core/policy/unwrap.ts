@@ -1,5 +1,5 @@
 // impl/08 §3 (module enforcement): wrapper unwrapping. No regex (ADR-0008).
-// sudo env time nice timeout command xargs (step 1-2), bash -c / sh -c (step 3), $( ) backticks <( ) >( ) (step 4,
+// sudo env time nice timeout command xargs, rtk proxy / bypass (step 1-2), bash -c / sh -c (step 3), $( ) backticks <( ) >( ) (step 4,
 // DECISIONS-r9 P1). An unrecognized wrapper shape stays as-is. Recursion stops at MAX_NEST_DEPTH. Never throws.
 import { MAX_NEST_DEPTH } from "../contracts/constants.ts";
 import type { SimpleCommand } from "../contracts/types.ts";
@@ -12,16 +12,19 @@ interface Wrapper {
   assignments: boolean;           // NAME=val words are skipped (env, sudo)
   duration: boolean;              // a duration operand comes before the command (timeout)
   refuseShorts: string;           // any of these short options means "not a wrapped command" (command -v)
+  subcommands: readonly string[]; // when set, the first word must be one of these (rtk proxy / rtk bypass, #1388)
 }
 const NONE = "";
 const WRAPPERS: Readonly<Record<string, Wrapper>> = Object.freeze({
-  sudo: { valueShorts: "ugpChDrtUTR", valueLongs: ["--user", "--group", "--prompt", "--chdir", "--host"], assignments: true, duration: false, refuseShorts: NONE },
-  env: { valueShorts: "uCS", valueLongs: ["--unset", "--chdir", "--split-string"], assignments: true, duration: false, refuseShorts: NONE },
-  time: { valueShorts: "fo", valueLongs: ["--format", "--output"], assignments: false, duration: false, refuseShorts: NONE },
-  nice: { valueShorts: "n", valueLongs: ["--adjustment"], assignments: false, duration: false, refuseShorts: NONE },
-  timeout: { valueShorts: "sk", valueLongs: ["--signal", "--kill-after"], assignments: false, duration: true, refuseShorts: NONE },
-  command: { valueShorts: NONE, valueLongs: [], assignments: false, duration: false, refuseShorts: "vV" },
-  xargs: { valueShorts: "aEdILnPs", valueLongs: ["--arg-file", "--delimiter", "--max-args", "--max-procs", "--max-chars"], assignments: false, duration: false, refuseShorts: NONE },
+  sudo: { valueShorts: "ugpChDrtUTR", valueLongs: ["--user", "--group", "--prompt", "--chdir", "--host"], assignments: true, duration: false, refuseShorts: NONE, subcommands: [] },
+  env: { valueShorts: "uCS", valueLongs: ["--unset", "--chdir", "--split-string"], assignments: true, duration: false, refuseShorts: NONE, subcommands: [] },
+  time: { valueShorts: "fo", valueLongs: ["--format", "--output"], assignments: false, duration: false, refuseShorts: NONE, subcommands: [] },
+  nice: { valueShorts: "n", valueLongs: ["--adjustment"], assignments: false, duration: false, refuseShorts: NONE, subcommands: [] },
+  timeout: { valueShorts: "sk", valueLongs: ["--signal", "--kill-after"], assignments: false, duration: true, refuseShorts: NONE, subcommands: [] },
+  command: { valueShorts: NONE, valueLongs: [], assignments: false, duration: false, refuseShorts: "vV", subcommands: [] },
+  xargs: { valueShorts: "aEdILnPs", valueLongs: ["--arg-file", "--delimiter", "--max-args", "--max-procs", "--max-chars"], assignments: false, duration: false, refuseShorts: NONE, subcommands: [] },
+  // #1388: rtk (rtk-ai/rtk) runs the inner command as-is under `proxy` / `bypass`; its other subcommands are rtk's own.
+  rtk: { valueShorts: NONE, valueLongs: [], assignments: false, duration: false, refuseShorts: NONE, subcommands: ["proxy", "bypass"] },
 });
 const SHELLS: readonly string[] = ["bash", "sh", "zsh"]; // D-CDX-CAT-1: Codex runs the cmd as zsh -lc on macOS
 const SCRIPT_FLAG = "c";
@@ -48,6 +51,10 @@ function isDuration(s: string): boolean {
 /** The wrapped command's words (argv0 first), or null when this is not a recognized wrapper shape. */
 function peel(w: Wrapper, args: readonly string[]): string[] | null {
   let k = 0;
+  if (w.subcommands.length > 0) {
+    if (args.length === 0 || !w.subcommands.includes(args[0])) return null;
+    k = 1;
+  }
   while (k < args.length) {
     const a = args[k];
     if (a === LONG_OPT) { k++; break; }
