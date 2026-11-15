@@ -25,7 +25,7 @@ The Context Mode plugin runs that work in a local sandbox, keeps the full output
 - **The plugin keeps your data on your machine.** Every index lives in `~/.context-mode`: one `context.db` per project.
 - **Zero telemetry.** The plugin keeps all usage data on your machine. [Security and privacy](#security-and-privacy) lists each network call it makes.
 - **Works offline after install.** Sandbox runs, file indexing and search use local SQLite and your own runtimes.
-- **Thinking in Code.** The agent writes a short script instead of reading the data, and only what the script prints reaches the context: see [How it works, step 5](#thinking-in-code).
+- **Code Mode.** The agent writes a short script instead of reading the data, and only what the script prints reaches the context: see [How it works, step 5](#code-mode).
 - **Small replies.** On the 36 bench rows with 10 KB or more of raw output, the plugin's median reply is 99.4% smaller than the raw output.
 
 ## Adoption: stars and npm downloads
@@ -357,17 +357,17 @@ Real tool output from public projects, run through Context Mode. Bench of 2026-1
 
 | What you do | Tool | Raw | Reaches the context | Saved |
 |---|---|---:|---:|---:|
-| [Read a browser page](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-devtools-mcp-snapshot) | Chrome DevTools MCP `take_snapshot`, [Thinking in Code](#thinking-in-code) | 136,514 B | 463 B | 99.7% |
-| [List 40 issues](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-gh-issue-list-vite) | GitHub CLI `gh issue list --json`, [Thinking in Code](#thinking-in-code) | 182,943 B | 850 B | 99.5% |
-| [List 25 pull requests with checks](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-gh-pr-list-vite) | GitHub CLI `gh pr list --json`, [Thinking in Code](#thinking-in-code) | 195,471 B | 776 B | 99.6% |
-| [Look up library docs](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-context7-query-docs-vite) | Context7 `query-docs`, [Thinking in Code](#thinking-in-code) | 6,917 B | 473 B | 93.2% |
-| [Run 1,106 tests](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-vitest-run-vite) | Vitest `vitest run --reporter=verbose`, [Thinking in Code](#thinking-in-code) | 62,909 B | 429 B | 99.3% |
-| [Lint a source folder](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-biome-lint-vite) | Biome `biome lint --reporter=json`, [Thinking in Code](#thinking-in-code) | 288,523 B | 577 B | 99.8% |
-| [Install a workspace](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-pnpm-install-vite) | pnpm `pnpm install --frozen-lockfile`, [Thinking in Code](#thinking-in-code) | 14,988 B | 199 B | 98.7% |
-| [Install packages](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-npm-install-log) | npm `npm install --loglevel http`, [Thinking in Code](#thinking-in-code) | 37,761 B | 435 B | 98.8% |
-| [Read container logs](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-docker-logs-mongo) | Docker `docker logs`, [Thinking in Code](#thinking-in-code) | 60,374 B | 587 B | 99.0% |
-| [Plan 72 resources](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-terraform-plan) | Terraform `terraform plan`, [Thinking in Code](#thinking-in-code) | 34,081 B | 166 B | 99.5% |
-| [Read 300 commits with file stats](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-git-log-stat-vite) | git `git log --stat`, [Thinking in Code](#thinking-in-code) | 164,385 B | 268 B | 99.8% |
+| [Read a browser page](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-devtools-mcp-snapshot) | Chrome DevTools MCP `take_snapshot`, [Code Mode](#code-mode) | 136,514 B | 463 B | 99.7% |
+| [List 40 issues](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-gh-issue-list-vite) | GitHub CLI `gh issue list --json`, [Code Mode](#code-mode) | 182,943 B | 850 B | 99.5% |
+| [List 25 pull requests with checks](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-gh-pr-list-vite) | GitHub CLI `gh pr list --json`, [Code Mode](#code-mode) | 195,471 B | 776 B | 99.6% |
+| [Look up library docs](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-context7-query-docs-vite) | Context7 `query-docs`, [Code Mode](#code-mode) | 6,917 B | 473 B | 93.2% |
+| [Run 1,106 tests](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-vitest-run-vite) | Vitest `vitest run --reporter=verbose`, [Code Mode](#code-mode) | 62,909 B | 429 B | 99.3% |
+| [Lint a source folder](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-biome-lint-vite) | Biome `biome lint --reporter=json`, [Code Mode](#code-mode) | 288,523 B | 577 B | 99.8% |
+| [Install a workspace](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-pnpm-install-vite) | pnpm `pnpm install --frozen-lockfile`, [Code Mode](#code-mode) | 14,988 B | 199 B | 98.7% |
+| [Install packages](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-npm-install-log) | npm `npm install --loglevel http`, [Code Mode](#code-mode) | 37,761 B | 435 B | 98.8% |
+| [Read container logs](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-docker-logs-mongo) | Docker `docker logs`, [Code Mode](#code-mode) | 60,374 B | 587 B | 99.0% |
+| [Plan 72 resources](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-terraform-plan) | Terraform `terraform plan`, [Code Mode](#code-mode) | 34,081 B | 166 B | 99.5% |
+| [Read 300 commits with file stats](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/a-sandbox/README.md#a-git-log-stat-vite) | git `git log --stat`, [Code Mode](#code-mode) | 164,385 B | 268 B | 99.8% |
 | [Read an 89 KB source file](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/f-hook-redirect/README.md#f-read-vite-config) | Read, sent to `ctx_execute` by the hook | 91,362 B | 375 B | 99.6% |
 | [Fetch a 265 KB docs page](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/f-hook-redirect/README.md#f-webfetch-vite-docs) | WebFetch, sent to `ctx_index` and `ctx_search` | 271,731 B | 439 B | 99.8% |
 | [Fetch a 214 KB API reply](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/f-hook-redirect/README.md#f-bash-curl-post) | curl in Bash, replaced after it runs | 219,175 B | 291 B | 99.9% |
@@ -452,8 +452,8 @@ One tool call, in time order, from the install to a hook error.
 2. **Session start.** The `SessionStart` hook opens the project database. When the session ran before, the agent gets one line that tells it to call `ctx_resume` ([dispatch.ts](https://github.com/mksglu/context-mode/blob/v2.2.0/src/core/hooks/dispatch.ts)).
 3. **PreToolUse checks.** Before a tool runs, the `PreToolUse` hook checks the call in a fixed order: the user's deny list, WebFetch, curl and wget, inline HTTP and build commands, then a full-file Read over `OUTPUT_CAP` (16,384 B) and one-file shell dumps such as `cat` or `tail`. A Read with a line range runs as usual ([decide.ts](https://github.com/mksglu/context-mode/blob/v2.2.0/src/core/policy/decide.ts)).
 4. **The exact call.** When a check matches, the hook stops the call and its reply names the exact `ctx_*` call to use, for example `ctx_execute` with `{"language":"shell","code":"<the command>","intent":"<what you need>"}`. For WebFetch the reply names `ctx_index`, then `ctx_search` ([read-deny.ts](https://github.com/mksglu/context-mode/blob/v2.2.0/src/core/policy/read-deny.ts)).
-5. **The sandbox.** This is the Thinking in Code step: the agent's script runs here, and only what it prints comes back. `ctx_execute` writes the script to a temp folder and spawns the runtime from an argument list in the project folder. The timeout is `EXEC_TIMEOUT_MS` (600,000 ms, default and maximum); on timeout it stops the whole process group (`taskkill /F /T` on Windows). The child gets your environment minus preload variables such as `NODE_OPTIONS`, and the agent gets what the script prints, at most `OUTPUT_CAP` ([execute.ts](https://github.com/mksglu/context-mode/blob/v2.2.0/src/core/tools/execute.ts)).
-   <a id="thinking-in-code"></a>**Thinking in Code.** The agent sends a short script as a tool parameter, the script reads the data in the sandbox, and only what it prints goes into the context. Two real calls, in the form the Claude Code terminal shows them:
+5. **The sandbox.** This is the Code Mode step: the agent's script runs here, and only what it prints comes back. `ctx_execute` writes the script to a temp folder and spawns the runtime from an argument list in the project folder. The timeout is `EXEC_TIMEOUT_MS` (600,000 ms, default and maximum); on timeout it stops the whole process group (`taskkill /F /T` on Windows). The child gets your environment minus preload variables such as `NODE_OPTIONS`, and the agent gets what the script prints, at most `OUTPUT_CAP` ([execute.ts](https://github.com/mksglu/context-mode/blob/v2.2.0/src/core/tools/execute.ts)).
+   <a id="code-mode"></a>**Code Mode.** The agent sends a short script as a tool parameter, the script reads the data in the sandbox, and only what it prints goes into the context. Two real calls, in the form the Claude Code terminal shows them:
 
    `ctx_execute` on 5,000 JSON records, from the Claude Code 2.1.312 stream of the Try-it run with Context Mode 2.0.0-next.26 ([04-api-json.json](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/evidence/try-it-2026-11-02/04-api-json.json)). The data is 1,039,898 B; the agent gets 254 B.
 
@@ -483,7 +483,7 @@ One tool call, in time order, from the install to a hook error.
         }
    ```
 
-   `ctx_batch` on an install log and a long git log, one live MCP call to `release-out/server.mjs` of Context Mode 2.0.0-next.36 on 2026-11-03 ([2026-11-03-ctx-batch.json](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/evidence/thinking-in-code/2026-11-03-ctx-batch.json)). The commands print 228,881 B; the agent gets 8,667 B, the parts that match its two queries, and the full output stays in the index.
+   `ctx_batch` on an install log and a long git log, one live MCP call to `release-out/server.mjs` of Context Mode 2.0.0-next.36 on 2026-11-03 ([2026-11-03-ctx-batch.json](https://github.com/mksglu/context-mode/blob/v2.2.0/bench/evidence/code-mode/2026-11-03-ctx-batch.json)). The commands print 228,881 B; the agent gets 8,667 B, the parts that match its two queries, and the full output stays in the index.
 
    ```text
    ⏺ context-mode - ctx_batch (MCP)(commands: ["cat npm-install… queries: ["cache miss","feat commit"])
@@ -656,7 +656,7 @@ Source: [contextmode.ai/docs](https://contextmode.ai/docs/how-saving-works?utm_s
 
 | Feature | What it does | What you get | Details |
 |---|---|---|---|
-| Context Saving | Folds old tool output, runs data work as code (Thinking in Code), trims tool schemas, places cache marks | A tool output over 2,048 B becomes a short pointer, with the full copy archived | Saves the most on sessions with many tool calls |
+| Context Saving | Folds old tool output, runs data work as code (Code Mode), trims tool schemas, places cache marks | A tool output over 2,048 B becomes a short pointer, with the full copy archived | Saves the most on sessions with many tool calls |
 | Recall | The model sees recent work and an index of older work; the agent searches the archive for the rest | Gateway, Claude Code, Opus 5.5, 200K window, 2026-10-04: mean cost per session $4.8627 to $3.0353 (-37.6% in dollars, `ab.json` below) | Cost measured in Claude Code on Claude Opus 5.5 |
 | Memory | Each fact keeps two times: when it was true and when the Gateway learned it | Claude Code and Codex on one account share one store, tested end to end | The memory block goes into the first request of a new session |
 | Skills | A skill catalog on the Gateway for your account; it loads the skill that matches your message | The matching skill loads on the message that needs it | Import skills from GitHub; a loaded skill joins the prompt in full |

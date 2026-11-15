@@ -55,7 +55,7 @@ function realCalls() {
   const res = ev.stream.flatMap((e) => (e.type === "user" ? e.message.content : [])).find((c) => c.tool_use_id === use.id);
   const text = res.content.map((c) => c.text).join("");
   const agent = readRoot("bench/evidence/try-it-2026-11-02/README.md").match(/Claude Code (\d+\.\d+\.\d+)/)[1];
-  const b = JSON.parse(readRoot("bench/evidence/thinking-in-code/2026-11-03-ctx-batch.json"));
+  const b = JSON.parse(readRoot("bench/evidence/code-mode/2026-11-03-ctx-batch.json"));
   const produced = b.files.reduce((n, f) => n + statSync(path.join(ROOT, f)).size, 0);
   return {
     exec: { tool: use.name.split("__").pop(), form: terminalForm("ctx_execute", use.input, text), read: ev.summary.raw_bytes, returned: Buffer.byteLength(text), agent, version: ev.summary.version },
@@ -986,8 +986,8 @@ describe("ADR-0015 repo: doc facts", () => {
     assert.ok(md.includes(`(${first}–${last},`), `tools.md must say ${first}–${last}`);
   });
 
-  test("docs/tools.md opens ctx_execute and ctx_batch with Thinking in Code and the bench bytes of a real run (D-TIC-DOCS-1)", () => {
-    // Owner 2026-11-03: "Tum web'de, readme'de docslarda her yerde Thinking in Code felsefesini ... gormek istiyorum".
+  test("docs/tools.md opens ctx_execute and ctx_batch with Code Mode and the bench bytes of a real run (D-TIC-DOCS-1)", () => {
+    // Owner 2026-11-03: "Tum web'de, readme'de docslarda her yerde Code Mode felsefesini ... gormek istiyorum".
     const md = read("docs/tools.md");
     const res = json("bench/results/2026-11-01-darwin-arm64.json").results;
     const row = (id) => res.find((r) => r.id === id);
@@ -996,7 +996,7 @@ describe("ADR-0015 repo: doc facts", () => {
     const batch = md.slice(md.indexOf("## ctx_batch"));
     assert.ok(md.indexOf("## ctx_execute") > 0 && md.indexOf("## ctx_batch") > md.indexOf("## ctx_execute"));
     for (const [part, id] of [[exec, "a-git-log-stat-vite"], [batch, "c-install-log"]]) {
-      assert.ok(part.split("\n").slice(0, 4).join("\n").includes("Thinking in Code"), `${id} section opens with the principle`);
+      assert.ok(part.split("\n").slice(0, 4).join("\n").includes("Code Mode"), `${id} section opens with the principle`);
       const m = row(id).metrics;
       assert.ok(part.includes(B(m.raw_bytes.median)) && part.includes(B(m.ctx_bytes.median)), `${id} bytes from the results JSON`);
       assert.ok(part.includes(`../bench/results/2026-11-01-darwin-arm64.json`) && part.includes("```"), `${id} links its row and shows the call`);
@@ -1011,7 +1011,7 @@ describe("ADR-0015 repo: doc facts", () => {
     assert.ok(exec.includes("https://contextmode.ai/docs/"), "the Gateway line links its own page");
     const how = read("docs/how-it-works.md");
     const during = how.slice(how.indexOf("2. **During the call**"), how.indexOf("3. **After the call**"));
-    assert.ok(during.includes("Thinking in Code") && during.includes("tools.md#ctx_execute"), "docs/how-it-works.md names the sandbox step Thinking in Code");
+    assert.ok(during.includes("Code Mode") && during.includes("tools.md#ctx_execute"), "docs/how-it-works.md names the sandbox step Code Mode");
   });
 
   test("docs/tools.md says where a doctor report over REPORT_CAP is stored (D-NO-LOSSY-CUT-1)", () => {
@@ -1745,16 +1745,16 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     devRow("D-README-USECASES-2", "playwright i silelim");
   });
 
-  test("README Thinking in Code lives in How it works step 5: the real ctx_execute and ctx_batch calls in their terminal form, bytes from the evidence (D-TIC-README-2)", () => {
+  test("README Code Mode lives in How it works step 5: the real ctx_execute and ctx_batch calls in their terminal form, bytes from the evidence (D-TIC-README-2)", () => {
     // Owner 2026-11-03: "ctx_execute ve batch tool lari icerisinde terminalde nasil gozukecek onu vermeliydin ... Bunu ayrica how its works kismina ekle en basa degil."
     const readme = readRepo("README.md");
-    assert.ok(!readme.includes("\n## Thinking in Code\n"), "no top-level Thinking in Code section");
-    assert.ok(!readme.split("\n").find((l) => l.startsWith("**Contents:** ")).includes("Thinking in Code"), "Contents names the sections only");
+    assert.ok(!readme.includes("\n## Code Mode\n"), "no top-level Code Mode section");
+    assert.ok(!readme.split("\n").find((l) => l.startsWith("**Contents:** ")).includes("Code Mode"), "Contents names the sections only");
     const why = readme.slice(readme.indexOf("\n## Why\n"), readme.indexOf("\n## Adoption: stars and npm downloads\n"));
-    assert.ok(why.split("\n").some((l) => l.startsWith("- **Thinking in Code.**") && l.includes("](#thinking-in-code)")), "a Why bullet names the principle and links it");
+    assert.ok(why.split("\n").some((l) => l.startsWith("- **Code Mode.**") && l.includes("](#code-mode)")), "a Why bullet names the principle and links it");
     const how = readme.slice(readme.indexOf("\n## How it works\n"), readme.indexOf("\n## Tools\n"));
     const step5 = how.slice(how.indexOf("\n5. **The sandbox.** "), how.indexOf("\n6. **Indexing.** "));
-    assert.ok(step5.includes('<a id="thinking-in-code"></a>'), "step 5 holds the #thinking-in-code anchor");
+    assert.ok(step5.includes('<a id="code-mode"></a>'), "step 5 holds the #code-mode anchor");
     const B = (n) => `${n.toLocaleString("en-US")} B`;
     const { exec, batch } = realCalls();
     assert.equal(exec.tool, "ctx_execute");
@@ -1764,13 +1764,13 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     assert.equal(batch.ev.produced_bytes, batch.produced, "produced bytes equal the input file sizes");
     assert.equal(batch.ev.returned_bytes, batch.returned, "returned bytes equal the stored reply");
     for (const need of [B(exec.read), B(exec.returned), `Claude Code ${exec.agent}`, exec.version, "](bench/evidence/try-it-2026-11-02/04-api-json.json)",
-      B(batch.produced), B(batch.returned), batch.ev.version, batch.ev.date, "](bench/evidence/thinking-in-code/2026-11-03-ctx-batch.json)"]) {
+      B(batch.produced), B(batch.returned), batch.ev.version, batch.ev.date, "](bench/evidence/code-mode/2026-11-03-ctx-batch.json)"]) {
       assert.ok(step5.includes(need), `step 5 lacks ${need}`);
     }
     assert.ok(!how.includes("```js"), "How it works shows tool calls, not bare scripts");
     const use = readme.slice(readme.indexOf("\n## Use cases\n"), readme.indexOf("\n## Benchmarks\n")).split("\n").filter((l) => l.startsWith("| ["));
     for (const row of use) {
-      assert.equal(row.includes("[Thinking in Code](#thinking-in-code)"), row.includes("](bench/a-sandbox/README.md#"), `mark only the sandbox script rows: ${row.slice(0, 70)}`);
+      assert.equal(row.includes("[Code Mode](#code-mode)"), row.includes("](bench/a-sandbox/README.md#"), `mark only the sandbox script rows: ${row.slice(0, 70)}`);
     }
     devRow("D-TIC-README-2", "terminalde nasil gozukecek");
   });
@@ -1986,7 +1986,7 @@ describe("ADR-0015 repo: README thesis, links and figures (D-README-THESIS-1)", 
     }
     assert.ok(steps.length >= 9 && steps.length <= 12, `${steps.length} steps`);
     for (const s of steps) {
-      // The step text is its first paragraph; an indented sub-part below it (step 5: Thinking in Code, D-TIC-README-2) is not counted.
+      // The step text is its first paragraph; an indented sub-part below it (step 5: Code Mode, D-TIC-README-2) is not counted.
       const sentences = s.split("\n\n")[0].split(". ").length;
       assert.ok(sentences >= 2 && sentences <= 6, `step has ${sentences} sentences: ${s.slice(0, 80)}`);
       assert.ok(s.includes("](src/") || s.includes("](docs/architecture/adr/") || s.includes("](docs/v2/adr/"), `step has no source or ADR link: ${s.slice(0, 80)}`);

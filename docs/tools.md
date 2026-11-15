@@ -17,7 +17,7 @@ Each tool rejects an unknown input field with `UNKNOWN_FIELD`.
 
 ## ctx_execute
 
-Thinking in Code: the agent writes a short script instead of reading the data.
+Code Mode: the agent writes a short script instead of reading the data.
 The script runs in the sandbox on your machine, and only what it prints goes into the context.
 
 A real bench run ([a-git-log-stat-vite](../bench/a-sandbox/README.md#a-git-log-stat-vite)): 300 commits of `git log --stat` are 164,385 B. The bench script ([source](../bench/a-sandbox/usecases.mjs)) prints 268 B ([results row](../bench/results/2026-11-01-darwin-arm64.json)).
@@ -50,16 +50,16 @@ A real call from the Try-it run (Claude Code 2.1.312, Context Mode 2.0.0-next.26
      }
 ```
 
-The hosted Gateway has its own Thinking in Code tools, apart from this plugin: [Gateway](https://contextmode.ai/docs/engine/gateway?utm_source=github&utm_medium=docs&utm_content=tools-tic).
+The hosted Gateway has its own Code Mode tools, apart from this plugin: [Gateway](https://contextmode.ai/docs/engine/gateway?utm_source=github&utm_medium=docs&utm_content=tools-tic).
 
 ## ctx_batch
 
-Thinking in Code for many commands at once: the agent names the commands and the questions in one call.
+Code Mode for many commands at once: the agent names the commands and the questions in one call.
 The output stays in the local index, and only the parts that answer the questions come back.
 
 A real bench run ([c-install-log](../bench/c-batch/README.md#c-install-log)): an install log and a long git log are 228,881 B. One call returns 12,797 B ([results row](../bench/results/2026-11-01-darwin-arm64.json)).
 
-A live call with the same two files and two of those queries (Context Mode 2.0.0-next.36, 2026-11-03, [2026-11-03-ctx-batch.json](../bench/evidence/thinking-in-code/2026-11-03-ctx-batch.json)), in the form the Claude Code terminal shows it. The commands print 228,881 B; the agent gets 8,667 B:
+A live call with the same two files and two of those queries (Context Mode 2.0.0-next.36, 2026-11-03, [2026-11-03-ctx-batch.json](../bench/evidence/code-mode/2026-11-03-ctx-batch.json)), in the form the Claude Code terminal shows it. The commands print 228,881 B; the agent gets 8,667 B:
 
 ```text
 ⏺ context-mode - ctx_batch (MCP)(commands: ["cat npm-install… queries: ["cache miss","feat commit"])

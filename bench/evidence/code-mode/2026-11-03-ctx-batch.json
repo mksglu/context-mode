@@ -5,7 +5,7 @@
     "name": "context-mode",
     "version": "dev"
   },
-  "how": "node release-out/server.mjs over stdio MCP (initialize, then tools/call ctx_batch), HOME and the project folder in a new temp folder that holds copies of the two files; script: bench/evidence/thinking-in-code/batch-live.mjs",
+  "how": "node release-out/server.mjs over stdio MCP (initialize, then tools/call ctx_batch), HOME and the project folder in a new temp folder that holds copies of the two files; script: bench/evidence/code-mode/batch-live.mjs",
   "files": [
     "bench/fixtures/data/npm-install-log.txt",
     "bench/fixtures/data/git-log-large.txt"

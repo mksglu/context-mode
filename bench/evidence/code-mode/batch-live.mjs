@@ -35,7 +35,7 @@ writeFileSync(out, JSON.stringify({
   date: new Date().toISOString().slice(0, 10),
   version,
   server: init.result.serverInfo,
-  how: "node release-out/server.mjs over stdio MCP (initialize, then tools/call ctx_batch), HOME and the project folder in a new temp folder that holds copies of the two files; script: bench/evidence/thinking-in-code/batch-live.mjs",
+  how: "node release-out/server.mjs over stdio MCP (initialize, then tools/call ctx_batch), HOME and the project folder in a new temp folder that holds copies of the two files; script: bench/evidence/code-mode/batch-live.mjs",
   files,
   produced_bytes: files.reduce((s, f) => s + readFileSync(path.join(repo, f)).length, 0),
   returned_bytes: Buffer.byteLength(text),
