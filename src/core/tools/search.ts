@@ -61,23 +61,56 @@ function sourceCount(db: DbHandle, scope: SearchScope, ctx: ToolContext, source:
 // names, or none; `named` = the source names a memory file (its hits page with `offset` like content hits).
 interface MemorySide { rows: TimelineRow[]; named: boolean }
 
-function zeroHits(db: DbHandle, scope: SearchScope, ctx: ToolContext, source: string | undefined, mem: MemorySide, offset = 0): ToolReply {
+function zeroHits(db: DbHandle, scope: SearchScope, ctx: ToolContext, source: string | undefined, mem: MemorySide, nm: Named, queries: string[], offset = 0): ToolReply {
   // D-MEMORY-SOURCE-1: the count holds the memory files in the scope with the indexed sources.
-  const n = sourceCount(db, scope, ctx, source) + mem.rows.length;
+  const inScope = sourceCount(db, scope, ctx, source);
+  const n = inScope + mem.rows.length;
   // D-LABEL-HANDLE-2: past the last hit the reply says so (the hits are behind, not missing).
   if (offset > 0) return reply("No more hits past offset " + offset + ' in scope "' + scope + '" across ' + n + " source(s).", false);
-  return reply('No hits in scope "' + scope + '" across ' + n + " source(s).", false);
+  const head = 'No hits in scope "' + scope + '" across ' + n + " source(s).";
+  // D-SEARCH-UNKNOWN-SOURCE-1 (#1390): an explicit source with no stored row in the scope names where it is, or the
+  // stored sources and how to store one. A memory file or source:"decision" keeps its own reply.
+  const pick = nm.pick;
+  if (pick === null || mem.named || inScope > 0) return reply(head, false);
+  if (pick.id !== null) {
+    const wider: SearchScope = scope === "session" && sourceCount(db, "worktree", ctx, source) > 0 ? "worktree" : "project";
+    return reply(head + "\nSource " + JSON.stringify(nm.arg) + ' is stored in scope "' + wider + '": ' + callText(queries, wider, nm.arg, "") + " searches it.", false);
+  }
+  return reply(head + "\n" + unknownSource(db, scope, ctx, nm.arg as string), true);
+}
+
+// D-SEARCH-UNKNOWN-SOURCE-1: the newest stored sources in a scope, one row per label.
+const STORED_SOURCES = `
+SELECT MAX(id) AS id, label FROM sources
+WHERE (:scope <> 'session' OR session_id = :session_id)
+  AND (:scope <> 'worktree' OR worktree = :worktree)
+GROUP BY label ORDER BY MAX(id) DESC LIMIT :limit`;
+const STORED_SOURCES_SHOWN = 5;
+
+function unknownSource(db: DbHandle, scope: SearchScope, ctx: ToolContext, given: string): string {
+  const line = "Source " + JSON.stringify(given) + ' is not a stored source in scope "' + scope + '".';
+  const rows = db.raw.prepare(STORED_SOURCES).all({
+    scope,
+    session_id: ctx.sessionId,
+    worktree: ctx.project.worktree,
+    limit: STORED_SOURCES_SHOWN + 1,
+  }) as Array<{ id: number; label: string }>;
+  if (rows.length === 0) return line + "\nctx_index stores one: ctx_index({content:\"...\", source:" + JSON.stringify(given) + "}).";
+  const names = rows.slice(0, STORED_SOURCES_SHOWN).map((r) => (isLongLabel(r.label) ? sourceHandle(Number(r.id)) : JSON.stringify(r.label)));
+  const more = rows.length > STORED_SOURCES_SHOWN ? ", ..." : "";
+  return line + "\nStored sources, newest first: " + names.join(", ") + more + ". " + callText([], scope, undefined, 'sort:"timeline"') + " lists them all.";
 }
 
 // D-LABEL-HANDLE-1/2: how one call names its source to the user: `arg` is the value a paging line repeats (the
 // handle of a long label, else what the user typed); `note` is the collision line, when the value was a label
 // here and another source's handle.
-interface Named { arg: string | undefined; note: string | null }
+// `pick` is the stored source the value named (null = no source, or source:"decision").
+interface Named { arg: string | undefined; note: string | null; pick: SourcePick | null }
 
 function named(given: string | undefined, pick: SourcePick | null): Named {
-  if (given === undefined || pick === null) return { arg: given, note: null };
+  if (given === undefined || pick === null) return { arg: given, note: null, pick: null };
   const arg = pick.id !== null && isLongLabel(given) ? sourceHandle(pick.id) : given;
-  return { arg, note: collisionLine(given, pick) };
+  return { arg, note: collisionLine(given, pick), pick };
 }
 
 // D-LABEL-HANDLE-2: empty `queries` on one stored source -> its card: handle, label size, chunks, bytes, then the
@@ -248,7 +281,7 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
   const take: number[] = fetched.map((h) => replyHits(h, size));
   const pages: Hit[][] = fetched.map((h, i) => h.slice(0, take[i]));
   // Step 9: every query had zero hits.
-  if (pages.every((p) => p.length === 0)) return zeroHits(db, scope, ctx, input.source, ms, offset);
+  if (pages.every((p) => p.length === 0)) return zeroHits(db, scope, ctx, input.source, ms, nm, input.queries, offset);
 
   // D-LABEL-HANDLE-2: the cursor names a long label by its handle, so the line is short and whole.
   const moreLine = (q: string, pos: number): string =>
@@ -332,7 +365,7 @@ function timelineLine(r: TimelineRow): string {
 function timeline(db: DbHandle, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext, nm: Named, ms: MemorySide): ToolReply {
   // D-M2-T9-1: memory files belong to the worktree, not to a session (ms.rows is empty for scope "session").
   const page = ftsQueryTimeline(db, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, input.after ?? null, input.source, ms.rows);
-  if (page.rows.length === 0) return zeroHits(db, scope, ctx, input.source, ms);
+  if (page.rows.length === 0) return zeroHits(db, scope, ctx, input.source, ms, nm, input.queries);
 
   const moreLine = (ts: number): string =>
     "more: " + callText(input.queries, scope, nm.arg, 'sort:"timeline", after:' + ts);

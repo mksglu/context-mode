@@ -2033,6 +2033,8 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
         const declared = new Set(Object.keys(ctxSearchSchema.shape));
         const root = mkdtempSync(join(tmpdir(), "cm-r6a-"));
         try {
+          // #1390: an unknown source is isError:true, so the source this test names is stored first.
+          assert.equal((await ctxIndex.handler({ content: "x row", source: "s" }, ctxFor(root))).isError, false);
           for (const input of [{ queries: ["x"], scope: "project", source: "s", offset: 0 }, { queries: [], sort: "timeline", after: 0, source: "s" }]) {
             const seen = new Set();
             const out = await ctxSearch.handler(recorder(input, seen), ctxFor(root));
@@ -2062,6 +2064,8 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
         assert.deepEqual(Object.keys(ctxSearchSchema.shape).sort(), Object.keys(valid).sort());
         const root = mkdtempSync(join(tmpdir(), "cm-r6b-"));
         try {
+          // #1390: an unknown source is isError:true, so the source this test names is stored first.
+          assert.equal((await ctxIndex.handler({ content: "x row", source: "note" }, ctxFor(root))).isError, false);
           for (const [key, input] of Object.entries(valid)) {
             assert.equal(ctxSearchSchema.safeParse(input).success, true, key);
             const out = await ctxSearch.handler(input, ctxFor(root));
