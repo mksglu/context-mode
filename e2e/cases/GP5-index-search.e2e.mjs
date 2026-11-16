@@ -516,6 +516,9 @@ test("[M2] GP5/search-param-schema-match", async () => {
     zeroTimeline: { queries: ["x"], sort: "timeline", offset: 0, after: 0 },
     zeroRelevance: { queries: ["x"], offset: 0, after: 0 },
   };
+  // #1390: an explicit source that names no stored source is a fixable input (isError:true), so
+  // store "note" first; this test checks that the schema and the handler agree on valid input.
+  await withClient((c) => c.request("tools/call", { name: "ctx_index", arguments: { content: "x marks the note", source: "note" } }));
   const results = {};
   for (const [key, input] of Object.entries(valid)) {
     const reply = await withClient((c) => c.request("tools/call", { name: "ctx_search", arguments: input }));
