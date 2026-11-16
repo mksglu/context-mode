@@ -1902,6 +1902,61 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
         }
       });
 
+      // #1390: an explicit source that names no stored source is a different case from zero hits in a real source
+      // set. The reply keeps the zero-hit line, says the source is not stored, and names the fix (the stored
+      // sources, or how to store one). isError:true for this case only; zero hits in a real source stay isError:false.
+      test("ctxSearch with a source that names no stored source says so and lists the stored sources (#1390)", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-se-1390-"));
+        try {
+          const ctx = ctxFor(root);
+          const missing = "https://example.invalid/missing";
+          // Empty store: the reply says the source is not stored and how to store one.
+          const empty = await ctxSearch.handler({ queries: ["alpha-token"], source: missing }, ctx);
+          const el = empty.text.split("\n");
+          assert.equal(empty.isError, true, empty.text);
+          assert.equal(el[0], 'No hits in scope "worktree" across 0 source(s).', empty.text);
+          assert.equal(el[1], 'Source "https://example.invalid/missing" is not a stored source in scope "worktree".', empty.text);
+          assert.ok(empty.text.includes("ctx_index"), empty.text);
+          // Another source is stored: the reply names it, so a typo and an empty store read differently.
+          assert.equal((await ctxIndex.handler({ content: "alpha-token lives here", source: "notes-real" }, ctx)).isError, false);
+          const other = await ctxSearch.handler({ queries: ["alpha-token"], source: missing }, ctx);
+          const ol = other.text.split("\n");
+          assert.equal(other.isError, true, other.text);
+          assert.equal(ol[1], 'Source "https://example.invalid/missing" is not a stored source in scope "worktree".', other.text);
+          assert.ok(other.text.includes("notes-real"), other.text);
+          assert.notEqual(other.text, empty.text);
+          // The same answer with scope "session", sort "timeline" and empty queries.
+          for (const extra of [{ scope: "session" }, { sort: "timeline" }, { queries: [] }]) {
+            const out = await ctxSearch.handler({ queries: ["alpha-token"], source: missing, ...extra }, ctx);
+            assert.equal(out.isError, true, JSON.stringify(extra) + "\n" + out.text);
+            assert.ok(out.text.includes('Source "https://example.invalid/missing" is not a stored source in scope "' + (extra.scope ?? "worktree") + '".'), JSON.stringify(extra) + "\n" + out.text);
+          }
+          // Zero hits in a stored source stays a clean empty result.
+          const real = await ctxSearch.handler({ queries: ["zzznomatchzzz"], source: "notes-real" }, ctx);
+          assert.equal(real.isError, false, real.text);
+          assert.ok(!real.text.includes("is not a stored source"), real.text);
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
+      test("ctxSearch with a source stored only in another worktree names the scope that holds it (#1390)", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-se-1390b-"));
+        try {
+          const ctx = ctxFor(root);
+          const elsewhere = { ...ctx, project: { ...ctx.project, worktree: join(root, "other-wt") } };
+          assert.equal((await ctxIndex.handler({ content: "alpha-token lives there", source: "notes-other" }, elsewhere)).isError, false);
+          const out = await ctxSearch.handler({ queries: ["alpha-token"], source: "notes-other" }, ctx);
+          assert.ok(out.text.includes('ctx_search({queries:["alpha-token"], scope:"project", source:"notes-other"})'), out.text);
+          // Scope "project" holds it: the call the reply names finds the hit.
+          const proj = await ctxSearch.handler({ queries: ["alpha-token"], scope: "project", source: "notes-other" }, ctx);
+          assert.equal(proj.isError, false, proj.text);
+          assert.ok(proj.text.includes("alpha-token"), proj.text);
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
       test("ctxSearch finds content indexed by ctx_index in the default (worktree) scope", async () => {
         const root = mkdtempSync(join(tmpdir(), "cm-se3-"));
         try {
