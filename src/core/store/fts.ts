@@ -855,14 +855,23 @@ export function recallQueryText(prompt: string): string {
   return [...(kept.size > 0 ? kept : all)].join(" ");
 }
 
+/** #1394: the newest sources id (0 when none); the unit recall boundary a compaction records. */
+export function readMaxSourceId(db: DbHandle): number {
+  const row = db.raw.prepare("SELECT COALESCE(MAX(id), 0) AS n FROM sources").get() as { n: number };
+  return Number(row.n);
+}
+
 /** One ranked query over this session's line units (any-word form); best first, -bm25 as the score. */
-export function queryUnits(db: DbHandle, sessionId: string, q: string, limit: number): UnitCandidate[] {
+export function queryUnits(
+  db: DbHandle, sessionId: string, q: string, limit: number, maxSourceId: number = Number.MAX_SAFE_INTEGER,
+): UnitCandidate[] {
   const match = searchTerms(q).join(" OR ");
   if (match === "" || sessionId === "") return [];
+  // #1394: maxSourceId keeps out units of outputs stored after the latest compaction (still in live context).
   const rows = db.raw.prepare(
     "SELECT u.source_id AS source_id, u.ord AS ord, u.body AS body, -bm25(line_units) AS score, s.label AS label " +
     "FROM line_units u JOIN sources s ON s.id = u.source_id " +
-    "WHERE line_units MATCH ? AND u.session_id = ? ORDER BY bm25(line_units) LIMIT ?",
-  ).all(match, sessionId, limit) as Array<{ source_id: number; ord: number; body: string; score: number; label: string }>;
+    "WHERE line_units MATCH ? AND u.session_id = ? AND s.id <= ? ORDER BY bm25(line_units) LIMIT ?",
+  ).all(match, sessionId, maxSourceId, limit) as Array<{ source_id: number; ord: number; body: string; score: number; label: string }>;
   return rows.map((r) => ({ sourceId: Number(r.source_id), ord: Number(r.ord), label: r.label, body: r.body, score: r.score }));
 }

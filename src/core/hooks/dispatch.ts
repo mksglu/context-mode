@@ -26,8 +26,8 @@ import { claudeDirOf, homeDirOf } from "../project/config-dir.ts";
 import { isInside } from "../project/contain.ts";
 import { metaGet, metaSet, metaTake, openDb } from "../store/db.ts";
 import { appendEvent, canonicalKey } from "../journal/append.ts";
-import { hasAgentRows, hasSessionRows, lastSessionSeq, readLastPrompt, readRecallRows, readSessionEvents } from "../journal/read.ts";
-import { finishReserved, insertChunks, insertUnits, queryUnits, recallQueryText, reserveSource, sourceHandle, type SourceDraft } from "../store/fts.ts";
+import { hasAgentRows, hasSessionRows, lastSessionSeq, readLastPrompt, readMaxSeq, readRecallRows, readSessionEvents } from "../journal/read.ts";
+import { finishReserved, insertChunks, insertUnits, queryUnits, readMaxSourceId, recallQueryText, reserveSource, sourceHandle, type SourceDraft } from "../store/fts.ts";
 import { buildUnits } from "../index/units.ts";
 import { renderState } from "../compaction/render.ts";
 import { pickRecall } from "../compaction/recall.ts";
@@ -219,8 +219,27 @@ async function firstTurnResume(ev: CanonicalHookEvent, row: AdapterRow, project:
 
 // ---------- DECISIONS-r11 (B) turn-boundary recall ----------
 
+// #1394: the value is the boundary of the latest compaction, {"seq": newest journal seq, "source": newest
+// sources id}. Rows and outputs written after it are still in the model's live context, so recall skips them.
 function markCompacted(db: DbHandle, sessionId: string): void {
-  if (sessionId !== "") metaSet(db, COMPACTED_META_PREFIX + sessionId, PENDING_COMPACT_FLAG);
+  if (sessionId === "") return;
+  metaSet(db, COMPACTED_META_PREFIX + sessionId, JSON.stringify({ seq: readMaxSeq(db), source: readMaxSourceId(db) }));
+}
+
+// A value from before #1394 ("1") carries no boundary: every row stays a candidate, as before.
+function compactBoundary(value: string): { seq: number; source: number } {
+  const all = { seq: Number.MAX_SAFE_INTEGER, source: Number.MAX_SAFE_INTEGER };
+  try {
+    const v = JSON.parse(value) as unknown;
+    if (typeof v !== "object" || v === null) return all;
+    const { seq, source } = v as { seq?: unknown; source?: unknown };
+    return {
+      seq: typeof seq === "number" ? seq : all.seq,
+      source: typeof source === "number" ? source : all.source,
+    };
+  } catch {
+    return all;
+  }
 }
 
 function seenSeqs(value: string | null): number[] {
@@ -249,14 +268,17 @@ function seenUnitKeys(value: string | null): string[] {
 async function recall(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext, prompt: string): Promise<Decision> {
   if (!hasRecall(row) || ev.sessionId === "") return ALLOW;
   const db = await openDb(project);
-  if (metaGet(db, COMPACTED_META_PREFIX + ev.sessionId) === null) return ALLOW;
+  const compacted = metaGet(db, COMPACTED_META_PREFIX + ev.sessionId);
+  if (compacted === null) return ALLOW;
+  const boundary = compactBoundary(compacted);
   const seenKey = RECALL_SEEN_META_PREFIX + ev.sessionId;
   const seen = seenSeqs(metaGet(db, seenKey));
   // r3-ledger: one ranked query over this session's line units, by the current prompt only (D-1330-RECALL-PROMPT-1).
   const unitsKey = RECALL_UNITS_SEEN_META_PREFIX + ev.sessionId;
   const seenUnits = seenUnitKeys(metaGet(db, unitsKey));
-  const units = queryUnits(db, ev.sessionId, recallQueryText(prompt), RECALL_UNIT_CANDIDATES);
-  const picked = pickRecall(readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS), prompt, new Set(seen), units, new Set(seenUnits));
+  const units = queryUnits(db, ev.sessionId, recallQueryText(prompt), RECALL_UNIT_CANDIDATES, boundary.source);
+  const rows = readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS, boundary.seq);
+  const picked = pickRecall(rows, prompt, new Set(seen), units, new Set(seenUnits));
   if (picked.text === "") return ALLOW;
   if (picked.seqs.length > 0) metaSet(db, seenKey, JSON.stringify([...seen, ...picked.seqs]));
   if (picked.units !== undefined) metaSet(db, unitsKey, JSON.stringify([...seenUnits, ...picked.units]));
