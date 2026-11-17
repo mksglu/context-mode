@@ -5228,7 +5228,7 @@ CREATE VIRTUAL TABLE line_units USING fts5(
 `;
 
 // src/core/store/db.ts
-var { existsSync: existsSync3, linkSync, mkdirSync: mkdirSync2, rmSync } = process.getBuiltinModule("node:fs");
+var { existsSync: existsSync3, linkSync, mkdirSync: mkdirSync2, renameSync, rmSync, statSync: statSync2 } = process.getBuiltinModule("node:fs");
 
 // src/core/ops/doctor-config.ts
 import { existsSync as existsSync11, readdirSync as readdirSync5, readFileSync as readFileSync8 } from "node:fs";
@@ -7310,7 +7310,7 @@ function parseTOML(code, options) {
 }
 
 // src/core/ops/atomic-file.ts
-import { mkdirSync as mkdirSync3, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync as mkdirSync3, renameSync as renameSync2, unlinkSync, writeFileSync } from "node:fs";
 import path4 from "node:path";
 function sleepSync(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -7319,7 +7319,7 @@ function errCode(e) {
   return e.code;
 }
 function renameWithRetry(from, to, opts = {}) {
-  const rename = opts.rename ?? renameSync;
+  const rename = opts.rename ?? renameSync2;
   const sleep = opts.sleep ?? sleepSync;
   const win = (opts.platform ?? process.platform) === "win32";
   for (let attempt = 0; ; attempt += 1) {
@@ -8987,7 +8987,7 @@ import { spawn as spawn3, spawnSync as spawnSync3 } from "node:child_process";
 
 // src/setup/spawn-bin.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
-import { accessSync as accessSync2, constants as fsc, statSync as statSync2 } from "node:fs";
+import { accessSync as accessSync2, constants as fsc, statSync as statSync3 } from "node:fs";
 import path11 from "node:path";
 var WIN_EXT = ".COM;.EXE;.BAT;.CMD";
 var WIN_SHIM_EXTS = Object.freeze([".cmd", ".bat"]);
@@ -9005,7 +9005,7 @@ function whichBin(bin, env, platform = process.platform) {
       const f2 = path11.join(dir, n3);
       try {
         accessSync2(f2, fsc.X_OK);
-        if (statSync2(f2).isFile()) return f2;
+        if (statSync3(f2).isFile()) return f2;
       } catch {
       }
     }
@@ -9382,7 +9382,7 @@ function listCopilotHooks(env, file, cwd) {
 
 // src/setup/engine.ts
 import { spawn as spawn5, spawnSync as spawnSync4 } from "node:child_process";
-import { closeSync as closeSync3, existsSync as existsSync19, mkdirSync as mkdirSync5, mkdtempSync, openSync as openSync3, readFileSync as readFileSync14, readSync as readSync3, readdirSync as readdirSync6, realpathSync as realpathSync10, rmSync as rmSync2, statSync as statSync3, writeFileSync as writeFileSync3 } from "node:fs";
+import { closeSync as closeSync3, existsSync as existsSync19, mkdirSync as mkdirSync5, mkdtempSync, openSync as openSync3, readFileSync as readFileSync14, readSync as readSync3, readdirSync as readdirSync6, realpathSync as realpathSync10, rmSync as rmSync2, statSync as statSync4, writeFileSync as writeFileSync3 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
 import path14 from "node:path";
 
@@ -9499,7 +9499,7 @@ function hostBin(bin, env, platform = process.platform) {
   for (const dir of pathEntries(get("PATH") ?? "", platform)) {
     const own2 = which(bin, { PATH: dir, ...get("PATHEXT") ? { PATHEXT: get("PATHEXT") } : {} }, platform);
     for (const f2 of [own2, ...real2.extra.map((p3) => path14.join(dir, ...p3))]) {
-      if (!f2 || !existsSync19(f2) || !statSync3(f2).isFile()) continue;
+      if (!f2 || !existsSync19(f2) || !statSync4(f2).isFile()) continue;
       const file = realpathSync10(f2);
       if (isNativeBinary(file) || owningPackage(path14.dirname(file)) === real2.pkg) return { file: f2, shims };
       shims.push(f2);
@@ -9836,7 +9836,10 @@ function opencodeListCheck(bin, major, env) {
   } catch {
     out2 = void 0;
   }
-  if (r2.status !== 0) return { name: "list", ok: false, detail: `${what} exited ${r2.status}: ${first(r2.stderr)}` };
+  if (r2.status !== 0) {
+    const host = `${r2.stderr}`.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 3).join(" ");
+    return { name: "list", ok: true, warn: true, detail: `${what} exited ${r2.status}: ${host}; doctor checked the entry and hooks on disk` };
+  }
   if (major >= 2) {
     if (!Array.isArray(out2)) return { name: "list", ok: false, detail: `${what} printed no config list: ${first(r2.stdout)}` };
     const listed2 = out2.some((d) => isObj5(d) && isObj5(d.info) && isObj5(d.info.mcp) && isObj5(d.info.mcp.servers) && isObj5(d.info.mcp.servers[SERVER_KEY]));
@@ -10775,7 +10778,7 @@ async function runDoctor(opts) {
       res.reason = gone.map((c3) => `${c3.name}: ${c3.detail}`).join("; ");
     }
     if (res.status === "PASS") {
-      if (res.v1.some((f2) => !UPGRADE_REPORT_ONLY_REASONS.includes(f2.reason))) {
+      if (res.v1.some((f2) => !UPGRADE_REPORT_ONLY_REASONS.includes(f2.reason) && !UPGRADE_KEEP_ASIDE_REASONS.includes(f2.reason))) {
         res.status = "FAIL";
         res.reason = V1_FORM_REASON;
       } else if (res.changes.length && !onlyTrust(row, res.changes) && !hasPluginIssue(row)) {

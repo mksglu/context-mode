@@ -28227,6 +28227,10 @@ var DB_TIMEOUT_MS = 5e3;
 var DB_WAL_SUFFIX = "-wal";
 var DB_SHM_SUFFIX = "-shm";
 var DB_TMP_SUFFIX = ".tmp";
+var DB_LINK_DENIED_CODES = ["EACCES", "EPERM", "ENOSYS", "ENOTSUP", "EOPNOTSUPP"];
+var DB_PUBLISH_CLAIM_SUFFIX = ".publish";
+var DB_CLAIM_BUSY_CODES = ["EEXIST", "EPERM"];
+var DB_PUBLISH_POLL_MS = 5;
 var SQLITE_PRIMARY_CODE_MASK = 255;
 var SQLITE_CORRUPT_CODE = 11;
 var SQLITE_NOTADB_CODE = 26;
@@ -28447,7 +28451,7 @@ function PURGE_SUMMARY(rows, scope) {
 var DECISION_SOURCE = "decision";
 var DECISION_USER_LABEL = "decision (user)";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
-var BUNDLE_SHA = true ? "9cb2aaa5ebb63491960b3f3e9655a5821383eae4" : void 0;
+var BUNDLE_SHA = true ? "1fce537096e8e2b7d1924c2b5ff2b83287f157ee" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10", "D11"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -29314,7 +29318,7 @@ function openReadOnlyHandle(sqlite, path8, opts = {}) {
 }
 
 // src/core/store/db.ts
-var { existsSync, linkSync, mkdirSync, rmSync } = process.getBuiltinModule("node:fs");
+var { existsSync, linkSync, mkdirSync, renameSync, rmSync, statSync } = process.getBuiltinModule("node:fs");
 function versionParts(v) {
   const bare2 = v.startsWith("v") ? v.slice(1) : v;
   return bare2.split(".").map((p) => Number.parseInt(p, 10));
@@ -29346,6 +29350,34 @@ function readUserVersion(raw) {
   const row5 = raw.prepare("PRAGMA user_version").get();
   return row5.user_version;
 }
+function errCode(err) {
+  return err.code ?? "";
+}
+function publishWithoutLink(tmp, path8) {
+  const claim3 = path8 + DB_PUBLISH_CLAIM_SUFFIX;
+  const start = Date.now();
+  for (; ; ) {
+    if (existsSync(path8)) return;
+    try {
+      mkdirSync(claim3);
+    } catch (err) {
+      if (!DB_CLAIM_BUSY_CODES.includes(errCode(err))) throw err;
+      if (Date.now() - start < DB_TIMEOUT_MS) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, DB_PUBLISH_POLL_MS);
+        continue;
+      }
+      const held = statSync(claim3, { throwIfNoEntry: false });
+      if (held !== void 0 && held.mtimeMs < start) rmSync(claim3, { recursive: true, force: true });
+      throw new Error(`context.db was not published within ${DB_TIMEOUT_MS} ms: ${claim3} was held; open again`);
+    }
+    try {
+      if (!existsSync(path8)) renameSync(tmp, path8);
+    } finally {
+      rmSync(claim3, { recursive: true, force: true });
+    }
+    return;
+  }
+}
 function createAtomically(sqlite, path8) {
   const { randomUUID: randomUUID2 } = process.getBuiltinModule("node:crypto");
   const tmp = path8 + "." + randomUUID2() + DB_TMP_SUFFIX;
@@ -29359,7 +29391,9 @@ function createAtomically(sqlite, path8) {
     try {
       linkSync(tmp, path8);
     } catch (err) {
-      if (err.code !== "EEXIST") throw err;
+      const code = errCode(err);
+      if (DB_LINK_DENIED_CODES.includes(code)) publishWithoutLink(tmp, path8);
+      else if (code !== "EEXIST") throw err;
     }
   } finally {
     for (const suffix of ["", DB_WAL_SUFFIX, DB_SHM_SUFFIX]) rmSync(tmp + suffix, { force: true });
@@ -29855,7 +29889,7 @@ function sha256Hex(text) {
 }
 
 // src/core/project/resolve.ts
-var { existsSync: existsSync3, readFileSync: readFileSync2, realpathSync: realpathSync3, statSync } = process.getBuiltinModule("node:fs");
+var { existsSync: existsSync3, readFileSync: readFileSync2, realpathSync: realpathSync3, statSync: statSync2 } = process.getBuiltinModule("node:fs");
 function sourceOf(agent) {
   switch (agent) {
     case "claude-code":
@@ -29916,7 +29950,7 @@ function gitDirs(dir) {
 function gitDirAt(dotGit) {
   let gitDir;
   try {
-    if (statSync(dotGit).isDirectory()) {
+    if (statSync2(dotGit).isDirectory()) {
       gitDir = dotGit;
     } else {
       const line = firstLine(dotGit);
@@ -32531,12 +32565,12 @@ function recallQueryText(prompt) {
   if (cur !== "" && kept.size < RECALL_QUERY_MAX_TERMS) add(cur);
   return [...kept.size > 0 ? kept : all].join(" ");
 }
-function queryUnits(db, sessionId, q, limit) {
+function queryUnits(db, sessionId, q, limit, maxSourceId = Number.MAX_SAFE_INTEGER) {
   const match = searchTerms(q).join(" OR ");
   if (match === "" || sessionId === "") return [];
   const rows = db.raw.prepare(
-    "SELECT u.source_id AS source_id, u.ord AS ord, u.body AS body, -bm25(line_units) AS score, s.label AS label FROM line_units u JOIN sources s ON s.id = u.source_id WHERE line_units MATCH ? AND u.session_id = ? ORDER BY bm25(line_units) LIMIT ?"
-  ).all(match, sessionId, limit);
+    "SELECT u.source_id AS source_id, u.ord AS ord, u.body AS body, -bm25(line_units) AS score, s.label AS label FROM line_units u JOIN sources s ON s.id = u.source_id WHERE line_units MATCH ? AND u.session_id = ? AND s.id <= ? ORDER BY bm25(line_units) LIMIT ?"
+  ).all(match, sessionId, maxSourceId, limit);
   return rows.map((r) => ({ sourceId: Number(r.source_id), ord: Number(r.ord), label: r.label, body: r.body, score: r.score }));
 }
 
@@ -32549,7 +32583,7 @@ function ownersDir(configDir, projectKey) {
 function ownerFile(configDir, projectKey, serverId) {
   return join4(ownersDir(configDir, projectKey), serverId + OWNER_PID_EXT);
 }
-function errCode(err) {
+function errCode2(err) {
   return err.code;
 }
 function writeOwnerPid(configDir, projectKey, serverId) {
@@ -32565,8 +32599,8 @@ function isLive(pid) {
     process.kill(pid, 0);
     return true;
   } catch (err) {
-    if (errCode(err) === "ESRCH") return false;
-    if (errCode(err) === "EPERM") return true;
+    if (errCode2(err) === "ESRCH") return false;
+    if (errCode2(err) === "EPERM") return true;
     throw err;
   }
 }
@@ -32576,7 +32610,7 @@ function listLiveOwners(configDir, projectKey) {
   try {
     names = readdirSync2(dir);
   } catch (err) {
-    if (errCode(err) === "ENOENT") return [];
+    if (errCode2(err) === "ENOENT") return [];
     throw err;
   }
   const live = [];
@@ -32587,7 +32621,7 @@ function listLiveOwners(configDir, projectKey) {
     try {
       text = readFileSync3(file2, "utf8");
     } catch (err) {
-      if (errCode(err) === "ENOENT") continue;
+      if (errCode2(err) === "ENOENT") continue;
       throw err;
     }
     const serverId = basename3(name, OWNER_PID_EXT);
@@ -44220,7 +44254,7 @@ function buildChildEnv(parent, extra) {
 }
 
 // src/core/sandbox/runtimes.ts
-import { accessSync, constants as fsConstants, statSync as statSync2 } from "node:fs";
+import { accessSync, constants as fsConstants, statSync as statSync3 } from "node:fs";
 import path from "node:path";
 
 // src/core/sandbox/path-entries.ts
@@ -44265,7 +44299,7 @@ function fileNames(name, pathExt) {
 function probe(full) {
   let st;
   try {
-    st = statSync2(full, { throwIfNoEntry: false });
+    st = statSync3(full, { throwIfNoEntry: false });
   } catch {
     return "unreadable";
   }
@@ -44460,7 +44494,7 @@ function runProcess(argv, o) {
 }
 
 // src/core/index/auto-memory.ts
-import { readdirSync as readdirSync4, readFileSync as readFileSync4, statSync as statSync3 } from "node:fs";
+import { readdirSync as readdirSync4, readFileSync as readFileSync4, statSync as statSync4 } from "node:fs";
 import { join as join6 } from "node:path";
 var MEMORY_FILES = Object.freeze([
   Object.freeze(["CLAUDE.md"]),
@@ -44486,7 +44520,7 @@ function readAutoMemory(project) {
     const path8 = join6(project.worktree, ...segs);
     if (!isInside(project.worktree, path8)) continue;
     try {
-      const st = statSync3(path8);
+      const st = statSync4(path8);
       if (!st.isFile()) continue;
       rows.push({
         origin: "memory",
@@ -44610,15 +44644,42 @@ function sourceCount(db, scope, ctx, source) {
   });
   return Number(row5.n);
 }
-function zeroHits(db, scope, ctx, source, mem, offset = 0) {
-  const n = sourceCount(db, scope, ctx, source) + mem.rows.length;
+function zeroHits(db, scope, ctx, source, mem, nm, queries, offset = 0) {
+  const inScope = sourceCount(db, scope, ctx, source);
+  const n = inScope + mem.rows.length;
   if (offset > 0) return reply("No more hits past offset " + offset + ' in scope "' + scope + '" across ' + n + " source(s).", false);
-  return reply('No hits in scope "' + scope + '" across ' + n + " source(s).", false);
+  const head = 'No hits in scope "' + scope + '" across ' + n + " source(s).";
+  const pick4 = nm.pick;
+  if (pick4 === null || mem.named || inScope > 0) return reply(head, false);
+  if (pick4.id !== null) {
+    const wider = scope === "session" && sourceCount(db, "worktree", ctx, source) > 0 ? "worktree" : "project";
+    return reply(head + "\nSource " + JSON.stringify(nm.arg) + ' is stored in scope "' + wider + '": ' + callText(queries, wider, nm.arg, "") + " searches it.", false);
+  }
+  return reply(head + "\n" + unknownSource(db, scope, ctx, nm.arg), true);
+}
+var STORED_SOURCES = `
+SELECT MAX(id) AS id, label FROM sources
+WHERE (:scope <> 'session' OR session_id = :session_id)
+  AND (:scope <> 'worktree' OR worktree = :worktree)
+GROUP BY label ORDER BY MAX(id) DESC LIMIT :limit`;
+var STORED_SOURCES_SHOWN = 5;
+function unknownSource(db, scope, ctx, given) {
+  const line = "Source " + JSON.stringify(given) + ' is not a stored source in scope "' + scope + '".';
+  const rows = db.raw.prepare(STORED_SOURCES).all({
+    scope,
+    session_id: ctx.sessionId,
+    worktree: ctx.project.worktree,
+    limit: STORED_SOURCES_SHOWN + 1
+  });
+  if (rows.length === 0) return line + '\nctx_index stores one: ctx_index({content:"...", source:' + JSON.stringify(given) + "}).";
+  const names = rows.slice(0, STORED_SOURCES_SHOWN).map((r) => isLongLabel(r.label) ? sourceHandle(Number(r.id)) : JSON.stringify(r.label));
+  const more = rows.length > STORED_SOURCES_SHOWN ? ", ..." : "";
+  return line + "\nStored sources, newest first: " + names.join(", ") + more + ". " + callText([], scope, void 0, 'sort:"timeline"') + " lists them all.";
 }
 function named(given, pick4) {
-  if (given === void 0 || pick4 === null) return { arg: given, note: null };
+  if (given === void 0 || pick4 === null) return { arg: given, note: null, pick: null };
   const arg = pick4.id !== null && isLongLabel(given) ? sourceHandle(pick4.id) : given;
-  return { arg, note: collisionLine(given, pick4) };
+  return { arg, note: collisionLine(given, pick4), pick: pick4 };
 }
 function sourceCard(db, id, input, scope, arg) {
   const row5 = sourceCardRow(db, id);
@@ -44750,7 +44811,7 @@ function relevance(db, given, scope, ctx, nm, ms, indexed) {
   });
   const take = fetched.map((h) => replyHits(h, size));
   const pages = fetched.map((h, i) => h.slice(0, take[i]));
-  if (pages.every((p) => p.length === 0)) return zeroHits(db, scope, ctx, input.source, ms, offset);
+  if (pages.every((p) => p.length === 0)) return zeroHits(db, scope, ctx, input.source, ms, nm, input.queries, offset);
   const moreLine3 = (q, pos) => "More: " + callText([q], scope, nm.arg, "offset:" + pos);
   let reserve = 0;
   for (const q of input.queries) reserve += bytes2(moreLine3(q, offset + size)) + 1;
@@ -44820,7 +44881,7 @@ function timelineLine(r) {
 }
 function timeline(db, input, scope, ctx, nm, ms) {
   const page2 = ftsQueryTimeline(db, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, input.after ?? null, input.source, ms.rows);
-  if (page2.rows.length === 0) return zeroHits(db, scope, ctx, input.source, ms);
+  if (page2.rows.length === 0) return zeroHits(db, scope, ctx, input.source, ms, nm, input.queries);
   const moreLine3 = (ts) => "more: " + callText(input.queries, scope, nm.arg, 'sort:"timeline", after:' + ts);
   const reserve = bytes2(moreLine3(page2.rows[page2.rows.length - 1].ts)) + 1;
   const lines = nm.note === null ? [] : [nm.note];
@@ -48285,16 +48346,16 @@ function parseTOML(code, options) {
 }
 
 // src/core/ops/atomic-file.ts
-import { mkdirSync as mkdirSync4, renameSync, unlinkSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { mkdirSync as mkdirSync4, renameSync as renameSync2, unlinkSync, writeFileSync as writeFileSync2 } from "node:fs";
 import path3 from "node:path";
 function sleepSync(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
-function errCode2(e) {
+function errCode3(e) {
   return e.code;
 }
 function renameWithRetry(from, to, opts = {}) {
-  const rename = opts.rename ?? renameSync;
+  const rename = opts.rename ?? renameSync2;
   const sleep2 = opts.sleep ?? sleepSync;
   const win = (opts.platform ?? process.platform) === "win32";
   for (let attempt = 0; ; attempt += 1) {
@@ -48302,7 +48363,7 @@ function renameWithRetry(from, to, opts = {}) {
       rename(from, to);
       return;
     } catch (e) {
-      const busy = win && ATOMIC_RENAME_BUSY_CODES.includes(errCode2(e) ?? "");
+      const busy = win && ATOMIC_RENAME_BUSY_CODES.includes(errCode3(e) ?? "");
       if (!busy || attempt >= ATOMIC_RENAME_RETRIES) throw e;
       sleep2(ATOMIC_RENAME_DELAY_MS);
     }
@@ -48317,15 +48378,15 @@ function unlinkWithRetry(file2, opts = {}) {
       unlink(file2);
       return;
     } catch (e) {
-      if (errCode2(e) === "ENOENT") return;
-      const busy = win && ATOMIC_RENAME_BUSY_CODES.includes(errCode2(e) ?? "");
+      if (errCode3(e) === "ENOENT") return;
+      const busy = win && ATOMIC_RENAME_BUSY_CODES.includes(errCode3(e) ?? "");
       if (!busy || attempt >= ATOMIC_RENAME_RETRIES) throw replaceFailure(file2, e);
       sleep2(ATOMIC_RENAME_DELAY_MS);
     }
   }
 }
 function replaceFailure(file2, e) {
-  const busy = ATOMIC_RENAME_BUSY_CODES.includes(errCode2(e) ?? "");
+  const busy = ATOMIC_RENAME_BUSY_CODES.includes(errCode3(e) ?? "");
   const cause = e.message;
   return new Error(busy ? `Could not replace ${file2}: ${cause}. Fix: close the program using ${file2}, then re-run` : `Could not write ${file2}: ${cause}. Fix: check the path and its permissions, then re-run`, { cause: e });
 }
@@ -50015,7 +50076,7 @@ function configPaths(row5, env, worktree) {
 }
 
 // src/core/ops/doctor-db.ts
-import { existsSync as existsSync13, statSync as statSync4 } from "node:fs";
+import { existsSync as existsSync13, statSync as statSync5 } from "node:fs";
 var unknown5 = (id, detail) => ({ id, label: DOCTOR_LABEL[id], status: "UNKNOWN", detail });
 var pass3 = (id, detail) => ({ id, label: DOCTOR_LABEL[id], status: "PASS", detail });
 var fail3 = (detail, fixCommand) => ({ id: "D8", label: DOCTOR_LABEL.D8, status: "FAIL", detail, fixCommand });
@@ -50057,7 +50118,7 @@ function orphanFiles(dbPath) {
   const files = [];
   for (const suffix of [DB_WAL_SUFFIX, DB_SHM_SUFFIX]) {
     const path8 = dbPath + suffix;
-    if (existsSync13(path8)) files.push({ path: path8, bytes: statSync4(path8).size });
+    if (existsSync13(path8)) files.push({ path: path8, bytes: statSync5(path8).size });
   }
   return files.length > 0 && !existsSync13(dbPath) ? files : [];
 }
@@ -51942,7 +52003,7 @@ import { spawn as spawn3, spawnSync as spawnSync2 } from "node:child_process";
 
 // src/setup/spawn-bin.ts
 import { spawnSync } from "node:child_process";
-import { accessSync as accessSync2, constants as fsc, statSync as statSync5 } from "node:fs";
+import { accessSync as accessSync2, constants as fsc, statSync as statSync6 } from "node:fs";
 import path5 from "node:path";
 var WIN_EXT = ".COM;.EXE;.BAT;.CMD";
 var WIN_SHIM_EXTS = Object.freeze([".cmd", ".bat"]);
@@ -51960,7 +52021,7 @@ function whichBin(bin, env, platform = process.platform) {
       const f = path5.join(dir, n);
       try {
         accessSync2(f, fsc.X_OK);
-        if (statSync5(f).isFile()) return f;
+        if (statSync6(f).isFile()) return f;
       } catch {
       }
     }
@@ -53287,11 +53348,11 @@ var ctxExecute = {
 };
 
 // src/core/tools/index.ts
-import { existsSync as existsSync20, readFileSync as readFileSync17, statSync as statSync7 } from "node:fs";
+import { existsSync as existsSync20, readFileSync as readFileSync17, statSync as statSync8 } from "node:fs";
 import { dirname as dirname12, extname as extname3, join as join22, relative as relative3, resolve as resolve9 } from "node:path";
 
 // src/core/index/walk.ts
-import { readdirSync as readdirSync9, readFileSync as readFileSync15, realpathSync as realpathSync10, statSync as statSync6 } from "node:fs";
+import { readdirSync as readdirSync9, readFileSync as readFileSync15, realpathSync as realpathSync10, statSync as statSync7 } from "node:fs";
 import { join as join20 } from "node:path";
 var GITIGNORE = ".gitignore";
 var GIT_DIR = ".git";
@@ -53325,7 +53386,7 @@ function visit(abs, rel, parent, contain, seen, found) {
         continue;
       }
       if (!isInside(contain, resolved)) continue;
-      const st = statSync6(resolved);
+      const st = statSync7(resolved);
       isDir = st.isDirectory();
       isFile = st.isFile();
       target = resolved;
@@ -57513,7 +57574,7 @@ function pathItems(input, project) {
   const abs = resolve9(project.worktree, input.path);
   if (!isInside(project.containmentRoot, abs)) throw missingOrOutside(input.path, abs, project.containmentRoot);
   const base = relative3(project.worktree, abs);
-  if (statSync7(abs).isDirectory()) {
+  if (statSync8(abs).isDirectory()) {
     return walkDir(abs, project.containmentRoot).map((f) => ({
       sourceKind: "path",
       label: pathLabel(join22(base, f.relPath)),

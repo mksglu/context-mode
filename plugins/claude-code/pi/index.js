@@ -11342,6 +11342,10 @@ var DB_TIMEOUT_MS = 5e3;
 var DB_WAL_SUFFIX = "-wal";
 var DB_SHM_SUFFIX = "-shm";
 var DB_TMP_SUFFIX = ".tmp";
+var DB_LINK_DENIED_CODES = ["EACCES", "EPERM", "ENOSYS", "ENOTSUP", "EOPNOTSUPP"];
+var DB_PUBLISH_CLAIM_SUFFIX = ".publish";
+var DB_CLAIM_BUSY_CODES = ["EEXIST", "EPERM"];
+var DB_PUBLISH_POLL_MS = 5;
 var SQLITE_PRIMARY_CODE_MASK = 255;
 var SQLITE_CORRUPT_CODE = 11;
 var SQLITE_NOTADB_CODE = 26;
@@ -11626,7 +11630,7 @@ var DECISION_ANSWERS_KEY = "answers";
 var DECISION_OPTION_KEY = "option";
 var DECISION_LABEL_JOIN = " | ";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
-var BUNDLE_SHA = true ? "9cb2aaa5ebb63491960b3f3e9655a5821383eae4" : void 0;
+var BUNDLE_SHA = true ? "1fce537096e8e2b7d1924c2b5ff2b83287f157ee" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10", "D11"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -14886,8 +14890,12 @@ var CC_READ_ONLY_DENY = Object.freeze(["Agent", "Artifact", "ArtifactComments", 
 var CLAUDE_CODE_BUILT_INS = Object.freeze({
   "general-purpose": { tools: null, disallowed: [] },
   fork: { tools: null, disallowed: [] },
+  claude: { tools: null, disallowed: [] },
   Explore: { tools: null, disallowed: [...CC_READ_ONLY_DENY] },
-  Plan: { tools: null, disallowed: [...CC_READ_ONLY_DENY] }
+  Plan: { tools: null, disallowed: [...CC_READ_ONLY_DENY] },
+  "claude-code-guide": { tools: ["Glob", "Grep", "Read", "WebFetch", "WebSearch"], disallowed: [] },
+  "statusline-setup": { tools: ["Read", "Edit"], disallowed: [] },
+  "web-fetch": { tools: ["WebFetch"], disallowed: [] }
 });
 var BUILT_IN_AGENT = "claude-code";
 function isSubagentCall(ev) {
@@ -15088,13 +15096,15 @@ function unique(names) {
 // src/core/policy/unwrap.ts
 var NONE = "";
 var WRAPPERS = Object.freeze({
-  sudo: { valueShorts: "ugpChDrtUTR", valueLongs: ["--user", "--group", "--prompt", "--chdir", "--host"], assignments: true, duration: false, refuseShorts: NONE },
-  env: { valueShorts: "uCS", valueLongs: ["--unset", "--chdir", "--split-string"], assignments: true, duration: false, refuseShorts: NONE },
-  time: { valueShorts: "fo", valueLongs: ["--format", "--output"], assignments: false, duration: false, refuseShorts: NONE },
-  nice: { valueShorts: "n", valueLongs: ["--adjustment"], assignments: false, duration: false, refuseShorts: NONE },
-  timeout: { valueShorts: "sk", valueLongs: ["--signal", "--kill-after"], assignments: false, duration: true, refuseShorts: NONE },
-  command: { valueShorts: NONE, valueLongs: [], assignments: false, duration: false, refuseShorts: "vV" },
-  xargs: { valueShorts: "aEdILnPs", valueLongs: ["--arg-file", "--delimiter", "--max-args", "--max-procs", "--max-chars"], assignments: false, duration: false, refuseShorts: NONE }
+  sudo: { valueShorts: "ugpChDrtUTR", valueLongs: ["--user", "--group", "--prompt", "--chdir", "--host"], assignments: true, duration: false, refuseShorts: NONE, subcommands: [] },
+  env: { valueShorts: "uCS", valueLongs: ["--unset", "--chdir", "--split-string"], assignments: true, duration: false, refuseShorts: NONE, subcommands: [] },
+  time: { valueShorts: "fo", valueLongs: ["--format", "--output"], assignments: false, duration: false, refuseShorts: NONE, subcommands: [] },
+  nice: { valueShorts: "n", valueLongs: ["--adjustment"], assignments: false, duration: false, refuseShorts: NONE, subcommands: [] },
+  timeout: { valueShorts: "sk", valueLongs: ["--signal", "--kill-after"], assignments: false, duration: true, refuseShorts: NONE, subcommands: [] },
+  command: { valueShorts: NONE, valueLongs: [], assignments: false, duration: false, refuseShorts: "vV", subcommands: [] },
+  xargs: { valueShorts: "aEdILnPs", valueLongs: ["--arg-file", "--delimiter", "--max-args", "--max-procs", "--max-chars"], assignments: false, duration: false, refuseShorts: NONE, subcommands: [] },
+  // #1388: rtk (rtk-ai/rtk) runs the inner command as-is under `proxy` / `bypass`; its other subcommands are rtk's own.
+  rtk: { valueShorts: NONE, valueLongs: [], assignments: false, duration: false, refuseShorts: NONE, subcommands: ["proxy", "bypass"] }
 });
 var SHELLS = ["bash", "sh", "zsh"];
 var SCRIPT_FLAG = "c";
@@ -15117,6 +15127,10 @@ function isDuration(s) {
 }
 function peel(w, args) {
   let k = 0;
+  if (w.subcommands.length > 0) {
+    if (args.length === 0 || !w.subcommands.includes(args[0])) return null;
+    k = 1;
+  }
   while (k < args.length) {
     const a = args[k];
     if (a === LONG_OPT2) {
@@ -16252,7 +16266,7 @@ function openReadOnlyHandle(sqlite, path8, opts = {}) {
 }
 
 // src/core/store/db.ts
-var { existsSync: existsSync3, linkSync, mkdirSync: mkdirSync2, rmSync } = process.getBuiltinModule("node:fs");
+var { existsSync: existsSync3, linkSync, mkdirSync: mkdirSync2, renameSync, rmSync, statSync: statSync3 } = process.getBuiltinModule("node:fs");
 function versionParts(v) {
   const bare2 = v.startsWith("v") ? v.slice(1) : v;
   return bare2.split(".").map((p) => Number.parseInt(p, 10));
@@ -16284,6 +16298,34 @@ function readUserVersion(raw) {
   const row5 = raw.prepare("PRAGMA user_version").get();
   return row5.user_version;
 }
+function errCode(err) {
+  return err.code ?? "";
+}
+function publishWithoutLink(tmp, path8) {
+  const claim3 = path8 + DB_PUBLISH_CLAIM_SUFFIX;
+  const start = Date.now();
+  for (; ; ) {
+    if (existsSync3(path8)) return;
+    try {
+      mkdirSync2(claim3);
+    } catch (err) {
+      if (!DB_CLAIM_BUSY_CODES.includes(errCode(err))) throw err;
+      if (Date.now() - start < DB_TIMEOUT_MS) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, DB_PUBLISH_POLL_MS);
+        continue;
+      }
+      const held = statSync3(claim3, { throwIfNoEntry: false });
+      if (held !== void 0 && held.mtimeMs < start) rmSync(claim3, { recursive: true, force: true });
+      throw new Error(`context.db was not published within ${DB_TIMEOUT_MS} ms: ${claim3} was held; open again`);
+    }
+    try {
+      if (!existsSync3(path8)) renameSync(tmp, path8);
+    } finally {
+      rmSync(claim3, { recursive: true, force: true });
+    }
+    return;
+  }
+}
 function createAtomically(sqlite, path8) {
   const { randomUUID: randomUUID2 } = process.getBuiltinModule("node:crypto");
   const tmp = path8 + "." + randomUUID2() + DB_TMP_SUFFIX;
@@ -16297,7 +16339,9 @@ function createAtomically(sqlite, path8) {
     try {
       linkSync(tmp, path8);
     } catch (err) {
-      if (err.code !== "EEXIST") throw err;
+      const code = errCode(err);
+      if (DB_LINK_DENIED_CODES.includes(code)) publishWithoutLink(tmp, path8);
+      else if (code !== "EEXIST") throw err;
     }
   } finally {
     for (const suffix of ["", DB_WAL_SUFFIX, DB_SHM_SUFFIX]) rmSync(tmp + suffix, { force: true });
@@ -16488,15 +16532,25 @@ function readLastPrompt(db, sessionId) {
   const row5 = db.raw.prepare("SELECT body FROM events WHERE session_id = ? AND kind = 'prompt' ORDER BY seq DESC LIMIT 1").get(sessionId);
   return row5 === void 0 ? "" : row5.body;
 }
-function readRecallRows(db, sessionId, worktree, limit) {
+function readRecallRows(db, sessionId, worktree, limit, maxSeq = Number.MAX_SAFE_INTEGER) {
   if (sessionId === "") return [];
-  return db.raw.prepare("SELECT * FROM events WHERE kind <> 'cost' AND (session_id = ? OR worktree = ?) ORDER BY seq DESC LIMIT ?").all(sessionId, worktree, limit);
+  return db.raw.prepare(
+    "SELECT * FROM events WHERE kind <> 'cost' AND ((session_id = ? AND seq <= ?) OR (worktree = ? AND session_id <> ?)) ORDER BY seq DESC LIMIT ?"
+  ).all(sessionId, maxSeq, worktree, sessionId, limit);
+}
+function readMaxSeq(db) {
+  const row5 = db.raw.prepare("SELECT COALESCE(MAX(seq), 0) AS n FROM events").get();
+  return Number(row5.n);
 }
 function hasAgentRows(db, worktree, agent) {
   return db.raw.prepare("SELECT 1 FROM events WHERE worktree = ? AND agent = ? LIMIT 1").get(worktree, agent) !== void 0;
 }
 function hasSessionRows(db, sessionId) {
   return db.raw.prepare("SELECT 1 FROM events WHERE session_id = ? LIMIT 1").get(sessionId) !== void 0;
+}
+function lastSessionSeq(db, sessionId) {
+  const row5 = db.raw.prepare("SELECT MAX(seq) AS m FROM events WHERE session_id = ?").get(sessionId);
+  return row5?.m ?? 0;
 }
 
 // src/core/store/snippet.ts
@@ -19075,12 +19129,16 @@ function recallQueryText(prompt) {
   if (cur !== "" && kept.size < RECALL_QUERY_MAX_TERMS) add(cur);
   return [...kept.size > 0 ? kept : all].join(" ");
 }
-function queryUnits(db, sessionId, q, limit) {
+function readMaxSourceId(db) {
+  const row5 = db.raw.prepare("SELECT COALESCE(MAX(id), 0) AS n FROM sources").get();
+  return Number(row5.n);
+}
+function queryUnits(db, sessionId, q, limit, maxSourceId = Number.MAX_SAFE_INTEGER) {
   const match = searchTerms(q).join(" OR ");
   if (match === "" || sessionId === "") return [];
   const rows = db.raw.prepare(
-    "SELECT u.source_id AS source_id, u.ord AS ord, u.body AS body, -bm25(line_units) AS score, s.label AS label FROM line_units u JOIN sources s ON s.id = u.source_id WHERE line_units MATCH ? AND u.session_id = ? ORDER BY bm25(line_units) LIMIT ?"
-  ).all(match, sessionId, limit);
+    "SELECT u.source_id AS source_id, u.ord AS ord, u.body AS body, -bm25(line_units) AS score, s.label AS label FROM line_units u JOIN sources s ON s.id = u.source_id WHERE line_units MATCH ? AND u.session_id = ? AND s.id <= ? ORDER BY bm25(line_units) LIMIT ?"
+  ).all(match, sessionId, maxSourceId, limit);
   return rows.map((r) => ({ sourceId: Number(r.source_id), ord: Number(r.ord), label: r.label, body: r.body, score: r.score }));
 }
 
@@ -20364,8 +20422,9 @@ async function sessionStart(ev, row5, project) {
   if (ev.source === "compact" && hasRecall(row5)) markCompacted(await openDb(project), ev.sessionId);
   if (ev.source === "compact" && row5.compactDelivery === "sessionstart") {
     const db2 = await openDb(project);
-    if (!shouldHint(db2, ev.sessionId, COMPACT_STATE_KEY)) return ALLOW2;
-    return { kind: "hint", text: compactText(db2, ev, row5), onceKey: COMPACT_STATE_KEY };
+    const onceKey = COMPACT_STATE_KEY + ":" + lastSessionSeq(db2, ev.sessionId);
+    if (!shouldHint(db2, ev.sessionId, onceKey)) return ALLOW2;
+    return { kind: "hint", text: compactText(db2, ev, row5), onceKey };
   }
   const db = await openDb(project);
   if (row5.compactDelivery === "opencode-cache" && metaTake(db, PENDING_COMPACT_META_PREFIX + ev.sessionId) !== null) {
@@ -20412,7 +20471,22 @@ async function firstTurnResume(ev, row5, project) {
   return { kind: "hint", text: withPrefix(RESUME_HINT, row5), onceKey: RESUME_HINT_KEY };
 }
 function markCompacted(db, sessionId) {
-  if (sessionId !== "") metaSet(db, COMPACTED_META_PREFIX + sessionId, PENDING_COMPACT_FLAG);
+  if (sessionId === "") return;
+  metaSet(db, COMPACTED_META_PREFIX + sessionId, JSON.stringify({ seq: readMaxSeq(db), source: readMaxSourceId(db) }));
+}
+function compactBoundary(value) {
+  const all = { seq: Number.MAX_SAFE_INTEGER, source: Number.MAX_SAFE_INTEGER };
+  try {
+    const v = JSON.parse(value);
+    if (typeof v !== "object" || v === null) return all;
+    const { seq, source } = v;
+    return {
+      seq: typeof seq === "number" ? seq : all.seq,
+      source: typeof source === "number" ? source : all.source
+    };
+  } catch {
+    return all;
+  }
 }
 function seenSeqs(value) {
   if (value === null) return [];
@@ -20435,13 +20509,16 @@ function seenUnitKeys(value) {
 async function recall(ev, row5, project, prompt) {
   if (!hasRecall(row5) || ev.sessionId === "") return ALLOW2;
   const db = await openDb(project);
-  if (metaGet(db, COMPACTED_META_PREFIX + ev.sessionId) === null) return ALLOW2;
+  const compacted = metaGet(db, COMPACTED_META_PREFIX + ev.sessionId);
+  if (compacted === null) return ALLOW2;
+  const boundary = compactBoundary(compacted);
   const seenKey = RECALL_SEEN_META_PREFIX + ev.sessionId;
   const seen = seenSeqs(metaGet(db, seenKey));
   const unitsKey = RECALL_UNITS_SEEN_META_PREFIX + ev.sessionId;
   const seenUnits = seenUnitKeys(metaGet(db, unitsKey));
-  const units = queryUnits(db, ev.sessionId, recallQueryText(prompt), RECALL_UNIT_CANDIDATES);
-  const picked = pickRecall(readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS), prompt, new Set(seen), units, new Set(seenUnits));
+  const units = queryUnits(db, ev.sessionId, recallQueryText(prompt), RECALL_UNIT_CANDIDATES, boundary.source);
+  const rows = readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS, boundary.seq);
+  const picked = pickRecall(rows, prompt, new Set(seen), units, new Set(seenUnits));
   if (picked.text === "") return ALLOW2;
   if (picked.seqs.length > 0) metaSet(db, seenKey, JSON.stringify([...seen, ...picked.seqs]));
   if (picked.units !== void 0) metaSet(db, unitsKey, JSON.stringify([...seenUnits, ...picked.units]));
@@ -20628,6 +20705,7 @@ function ownRead(ev, tool, env) {
 async function postReplace(ev, row5, project, env, tool, result, text) {
   if (result.bytes <= REPLACE_TRIGGER_BYTES) return ALLOW2;
   if (boundedRead(tool)) return ALLOW2;
+  if (ompRangedRead(ev, tool)) return ALLOW2;
   if (ownRead(ev, tool, env)) return ALLOW2;
   if (result.keep === true) return ALLOW2;
   if (!hasReplace(row5)) return ALLOW2;
@@ -20642,6 +20720,7 @@ async function postReplace(ev, row5, project, env, tool, result, text) {
       shell: has3(row5.nativeTools.shell),
       read: RANGE_READ_TOOLS.includes(tool.canonicalName) && has3(row5.nativeTools.read ?? [])
     };
+    if (set3 !== null && !caller.ctx && !caller.shell && !caller.read) return ALLOW2;
     label2 = SUBAGENT_SOURCE_PREFIX + tool.canonicalName + ":" + (tool.callId ?? String(ev.turn ?? 0));
   } else {
     label2 = mainLabel(tool, ev);
@@ -20674,6 +20753,53 @@ function searchTwin(handle, intent, project) {
 }
 function boundedRead(tool) {
   return RANGE_READ_TOOLS.includes(tool.canonicalName) && READ_RANGE_KEYS.some((k) => tool.input[k] !== void 0 && tool.input[k] !== null);
+}
+function ompRangedRead(ev, tool) {
+  if (ev.agent !== "omp" || !RANGE_READ_TOOLS.includes(tool.canonicalName)) return false;
+  const p = READ_PATH_KEYS.map((k) => tool.input[k]).find((v) => typeof v === "string" && v !== "");
+  if (p === void 0 || !rangedPathSuffix(p)) return false;
+  try {
+    return lstatSync2(resolve8(ev.cwd, p), { throwIfNoEntry: false }) === void 0;
+  } catch {
+    return false;
+  }
+}
+function rangedPathSuffix(path8) {
+  let cut = path8.lastIndexOf(":");
+  let sel = path8.slice(cut + 1);
+  if (sel.toLowerCase() === "raw") {
+    cut = path8.lastIndexOf(":", cut - 1);
+    sel = path8.slice(cut + 1, path8.length - 4);
+  }
+  if (cut <= 0 || !rangeList(sel)) return false;
+  let file2 = path8.slice(0, cut);
+  if (file2.toLowerCase().endsWith(":raw")) file2 = file2.slice(0, -4);
+  return file2.length > 1 || !asciiLetter(file2);
+}
+function rangeList(sel) {
+  return sel !== "" && sel.split(",").every(rangeItem);
+}
+function rangeItem(item) {
+  if (item.startsWith("-")) return digitsOnly(item.slice(1));
+  let i = 0;
+  while (i < item.length && digit(item[i])) i++;
+  if (i === 0) return false;
+  if (i === item.length) return true;
+  const op = item[i];
+  const rest = item.slice(i + 1);
+  return op === "-" && (rest === "" || digitsOnly(rest)) || op === "+" && digitsOnly(rest);
+}
+function digitsOnly(s) {
+  if (s === "") return false;
+  for (const c of s) if (!digit(c)) return false;
+  return true;
+}
+function digit(c) {
+  return c >= "0" && c <= "9";
+}
+function asciiLetter(s) {
+  const c = s.toLowerCase();
+  return c.length === 1 && c >= "a" && c <= "z";
 }
 function replaceOutput(body, handleLine) {
   return body === "" ? handleLine : body + "\n" + handleLine;
@@ -20809,7 +20935,7 @@ function buildChildEnv(parent, extra) {
 }
 
 // src/core/sandbox/runtimes.ts
-import { accessSync, constants as fsConstants, statSync as statSync3 } from "node:fs";
+import { accessSync, constants as fsConstants, statSync as statSync4 } from "node:fs";
 import path from "node:path";
 
 // src/core/sandbox/path-entries.ts
@@ -20854,7 +20980,7 @@ function fileNames(name, pathExt) {
 function probe(full) {
   let st;
   try {
-    st = statSync3(full, { throwIfNoEntry: false });
+    st = statSync4(full, { throwIfNoEntry: false });
   } catch {
     return "unreadable";
   }
@@ -21049,7 +21175,7 @@ function runProcess(argv, o) {
 }
 
 // src/core/index/auto-memory.ts
-import { readdirSync as readdirSync3, readFileSync as readFileSync6, statSync as statSync4 } from "node:fs";
+import { readdirSync as readdirSync3, readFileSync as readFileSync6, statSync as statSync5 } from "node:fs";
 import { join as join9 } from "node:path";
 var MEMORY_FILES = Object.freeze([
   Object.freeze(["CLAUDE.md"]),
@@ -21075,7 +21201,7 @@ function readAutoMemory(project) {
     const path8 = join9(project.worktree, ...segs);
     if (!isInside(project.worktree, path8)) continue;
     try {
-      const st = statSync4(path8);
+      const st = statSync5(path8);
       if (!st.isFile()) continue;
       rows.push({
         origin: "memory",
@@ -21145,15 +21271,42 @@ function sourceCount(db, scope, ctx, source) {
   });
   return Number(row5.n);
 }
-function zeroHits(db, scope, ctx, source, mem, offset = 0) {
-  const n = sourceCount(db, scope, ctx, source) + mem.rows.length;
+function zeroHits(db, scope, ctx, source, mem, nm, queries, offset = 0) {
+  const inScope = sourceCount(db, scope, ctx, source);
+  const n = inScope + mem.rows.length;
   if (offset > 0) return reply("No more hits past offset " + offset + ' in scope "' + scope + '" across ' + n + " source(s).", false);
-  return reply('No hits in scope "' + scope + '" across ' + n + " source(s).", false);
+  const head2 = 'No hits in scope "' + scope + '" across ' + n + " source(s).";
+  const pick4 = nm.pick;
+  if (pick4 === null || mem.named || inScope > 0) return reply(head2, false);
+  if (pick4.id !== null) {
+    const wider = scope === "session" && sourceCount(db, "worktree", ctx, source) > 0 ? "worktree" : "project";
+    return reply(head2 + "\nSource " + JSON.stringify(nm.arg) + ' is stored in scope "' + wider + '": ' + callText(queries, wider, nm.arg, "") + " searches it.", false);
+  }
+  return reply(head2 + "\n" + unknownSource(db, scope, ctx, nm.arg), true);
+}
+var STORED_SOURCES = `
+SELECT MAX(id) AS id, label FROM sources
+WHERE (:scope <> 'session' OR session_id = :session_id)
+  AND (:scope <> 'worktree' OR worktree = :worktree)
+GROUP BY label ORDER BY MAX(id) DESC LIMIT :limit`;
+var STORED_SOURCES_SHOWN = 5;
+function unknownSource(db, scope, ctx, given) {
+  const line = "Source " + JSON.stringify(given) + ' is not a stored source in scope "' + scope + '".';
+  const rows = db.raw.prepare(STORED_SOURCES).all({
+    scope,
+    session_id: ctx.sessionId,
+    worktree: ctx.project.worktree,
+    limit: STORED_SOURCES_SHOWN + 1
+  });
+  if (rows.length === 0) return line + '\nctx_index stores one: ctx_index({content:"...", source:' + JSON.stringify(given) + "}).";
+  const names = rows.slice(0, STORED_SOURCES_SHOWN).map((r) => isLongLabel(r.label) ? sourceHandle(Number(r.id)) : JSON.stringify(r.label));
+  const more = rows.length > STORED_SOURCES_SHOWN ? ", ..." : "";
+  return line + "\nStored sources, newest first: " + names.join(", ") + more + ". " + callText([], scope, void 0, 'sort:"timeline"') + " lists them all.";
 }
 function named(given, pick4) {
-  if (given === void 0 || pick4 === null) return { arg: given, note: null };
+  if (given === void 0 || pick4 === null) return { arg: given, note: null, pick: null };
   const arg = pick4.id !== null && isLongLabel(given) ? sourceHandle(pick4.id) : given;
-  return { arg, note: collisionLine(given, pick4) };
+  return { arg, note: collisionLine(given, pick4), pick: pick4 };
 }
 function sourceCard(db, id, input, scope, arg) {
   const row5 = sourceCardRow(db, id);
@@ -21285,7 +21438,7 @@ function relevance(db, given, scope, ctx, nm, ms, indexed) {
   });
   const take = fetched.map((h) => replyHits(h, size));
   const pages = fetched.map((h, i) => h.slice(0, take[i]));
-  if (pages.every((p) => p.length === 0)) return zeroHits(db, scope, ctx, input.source, ms, offset);
+  if (pages.every((p) => p.length === 0)) return zeroHits(db, scope, ctx, input.source, ms, nm, input.queries, offset);
   const moreLine3 = (q, pos) => "More: " + callText([q], scope, nm.arg, "offset:" + pos);
   let reserve = 0;
   for (const q of input.queries) reserve += bytes2(moreLine3(q, offset + size)) + 1;
@@ -21355,7 +21508,7 @@ function timelineLine(r) {
 }
 function timeline(db, input, scope, ctx, nm, ms) {
   const page2 = ftsQueryTimeline(db, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, input.after ?? null, input.source, ms.rows);
-  if (page2.rows.length === 0) return zeroHits(db, scope, ctx, input.source, ms);
+  if (page2.rows.length === 0) return zeroHits(db, scope, ctx, input.source, ms, nm, input.queries);
   const moreLine3 = (ts) => "more: " + callText(input.queries, scope, nm.arg, 'sort:"timeline", after:' + ts);
   const reserve = bytes2(moreLine3(page2.rows[page2.rows.length - 1].ts)) + 1;
   const lines = nm.note === null ? [] : [nm.note];
@@ -23740,16 +23893,16 @@ function parseTOML(code, options) {
 }
 
 // src/core/ops/atomic-file.ts
-import { mkdirSync as mkdirSync3, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync as mkdirSync3, renameSync as renameSync2, unlinkSync, writeFileSync } from "node:fs";
 import path3 from "node:path";
 function sleepSync(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
-function errCode(e) {
+function errCode2(e) {
   return e.code;
 }
 function renameWithRetry(from, to, opts = {}) {
-  const rename = opts.rename ?? renameSync;
+  const rename = opts.rename ?? renameSync2;
   const sleep2 = opts.sleep ?? sleepSync;
   const win = (opts.platform ?? process.platform) === "win32";
   for (let attempt = 0; ; attempt += 1) {
@@ -23757,7 +23910,7 @@ function renameWithRetry(from, to, opts = {}) {
       rename(from, to);
       return;
     } catch (e) {
-      const busy = win && ATOMIC_RENAME_BUSY_CODES.includes(errCode(e) ?? "");
+      const busy = win && ATOMIC_RENAME_BUSY_CODES.includes(errCode2(e) ?? "");
       if (!busy || attempt >= ATOMIC_RENAME_RETRIES) throw e;
       sleep2(ATOMIC_RENAME_DELAY_MS);
     }
@@ -23772,15 +23925,15 @@ function unlinkWithRetry(file2, opts = {}) {
       unlink(file2);
       return;
     } catch (e) {
-      if (errCode(e) === "ENOENT") return;
-      const busy = win && ATOMIC_RENAME_BUSY_CODES.includes(errCode(e) ?? "");
+      if (errCode2(e) === "ENOENT") return;
+      const busy = win && ATOMIC_RENAME_BUSY_CODES.includes(errCode2(e) ?? "");
       if (!busy || attempt >= ATOMIC_RENAME_RETRIES) throw replaceFailure(file2, e);
       sleep2(ATOMIC_RENAME_DELAY_MS);
     }
   }
 }
 function replaceFailure(file2, e) {
-  const busy = ATOMIC_RENAME_BUSY_CODES.includes(errCode(e) ?? "");
+  const busy = ATOMIC_RENAME_BUSY_CODES.includes(errCode2(e) ?? "");
   const cause = e.message;
   return new Error(busy ? `Could not replace ${file2}: ${cause}. Fix: close the program using ${file2}, then re-run` : `Could not write ${file2}: ${cause}. Fix: check the path and its permissions, then re-run`, { cause: e });
 }
@@ -25470,7 +25623,7 @@ function configPaths(row5, env, worktree) {
 }
 
 // src/core/ops/doctor-db.ts
-import { existsSync as existsSync12, statSync as statSync5 } from "node:fs";
+import { existsSync as existsSync12, statSync as statSync6 } from "node:fs";
 var unknown3 = (id, detail) => ({ id, label: DOCTOR_LABEL[id], status: "UNKNOWN", detail });
 var pass3 = (id, detail) => ({ id, label: DOCTOR_LABEL[id], status: "PASS", detail });
 var fail4 = (detail, fixCommand) => ({ id: "D8", label: DOCTOR_LABEL.D8, status: "FAIL", detail, fixCommand });
@@ -25512,7 +25665,7 @@ function orphanFiles(dbPath) {
   const files = [];
   for (const suffix of [DB_WAL_SUFFIX, DB_SHM_SUFFIX]) {
     const path8 = dbPath + suffix;
-    if (existsSync12(path8)) files.push({ path: path8, bytes: statSync5(path8).size });
+    if (existsSync12(path8)) files.push({ path: path8, bytes: statSync6(path8).size });
   }
   return files.length > 0 && !existsSync12(dbPath) ? files : [];
 }
@@ -27397,7 +27550,7 @@ import { spawn as spawn3, spawnSync as spawnSync2 } from "node:child_process";
 
 // src/setup/spawn-bin.ts
 import { spawnSync } from "node:child_process";
-import { accessSync as accessSync2, constants as fsc, statSync as statSync6 } from "node:fs";
+import { accessSync as accessSync2, constants as fsc, statSync as statSync7 } from "node:fs";
 import path5 from "node:path";
 var WIN_EXT = ".COM;.EXE;.BAT;.CMD";
 var WIN_SHIM_EXTS = Object.freeze([".cmd", ".bat"]);
@@ -27415,7 +27568,7 @@ function whichBin(bin, env, platform = process.platform) {
       const f = path5.join(dir, n);
       try {
         accessSync2(f, fsc.X_OK);
-        if (statSync6(f).isFile()) return f;
+        if (statSync7(f).isFile()) return f;
       } catch {
       }
     }
@@ -27904,7 +28057,7 @@ function ownersDir(configDir, projectKey) {
 function ownerFile(configDir, projectKey, serverId) {
   return join17(ownersDir(configDir, projectKey), serverId + OWNER_PID_EXT);
 }
-function errCode2(err) {
+function errCode3(err) {
   return err.code;
 }
 function writeOwnerPid(configDir, projectKey, serverId) {
@@ -27920,8 +28073,8 @@ function isLive(pid) {
     process.kill(pid, 0);
     return true;
   } catch (err) {
-    if (errCode2(err) === "ESRCH") return false;
-    if (errCode2(err) === "EPERM") return true;
+    if (errCode3(err) === "ESRCH") return false;
+    if (errCode3(err) === "EPERM") return true;
     throw err;
   }
 }
@@ -27931,7 +28084,7 @@ function listLiveOwners(configDir, projectKey) {
   try {
     names = readdirSync7(dir);
   } catch (err) {
-    if (errCode2(err) === "ENOENT") return [];
+    if (errCode3(err) === "ENOENT") return [];
     throw err;
   }
   const live = [];
@@ -27942,7 +28095,7 @@ function listLiveOwners(configDir, projectKey) {
     try {
       text = readFileSync15(file2, "utf8");
     } catch (err) {
-      if (errCode2(err) === "ENOENT") continue;
+      if (errCode3(err) === "ENOENT") continue;
       throw err;
     }
     const serverId = basename3(name, OWNER_PID_EXT);
@@ -28044,8 +28197,8 @@ function keyIsTyped(key) {
   if (key.length === 0) return false;
   for (const ch of key) {
     const upper = ch >= "A" && ch <= "Z";
-    const digit = ch >= "0" && ch <= "9";
-    if (!upper && !digit && ch !== "_") return false;
+    const digit2 = ch >= "0" && ch <= "9";
+    if (!upper && !digit2 && ch !== "_") return false;
   }
   return true;
 }
@@ -28695,11 +28848,11 @@ var ctxExecute = {
 };
 
 // src/core/tools/index.ts
-import { existsSync as existsSync19, readFileSync as readFileSync20, statSync as statSync8 } from "node:fs";
+import { existsSync as existsSync19, readFileSync as readFileSync20, statSync as statSync9 } from "node:fs";
 import { dirname as dirname13, extname as extname3, join as join24, relative as relative5, resolve as resolve12 } from "node:path";
 
 // src/core/index/walk.ts
-import { readdirSync as readdirSync9, readFileSync as readFileSync18, realpathSync as realpathSync10, statSync as statSync7 } from "node:fs";
+import { readdirSync as readdirSync9, readFileSync as readFileSync18, realpathSync as realpathSync10, statSync as statSync8 } from "node:fs";
 import { join as join22 } from "node:path";
 var GITIGNORE = ".gitignore";
 var GIT_DIR = ".git";
@@ -28733,7 +28886,7 @@ function visit(abs, rel, parent, contain, seen, found) {
         continue;
       }
       if (!isInside(contain, resolved)) continue;
-      const st = statSync7(resolved);
+      const st = statSync8(resolved);
       isDir = st.isDirectory();
       isFile = st.isFile();
       target = resolved;
@@ -29436,8 +29589,8 @@ var EntityDecoder = class {
     while (offset < inputLength) {
       const char = input.charCodeAt(offset);
       if (isNumber2(char) || isHexadecimalCharacter(char)) {
-        const digit = char <= CharCodes.NINE ? char - CharCodes.ZERO : (char | TO_LOWER_BIT) - CharCodes.LOWER_A + 10;
-        result = result * 16 + digit;
+        const digit2 = char <= CharCodes.NINE ? char - CharCodes.ZERO : (char | TO_LOWER_BIT) - CharCodes.LOWER_A + 10;
+        result = result * 16 + digit2;
         consumed += 1;
         offset += 1;
       } else {
@@ -29465,13 +29618,13 @@ var EntityDecoder = class {
     let { result } = this;
     let { consumed } = this;
     while (offset < inputLength) {
-      const digit = input.charCodeAt(offset) - CharCodes.ZERO;
-      if (digit >>> 0 > 9) {
+      const digit2 = input.charCodeAt(offset) - CharCodes.ZERO;
+      if (digit2 >>> 0 > 9) {
         this.result = result;
         this.consumed = consumed;
-        return this.emitNumericEntity(digit + CharCodes.ZERO, 2);
+        return this.emitNumericEntity(digit2 + CharCodes.ZERO, 2);
       }
-      result = result * 10 + digit;
+      result = result * 10 + digit2;
       consumed += 1;
       offset += 1;
     }
@@ -32921,7 +33074,7 @@ function pathItems(input, project) {
   const abs = resolve12(project.worktree, input.path);
   if (!isInside(project.containmentRoot, abs)) throw missingOrOutside(input.path, abs, project.containmentRoot);
   const base = relative5(project.worktree, abs);
-  if (statSync8(abs).isDirectory()) {
+  if (statSync9(abs).isDirectory()) {
     return walkDir(abs, project.containmentRoot).map((f) => ({
       sourceKind: "path",
       label: pathLabel(join24(base, f.relPath)),
@@ -62372,6 +62525,18 @@ function appendPayload(base, payload) {
   const text = str3(base);
   return text === "" ? payload : text + "\n\n" + payload;
 }
+var SECTION = "context_mode";
+function deliver(event, payload) {
+  const options = event.systemPromptOptions;
+  const sections = field(options, "sections");
+  if (typeof sections === "object" && sections !== null && !Array.isArray(sections) && field(options, "forceSystemPrompt") === void 0) {
+    const named2 = sections;
+    if (payload === "") delete named2[SECTION];
+    else named2[SECTION] = payload;
+    return {};
+  }
+  return payload === "" ? {} : { systemPrompt: appendPayload(event.systemPrompt, payload) };
+}
 function textOf2(content) {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
@@ -62475,13 +62640,13 @@ function hostExtension(pi, host = "pi") {
     openPrompt = prompt;
     if (!rerun) turn += 1;
     registerTools();
-    const withPayload = () => ({ systemPrompt: appendPayload(event.systemPrompt, payload) });
+    const withPayload = () => deliver(event, payload);
     if (rerun && payload !== "") return withPayload();
     let out;
     try {
       out = await hook({ type: compactPending ? "session_compact" : "session_start" }, turn);
     } catch {
-      return payload === "" ? {} : withPayload();
+      return withPayload();
     }
     const compactTurn = compactPending;
     compactPending = false;

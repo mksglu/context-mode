@@ -168,6 +168,10 @@ var DB_TIMEOUT_MS = 5e3;
 var DB_WAL_SUFFIX = "-wal";
 var DB_SHM_SUFFIX = "-shm";
 var DB_TMP_SUFFIX = ".tmp";
+var DB_LINK_DENIED_CODES = ["EACCES", "EPERM", "ENOSYS", "ENOTSUP", "EOPNOTSUPP"];
+var DB_PUBLISH_CLAIM_SUFFIX = ".publish";
+var DB_CLAIM_BUSY_CODES = ["EEXIST", "EPERM"];
+var DB_PUBLISH_POLL_MS = 5;
 var SQLITE_PRIMARY_CODE_MASK = 255;
 var SQLITE_CORRUPT_CODE = 11;
 var SQLITE_NOTADB_CODE = 26;
@@ -1937,7 +1941,7 @@ function openReadOnlyHandle(sqlite, path3, opts = {}) {
 }
 
 // src/core/store/db.ts
-var { existsSync, linkSync, mkdirSync, rmSync } = process.getBuiltinModule("node:fs");
+var { existsSync, linkSync, mkdirSync, renameSync, rmSync, statSync } = process.getBuiltinModule("node:fs");
 function versionParts(v) {
   const bare = v.startsWith("v") ? v.slice(1) : v;
   return bare.split(".").map((p) => Number.parseInt(p, 10));
@@ -1969,6 +1973,34 @@ function readUserVersion(raw) {
   const row = raw.prepare("PRAGMA user_version").get();
   return row.user_version;
 }
+function errCode(err) {
+  return err.code ?? "";
+}
+function publishWithoutLink(tmp, path3) {
+  const claim = path3 + DB_PUBLISH_CLAIM_SUFFIX;
+  const start = Date.now();
+  for (; ; ) {
+    if (existsSync(path3)) return;
+    try {
+      mkdirSync(claim);
+    } catch (err) {
+      if (!DB_CLAIM_BUSY_CODES.includes(errCode(err))) throw err;
+      if (Date.now() - start < DB_TIMEOUT_MS) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, DB_PUBLISH_POLL_MS);
+        continue;
+      }
+      const held = statSync(claim, { throwIfNoEntry: false });
+      if (held !== void 0 && held.mtimeMs < start) rmSync(claim, { recursive: true, force: true });
+      throw new Error(`context.db was not published within ${DB_TIMEOUT_MS} ms: ${claim} was held; open again`);
+    }
+    try {
+      if (!existsSync(path3)) renameSync(tmp, path3);
+    } finally {
+      rmSync(claim, { recursive: true, force: true });
+    }
+    return;
+  }
+}
 function createAtomically(sqlite, path3) {
   const { randomUUID: randomUUID2 } = process.getBuiltinModule("node:crypto");
   const tmp = path3 + "." + randomUUID2() + DB_TMP_SUFFIX;
@@ -1982,7 +2014,9 @@ function createAtomically(sqlite, path3) {
     try {
       linkSync(tmp, path3);
     } catch (err) {
-      if (err.code !== "EEXIST") throw err;
+      const code = errCode(err);
+      if (DB_LINK_DENIED_CODES.includes(code)) publishWithoutLink(tmp, path3);
+      else if (code !== "EEXIST") throw err;
     }
   } finally {
     for (const suffix of ["", DB_WAL_SUFFIX, DB_SHM_SUFFIX]) rmSync(tmp + suffix, { force: true });
@@ -5215,8 +5249,12 @@ var CC_READ_ONLY_DENY = Object.freeze(["Agent", "Artifact", "ArtifactComments", 
 var CLAUDE_CODE_BUILT_INS = Object.freeze({
   "general-purpose": { tools: null, disallowed: [] },
   fork: { tools: null, disallowed: [] },
+  claude: { tools: null, disallowed: [] },
   Explore: { tools: null, disallowed: [...CC_READ_ONLY_DENY] },
-  Plan: { tools: null, disallowed: [...CC_READ_ONLY_DENY] }
+  Plan: { tools: null, disallowed: [...CC_READ_ONLY_DENY] },
+  "claude-code-guide": { tools: ["Glob", "Grep", "Read", "WebFetch", "WebSearch"], disallowed: [] },
+  "statusline-setup": { tools: ["Read", "Edit"], disallowed: [] },
+  "web-fetch": { tools: ["WebFetch"], disallowed: [] }
 });
 function isSubagentCall(ev) {
   return ev.agentId !== void 0 && ev.agentId !== "";
@@ -5225,13 +5263,15 @@ function isSubagentCall(ev) {
 // src/core/policy/unwrap.ts
 var NONE = "";
 var WRAPPERS = Object.freeze({
-  sudo: { valueShorts: "ugpChDrtUTR", valueLongs: ["--user", "--group", "--prompt", "--chdir", "--host"], assignments: true, duration: false, refuseShorts: NONE },
-  env: { valueShorts: "uCS", valueLongs: ["--unset", "--chdir", "--split-string"], assignments: true, duration: false, refuseShorts: NONE },
-  time: { valueShorts: "fo", valueLongs: ["--format", "--output"], assignments: false, duration: false, refuseShorts: NONE },
-  nice: { valueShorts: "n", valueLongs: ["--adjustment"], assignments: false, duration: false, refuseShorts: NONE },
-  timeout: { valueShorts: "sk", valueLongs: ["--signal", "--kill-after"], assignments: false, duration: true, refuseShorts: NONE },
-  command: { valueShorts: NONE, valueLongs: [], assignments: false, duration: false, refuseShorts: "vV" },
-  xargs: { valueShorts: "aEdILnPs", valueLongs: ["--arg-file", "--delimiter", "--max-args", "--max-procs", "--max-chars"], assignments: false, duration: false, refuseShorts: NONE }
+  sudo: { valueShorts: "ugpChDrtUTR", valueLongs: ["--user", "--group", "--prompt", "--chdir", "--host"], assignments: true, duration: false, refuseShorts: NONE, subcommands: [] },
+  env: { valueShorts: "uCS", valueLongs: ["--unset", "--chdir", "--split-string"], assignments: true, duration: false, refuseShorts: NONE, subcommands: [] },
+  time: { valueShorts: "fo", valueLongs: ["--format", "--output"], assignments: false, duration: false, refuseShorts: NONE, subcommands: [] },
+  nice: { valueShorts: "n", valueLongs: ["--adjustment"], assignments: false, duration: false, refuseShorts: NONE, subcommands: [] },
+  timeout: { valueShorts: "sk", valueLongs: ["--signal", "--kill-after"], assignments: false, duration: true, refuseShorts: NONE, subcommands: [] },
+  command: { valueShorts: NONE, valueLongs: [], assignments: false, duration: false, refuseShorts: "vV", subcommands: [] },
+  xargs: { valueShorts: "aEdILnPs", valueLongs: ["--arg-file", "--delimiter", "--max-args", "--max-procs", "--max-chars"], assignments: false, duration: false, refuseShorts: NONE, subcommands: [] },
+  // #1388: rtk (rtk-ai/rtk) runs the inner command as-is under `proxy` / `bypass`; its other subcommands are rtk's own.
+  rtk: { valueShorts: NONE, valueLongs: [], assignments: false, duration: false, refuseShorts: NONE, subcommands: ["proxy", "bypass"] }
 });
 var SHELLS = ["bash", "sh", "zsh"];
 var SCRIPT_FLAG = "c";
@@ -5254,6 +5294,10 @@ function isDuration(s) {
 }
 function peel(w, args) {
   let k = 0;
+  if (w.subcommands.length > 0) {
+    if (args.length === 0 || !w.subcommands.includes(args[0])) return null;
+    k = 1;
+  }
   while (k < args.length) {
     const a = args[k];
     if (a === LONG_OPT2) {
@@ -5624,7 +5668,7 @@ function isMediaRead(agent, abs) {
 }
 
 // src/core/policy/decide.ts
-var { statSync } = process.getBuiltinModule("node:fs");
+var { statSync: statSync2 } = process.getBuiltinModule("node:fs");
 var BASH = "Bash";
 var READ = "Read";
 var WEBFETCH = "WebFetch";
@@ -5815,7 +5859,7 @@ function inlineHttp(raw) {
 var CD_COMMAND = "cd";
 function fileSize(abs) {
   try {
-    const st = statSync(abs);
+    const st = statSync2(abs);
     return st.isFile() ? st.size : -1;
   } catch {
     return -1;
@@ -6049,7 +6093,7 @@ function sha256Hex(text) {
 }
 
 // src/core/project/resolve.ts
-var { existsSync: existsSync3, readFileSync: readFileSync4, realpathSync: realpathSync3, statSync: statSync2 } = process.getBuiltinModule("node:fs");
+var { existsSync: existsSync3, readFileSync: readFileSync4, realpathSync: realpathSync3, statSync: statSync3 } = process.getBuiltinModule("node:fs");
 function sourceOf(agent) {
   switch (agent) {
     case "claude-code":
@@ -6110,7 +6154,7 @@ function gitDirs(dir) {
 function gitDirAt(dotGit) {
   let gitDir;
   try {
-    if (statSync2(dotGit).isDirectory()) {
+    if (statSync3(dotGit).isDirectory()) {
       gitDir = dotGit;
     } else {
       const line = firstLine(dotGit);
@@ -6216,7 +6260,7 @@ function buildChildEnv(parent, extra) {
 }
 
 // src/core/sandbox/runtimes.ts
-import { accessSync, constants as fsConstants, statSync as statSync3 } from "node:fs";
+import { accessSync, constants as fsConstants, statSync as statSync4 } from "node:fs";
 import path from "node:path";
 
 // src/core/sandbox/path-entries.ts
@@ -6261,7 +6305,7 @@ function fileNames(name, pathExt) {
 function probe(full) {
   let st;
   try {
-    st = statSync3(full, { throwIfNoEntry: false });
+    st = statSync4(full, { throwIfNoEntry: false });
   } catch {
     return "unreadable";
   }
