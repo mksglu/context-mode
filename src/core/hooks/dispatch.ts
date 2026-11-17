@@ -496,6 +496,7 @@ async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // with a replace channel ("run, then replace", D-M7-RR-1, DECISIONS-r10 (1)).
   if (result.bytes <= REPLACE_TRIGGER_BYTES) return ALLOW; // D-M7-SV-1
   if (boundedRead(tool)) return ALLOW; // D-R41-READ-OFFSET-1 (#1314): the user asked for these lines
+  if (ompRangedRead(ev, tool)) return ALLOW; // D-1392-OMP-RANGE-1 (#1392): the same window, written in the path
   if (ownRead(ev, tool, env)) return ALLOW; // D-R48-OWN-FILE-1 (#1326): a skill or rule file reaches the model whole
   if (result.keep === true) return ALLOW; // D-M2-MCP-1: an MCP result with a non-text block stays as the host made it
   // ADR-0001: one path per row, no runtime fallback. A row with no replace channel gets no replace decision on
@@ -575,6 +576,68 @@ function searchTwin(handle: string, intent: string, project: ProjectContext): st
 // D-R41-READ-OFFSET-1 (#1314): a read-like tool called with offset, limit or view_range is a bounded window.
 export function boundedRead(tool: ToolCall): boolean {
   return RANGE_READ_TOOLS.includes(tool.canonicalName) && READ_RANGE_KEYS.some((k) => tool.input[k] !== undefined && tool.input[k] !== null);
+}
+
+// D-1392-OMP-RANGE-1 (#1392, ADR-0026): OMP's read has `path` only and takes the line range inline (OMP 18.21.0
+// read-selector.ts parseSel: :N, :N-M, :N+K, :N-, :-N, comma lists, `raw` before or after the range). A path whose
+// suffix is a range is a bounded window (D-R41-READ-OFFSET-1). A suffix with no range (none, :raw, :img, a drive
+// letter, a colon inside a folder name) is a full read and stays replaced. A file whose literal name holds the suffix
+// is read whole by OMP (path-utils.ts splitPathAndSelPreferringLiteral), so it stays replaced too.
+function ompRangedRead(ev: CanonicalHookEvent, tool: ToolCall): boolean {
+  if (ev.agent !== "omp" || !RANGE_READ_TOOLS.includes(tool.canonicalName)) return false;
+  const p = READ_PATH_KEYS.map((k) => tool.input[k]).find((v): v is string => typeof v === "string" && v !== "");
+  if (p === undefined || !rangedPathSuffix(p)) return false;
+  try {
+    return lstatSync(resolve(ev.cwd, p), { throwIfNoEntry: false }) === undefined;
+  } catch {
+    return false; // an unclear probe keeps the full-read path: the replace stays
+  }
+}
+
+// D-1392-OMP-RANGE-1: plain string parse from the last colon, no regex. `<file>:<range>`, `<file>:<range>:raw` or
+// `<file>:raw:<range>`. The file part is never empty and never one drive letter (`D:50` is a Windows path).
+export function rangedPathSuffix(path: string): boolean {
+  let cut = path.lastIndexOf(":");
+  let sel = path.slice(cut + 1);
+  if (sel.toLowerCase() === "raw") {
+    cut = path.lastIndexOf(":", cut - 1);
+    sel = path.slice(cut + 1, path.length - 4);
+  }
+  if (cut <= 0 || !rangeList(sel)) return false;
+  let file = path.slice(0, cut);
+  if (file.toLowerCase().endsWith(":raw")) file = file.slice(0, -4);
+  return file.length > 1 || !asciiLetter(file);
+}
+
+function rangeList(sel: string): boolean {
+  return sel !== "" && sel.split(",").every(rangeItem);
+}
+
+// One list item: N, N-M, N+K, N- or -N (OMP parseLineRanges and parseTailCount).
+function rangeItem(item: string): boolean {
+  if (item.startsWith("-")) return digitsOnly(item.slice(1));
+  let i = 0;
+  while (i < item.length && digit(item[i])) i++;
+  if (i === 0) return false;
+  if (i === item.length) return true;
+  const op = item[i];
+  const rest = item.slice(i + 1);
+  return (op === "-" && (rest === "" || digitsOnly(rest))) || (op === "+" && digitsOnly(rest));
+}
+
+function digitsOnly(s: string): boolean {
+  if (s === "") return false;
+  for (const c of s) if (!digit(c)) return false;
+  return true;
+}
+
+function digit(c: string): boolean {
+  return c >= "0" && c <= "9";
+}
+
+function asciiLetter(s: string): boolean {
+  const c = s.toLowerCase();
+  return c.length === 1 && c >= "a" && c <= "z";
 }
 
 // D-R4-BUDGET-1: the replace is the body, one newline, the handle line. An empty body (selection budget 0, no
