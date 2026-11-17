@@ -2500,6 +2500,43 @@ describe("PRD-v2 section 10: saving on live payload shapes", () => {
     assert.equal(r, undefined);
   });
 
+  // #1392: OMP 18.21.0 read has `path` only, with the line range inline (src/tools/read.ts:899-901, read-selector.ts
+  // parseSel: :N, :N-M, :N+K, :N-, :-N, comma lists, :raw before or after). A ranged path is the user's own window
+  // (D-R41-READ-OFFSET-1); a path with no range (bare, :raw alone, a drive letter) is a full read and stays replaced.
+  async function ompHandlers(repo) {
+    const { hostExtension } = await import("../src/entries/pi.ts");
+    const handlers = {};
+    hostExtension({ on: (e, h) => { handlers[e] = h; }, registerTool: () => {} }, "omp");
+    const ctx = { cwd: repo, sessionManager: { getSessionId: () => "o1" } };
+    await handlers.before_agent_start({ systemPrompt: ["base"] }, ctx);
+    return { handlers, ctx };
+  }
+
+  test("omp tool_result of a `read` with a line range in the path is not replaced (#1392)", async (t) => {
+    const { repo, big } = sandbox(t);
+    const { handlers, ctx } = await ompHandlers(repo);
+    const ranged = ["logs/app.log:50-120", "logs/app.log:50+40", "logs/app.log:50", "logs/app.log:50-", "logs/app.log:-60",
+      "logs/app.log:5-16,960-973", "logs/app.log:2-4:raw", "logs/app.log:raw:2-4", "D:/x/app.log:50-120"];
+    const whole = [];
+    for (const p of ranged) {
+      const r = await handlers.tool_result({ type: "tool_result", toolCallId: "r-" + p, toolName: "read", input: { path: p },
+        content: [{ type: "text", text: big }], isError: false, details: undefined }, ctx);
+      if (r === undefined) whole.push(p);
+    }
+    assert.deepEqual(whole, ranged, "every ranged read reaches the model whole");
+  });
+
+  test("omp tool_result of a full `read` (no range in the path) is still replaced (#1392)", async (t) => {
+    const { repo, big } = sandbox(t);
+    const { handlers, ctx } = await ompHandlers(repo);
+    for (const p of ["logs/app.log", "logs/app.log:raw", "D:/x/app.log", "D:\\x\\app.log", "logs/app.log:img", "logs/v1:2/app.log"]) {
+      const r = await handlers.tool_result({ type: "tool_result", toolCallId: "f-" + p, toolName: "read", input: { path: p },
+        content: [{ type: "text", text: big }], isError: false, details: undefined }, ctx);
+      assert.ok(r !== undefined, p + " is replaced");
+      assert.ok(Buffer.byteLength(r.content[0].text) < Buffer.byteLength(big) / 2, p + ": replaced text is under half the raw output");
+    }
+  });
+
   test("gemini AfterTool of a bounded read_file (offset/limit) is not replaced (#1314)", async (t) => {
     const { repo, big, env } = sandbox(t);
     const out = await handleHook("gemini", { session_id: "g1", transcript_path: "", cwd: repo, hook_event_name: "AfterTool", timestamp: "2026-11-05T00:00:00Z",
