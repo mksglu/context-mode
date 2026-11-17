@@ -71,8 +71,8 @@ function main() {
     return fail("ci.yml must carry no secrets or key env (ADR-0012: no key in CI)");
   }
 
-  if (!/timeout-minutes:\s*20\b/.test(src)) {
-    return fail("ci.yml job must set timeout-minutes: 20 (DEVIATIONS D-M7-CI-2: Windows Node 26 hit the 10 min limit)");
+  if (!src.includes("timeout-minutes: 30\n")) {
+    return fail("ci.yml job must set timeout-minutes: 30 (DEVIATIONS D-M7-CI-2, D-CI-TIMEOUT-30-1: macOS Node 26 hit the 20 min limit)");
   }
 
   console.log(JSON.stringify({ ok: true }));

@@ -265,7 +265,7 @@ import { vscodeMcpFile } from "../harness/vscode-user-dir.mjs";
     assert.deepStrictEqual(normalize({ errorModuleNotFound }), loadGolden("adapter-bundle-static-imports"));
   });
 
-  // GP9/windows-ci-no-hang (#995) is proven by .github/workflows/ci.yml timeout-minutes: 20 (D-M7-CI-2)
+  // GP9/windows-ci-no-hang (#995) is proven by .github/workflows/ci.yml timeout-minutes: 30 (D-M7-CI-2, D-CI-TIMEOUT-30-1)
   // (checked by e2e/checks/ci-config.mjs), not by a case here.
   void RUN_BUNDLE;
 
