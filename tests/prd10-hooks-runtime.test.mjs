@@ -1002,7 +1002,7 @@ describe("PRD-v2 section 10: compaction delivery, recall and decision rows (GP6)
 
   // ---------- compactSummary "none" (DECISIONS-r6 D6) ----------
 
-  test("[M4] SessionStart(compact) on codex (none): the renderState block, once per session (A23)", async () => {
+  test("[M4] SessionStart(compact) on codex (none): the renderState block, once per compaction (A23, #1396)", async () => {
     const s = sid();
     await handleHook("codex", payload(s, { hook_event_name: "UserPromptSubmit", prompt: "fix the flaky login test" }), env);
     await waitRows("SELECT seq FROM events WHERE session_id = ?", [s], 1);

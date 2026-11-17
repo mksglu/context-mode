@@ -62,3 +62,9 @@ export function hasAgentRows(db: DbHandle, worktree: string, agent: string): boo
 export function hasSessionRows(db: DbHandle, sessionId: string): boolean {
   return db.raw.prepare("SELECT 1 FROM events WHERE session_id = ? LIMIT 1").get(sessionId) !== undefined;
 }
+
+/** #1396: newest journal seq of one session, or 0 when it has none. Keys the SessionStart(compact) marker per compaction. */
+export function lastSessionSeq(db: DbHandle, sessionId: string): number {
+  const row = db.raw.prepare("SELECT MAX(seq) AS m FROM events WHERE session_id = ?").get(sessionId) as { m: number | null } | undefined;
+  return row?.m ?? 0;
+}

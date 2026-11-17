@@ -26,7 +26,7 @@ import { claudeDirOf, homeDirOf } from "../project/config-dir.ts";
 import { isInside } from "../project/contain.ts";
 import { metaGet, metaSet, metaTake, openDb } from "../store/db.ts";
 import { appendEvent, canonicalKey } from "../journal/append.ts";
-import { hasAgentRows, hasSessionRows, readLastPrompt, readRecallRows, readSessionEvents } from "../journal/read.ts";
+import { hasAgentRows, hasSessionRows, lastSessionSeq, readLastPrompt, readRecallRows, readSessionEvents } from "../journal/read.ts";
 import { finishReserved, insertChunks, insertUnits, queryUnits, recallQueryText, reserveSource, sourceHandle, type SourceDraft } from "../store/fts.ts";
 import { buildUnits } from "../index/units.ts";
 import { renderState } from "../compaction/render.ts";
@@ -163,9 +163,12 @@ async function sessionStart(ev: CanonicalHookEvent, row: AdapterRow, project: Pr
   if (ev.source === "compact" && hasRecall(row)) markCompacted(await openDb(project), ev.sessionId);
   if (ev.source === "compact" && row.compactDelivery === "sessionstart") {
     const db = await openDb(project);
-    // A23: the throttle marker guards a duplicate SessionStart(compact) in one session.
-    if (!shouldHint(db, ev.sessionId, COMPACT_STATE_KEY)) return ALLOW;
-    return { kind: "hint", text: compactText(db, ev, row), onceKey: COMPACT_STATE_KEY };
+    // A23, #1396: the host sends one SessionStart(compact) per compaction with the same session id. The
+    // marker key carries the newest journal seq, so each compaction gets its state block and a duplicate
+    // delivery of the same compaction (no new row in between) stays silent.
+    const onceKey = COMPACT_STATE_KEY + ":" + lastSessionSeq(db, ev.sessionId);
+    if (!shouldHint(db, ev.sessionId, onceKey)) return ALLOW;
+    return { kind: "hint", text: compactText(db, ev, row), onceKey };
   }
   const db = await openDb(project);
   // impl/12 §4.6 step 2, D-M5-P2-4: the OpenCode plugin's one `context` call per session reads and clears
