@@ -1112,6 +1112,51 @@ describe("PRD-v2 section 10: compaction delivery, recall and decision rows (GP6)
     assert.deepEqual(off, { stdout: "", exitCode: 0 });
   });
 
+  // #1394: recall pushes state the compaction took away (DECISIONS-r11 B). A row written after the latest
+  // SessionStart(compact) is still in the model's live context, so recall never sends it again; a row from
+  // before the boundary still comes back.
+  test("[M7] recall/compaction-boundary (#1394): rows after the latest compaction stay out, rows before it come back", async () => {
+    const s = sid();
+    await longSession("claude-code", s, "UserPromptSubmit");
+    await handleHook("claude-code", payload(s, { hook_event_name: "SessionStart", source: "compact" }), env);
+    await handleHook("claude-code", payload(s, {
+      hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "npm run bundle:quokkafrob" },
+      tool_response: { stdout: "", stderr: "quokkafrob bundle failed: EACCES writing dist/quokkafrob.js", is_error: true },
+    }), env);
+    await waitRows("SELECT seq FROM events WHERE session_id = ? AND kind = 'toolerr'", [s], 2);
+    const post = query("SELECT seq FROM events WHERE session_id = ? AND kind = 'toolerr' ORDER BY seq DESC", s)[0];
+    // a host-made prompt (task-notification) that names the post-compaction row
+    const late = context(await handleHook("claude-code", payload(s, {
+      hook_event_name: "UserPromptSubmit", prompt: "<task-notification>why did the quokkafrob bundle fail with EACCES</task-notification>",
+    }), env));
+    assert.ok(late === null || !late.includes("#" + post.seq + " "), "post-compaction row recalled: " + String(late));
+    assert.ok(late === null || !late.includes("quokkafrob bundle failed"), String(late));
+    // the pre-compaction row is still recalled
+    const pre = query("SELECT seq FROM events WHERE session_id = ? AND kind = 'toolerr' ORDER BY seq ASC", s)[0];
+    const text = context(await handleHook("claude-code", payload(s, { hook_event_name: "UserPromptSubmit", prompt: ASK_ERROR }), env));
+    assert.ok(text !== null && text.includes("#" + pre.seq + " toolerr Bash: "), String(text));
+  });
+
+  test("[M7] recall/compaction-boundary units (#1394): line units of an output after the latest compaction stay out", async () => {
+    const s = sid();
+    await longSession("claude-code", s, "UserPromptSubmit");
+    await handleHook("claude-code", payload(s, { hook_event_name: "SessionStart", source: "compact" }), env);
+    const PLANTED = "walrusbeam deploy rolled back after 41 health check failures on canary-3";
+    const lines = [];
+    for (let i = 0, n = 0; n < SYNC_INDEX_MAX_BYTES - 2000; i++) {
+      const l = i === 50 ? PLANTED : "step " + i + " of the release pipeline finished in " + (i % 17) + " s on runner " + (i % 5);
+      lines.push(l);
+      n += Buffer.byteLength(l, "utf8") + 1;
+    }
+    await handleHook("claude-code", payload(s, {
+      hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "cat deploy.log", description: "deploy log" },
+      tool_use_id: "toolu_1394", tool_response: { stdout: lines.join("\n"), stderr: "", interrupted: false, isImage: false },
+    }), env);
+    await waitRows("SELECT 1 FROM line_units WHERE session_id = ?", [s], lines.length);
+    const text = context(await handleHook("claude-code", payload(s, { hook_event_name: "UserPromptSubmit", prompt: "why did the walrusbeam deploy roll back on canary-3" }), env));
+    assert.ok(text === null || !text.includes(PLANTED), "post-compaction line unit recalled: " + String(text));
+  });
+
   // #1330 (Lcstyle, aron-intframe): the first prompt is 30 KB of the README; a later output holds README lines and
   // one line the next question is about. The recall query is the current prompt only (D-1330-RECALL-PROMPT-1).
   test("[M7] recall/long-first-prompt (#1330): the asked-for line ranks first, well inside the hook timeout", async () => {
