@@ -1015,6 +1015,24 @@ describe("PRD-v2 section 10: compaction delivery, recall and decision rows (GP6)
     assert.equal(again.stdout, "");
   });
 
+  test("#1396 SessionStart(compact) on claude-code: one state block per compaction in one session, a repeat of the same compaction stays silent", async () => {
+    const s = sid();
+    const compact = () => handleHook("claude-code", payload(s, { hook_event_name: "SessionStart", source: "compact" }), env);
+    await handleHook("claude-code", payload(s, { hook_event_name: "UserPromptSubmit", prompt: "fix the flaky login test" }), env);
+    await waitRows("SELECT seq FROM events WHERE session_id = ?", [s], 1);
+    const first = context(await compact());
+    assert.ok(first !== null && isStateBlock(first), String(first));
+    assert.ok(first.includes("fix the flaky login test"), first);
+    assert.equal((await compact()).stdout, "", "a repeat of the same compaction stays silent");
+    await handleHook("claude-code", payload(s, { hook_event_name: "UserPromptSubmit", prompt: "now ship the billing export" }), env);
+    await waitRows("SELECT seq FROM events WHERE session_id = ?", [s], 2);
+    const second = context(await compact());
+    assert.ok(second !== null && isStateBlock(second), "the second compaction gets its own state block: " + String(second));
+    assert.ok(second.includes("now ship the billing export"), second);
+    assert.ok(second.includes('session="' + s + '"'), second);
+    assert.notEqual(second, first);
+  });
+
   test("[M4] SessionStart(compact) on codex with an empty journal: the empty state block, never a throw", async () => {
     const text = context(await handleHook("codex", payload(sid(), { hook_event_name: "SessionStart", source: "compact" }), env));
     assert.ok(text !== null && isStateBlock(text), String(text));
