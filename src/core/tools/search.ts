@@ -65,13 +65,14 @@ function zeroHits(db: DbHandle, scope: SearchScope, ctx: ToolContext, source: st
   // D-MEMORY-SOURCE-1: the count holds the memory files in the scope with the indexed sources.
   const inScope = sourceCount(db, scope, ctx, source);
   const n = inScope + mem.rows.length;
-  // D-LABEL-HANDLE-2: past the last hit the reply says so (the hits are behind, not missing).
-  if (offset > 0) return reply("No more hits past offset " + offset + ' in scope "' + scope + '" across ' + n + " source(s).", false);
   const head = 'No hits in scope "' + scope + '" across ' + n + " source(s).";
   // D-SEARCH-UNKNOWN-SOURCE-1 (#1390): an explicit source with no stored row in the scope names where it is, or the
-  // stored sources and how to store one. A memory file or source:"decision" keeps its own reply.
+  // stored sources and how to store one, with or without `offset`. A memory file or source:"decision" keeps its own reply.
   const pick = nm.pick;
-  if (pick === null || mem.named || inScope > 0) return reply(head, false);
+  if (pick === null || mem.named || inScope > 0) {
+    // D-LABEL-HANDLE-2: past the last hit the reply says so (the hits are behind, not missing).
+    return reply(offset > 0 ? "No more hits past offset " + offset + ' in scope "' + scope + '" across ' + n + " source(s)." : head, false);
+  }
   if (pick.id !== null) {
     const wider: SearchScope = scope === "session" && sourceCount(db, "worktree", ctx, source) > 0 ? "worktree" : "project";
     return reply(head + "\nSource " + JSON.stringify(nm.arg) + ' is stored in scope "' + wider + '": ' + callText(queries, wider, nm.arg, "") + " searches it.", false);
@@ -426,9 +427,11 @@ async function handler(input: CtxSearchInput, ctx: ToolContext): Promise<ToolRep
   const scope: SearchScope = input.scope ?? "worktree";
   const db = await openDb(ctx.project, { readOnly: true });
   try {
-    // D-LABEL-HANDLE-1: a stored label wins, then a short id, then a label without its "#" suffix (pickSource).
+    // D-LABEL-HANDLE-1: a stored label wins, then a short id, then a label without its "#" suffix (pickSource),
+    // inside the asked scope first (D-SEARCH-SCOPE-PICK-1, #1390).
     const given = input.source;
-    const pick = given !== undefined && given !== DECISION_SOURCE ? pickSource(db, given) : null;
+    const within = { scope, sessionId: ctx.sessionId, worktree: ctx.project.worktree };
+    const pick = given !== undefined && given !== DECISION_SOURCE ? pickSource(db, given, true, within) : null;
     if (pick !== null) input = { ...input, source: pick.label };
     const nm = named(given, pick);
     const indexed = pick !== null && pick.id !== null;

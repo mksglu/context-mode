@@ -661,8 +661,14 @@ export function pathLabel(p: string): string {
   return p.includes("\\") ? p.split("\\").join("/") : p;
 }
 
-function labelStored(db: DbHandle, label: string): boolean {
-  return stmt(db.raw, "SELECT 1 AS x FROM sources WHERE label = ? LIMIT 1").get(label) !== undefined;
+// D-SEARCH-SCOPE-PICK-1 (#1390): the rows a `source` value may name; scope "project" = every row of the db.
+export interface PickScope { scope: SearchScope; sessionId: string; worktree: string }
+const EVERY_ROW: PickScope = { scope: "project", sessionId: "", worktree: "" };
+const IN_SCOPE = "(:scope <> 'session' OR session_id = :session_id) AND (:scope <> 'worktree' OR worktree = :worktree)";
+const scopeArgs = (w: PickScope): { scope: string; session_id: string; worktree: string } => ({ scope: w.scope, session_id: w.sessionId, worktree: w.worktree });
+
+function labelStored(db: DbHandle, label: string, w: PickScope): boolean {
+  return stmt(db.raw, "SELECT 1 AS x FROM sources WHERE label = :label AND " + IN_SCOPE + " LIMIT 1").get({ label, ...scopeArgs(w) }) !== undefined;
 }
 
 /**
@@ -670,10 +676,10 @@ function labelStored(db: DbHandle, label: string): boolean {
  * it, else its forward-slash form (a backslash path from a Windows agent), else the argument as given.
  * ctx_purge uses this alone; ctx_search adds the id and "#" suffix forms in resolveSourceLabel.
  */
-export function storedLabel(db: DbHandle, source: string): string {
-  if (labelStored(db, source)) return source;
+export function storedLabel(db: DbHandle, source: string, w: PickScope = EVERY_ROW): string {
+  if (labelStored(db, source, w)) return source;
   const canon = pathLabel(source);
-  return canon !== source && labelStored(db, canon) ? canon : source;
+  return canon !== source && labelStored(db, canon, w) ? canon : source;
 }
 
 /** D-LABEL-HANDLE-1: what a `source` argument named: the label, the newest row id with it, and the other source
@@ -685,40 +691,51 @@ export interface SourcePick {
   other: { id: number; label: string } | null;
 }
 
-function newestId(db: DbHandle, label: string): number | null {
-  const row = stmt(db.raw, "SELECT id FROM sources WHERE label = ? ORDER BY id DESC LIMIT 1").get(label) as { id: number } | undefined;
+function newestId(db: DbHandle, label: string, w: PickScope): number | null {
+  const row = stmt(db.raw, "SELECT id FROM sources WHERE label = :label AND " + IN_SCOPE + " ORDER BY id DESC LIMIT 1").get({ label, ...scopeArgs(w) }) as { id: number } | undefined;
   return row === undefined ? null : Number(row.id);
 }
 
-function labelOfId(db: DbHandle, id: number): string | null {
-  const row = stmt(db.raw, "SELECT label FROM sources WHERE id = ?").get(id) as { label: string } | undefined;
+function labelOfId(db: DbHandle, id: number, w: PickScope): string | null {
+  const row = stmt(db.raw, "SELECT label FROM sources WHERE id = :id AND " + IN_SCOPE).get({ id, ...scopeArgs(w) }) as { label: string } | undefined;
   return row === undefined ? null : row.label;
+}
+
+function pickIn(db: DbHandle, source: string, suffix: boolean, w: PickScope): SourcePick {
+  const named = storedLabel(db, source, w);
+  const id = parseSourceHandle(source);
+  const own = newestId(db, named, w);
+  if (own !== null) {
+    // The collision note names the handle's source wherever it is stored (the bytes of D-LABEL-HANDLE-1 stay).
+    const otherLabel = id === null || id === own ? null : labelOfId(db, id, EVERY_ROW);
+    return { label: named, id: own, via: "label", other: otherLabel === null || otherLabel === named ? null : { id: id as number, label: otherLabel } };
+  }
+  if (id !== null) {
+    const label = labelOfId(db, id, w);
+    if (label !== null) return { label, id, via: "handle", other: null };
+  }
+  if (suffix) {
+    const prefix = named + LABEL_SUFFIX_SEP;
+    const rows = stmt(db.raw, "SELECT id, label FROM sources WHERE substr(label, 1, :n) = :prefix AND " + IN_SCOPE + " ORDER BY id DESC").all({ n: prefix.length, prefix, ...scopeArgs(w) }) as Array<{ id: number; label: string }>;
+    for (const r of rows) {
+      if (r.label.lastIndexOf(LABEL_SUFFIX_SEP) === named.length) return { label: r.label, id: Number(r.id), via: "suffix", other: null };
+    }
+  }
+  return { label: source, id: null, via: "none", other: null };
 }
 
 // D-LABEL-HANDLE-1 (replaces the order of D-CR3-HANDLE-1): the source a `source` argument names, in this order:
 // a stored label (either slash form, D-PATH-LABEL-1) - what the user typed wins -, then the short id of a stored
 // row, then (with `suffix`) a label without its "#<call id>" suffix (the newest such source). No match -> the
 // argument as given, id null. ctx_purge passes suffix false: a delete names one label exactly.
-export function pickSource(db: DbHandle, source: string, suffix = true): SourcePick {
-  const named = storedLabel(db, source);
-  const id = parseSourceHandle(source);
-  const own = newestId(db, named);
-  if (own !== null) {
-    const otherLabel = id === null || id === own ? null : labelOfId(db, id);
-    return { label: named, id: own, via: "label", other: otherLabel === null || otherLabel === named ? null : { id: id as number, label: otherLabel } };
+// D-SEARCH-SCOPE-PICK-1 (#1390): with `w`, that order runs inside the asked scope first, then over every row, so a
+// match in another scope never hides the one in this scope.
+export function pickSource(db: DbHandle, source: string, suffix = true, w: PickScope = EVERY_ROW): SourcePick {
+  if (w.scope !== "project") {
+    const here = pickIn(db, source, suffix, w);
+    if (here.via !== "none") return here;
   }
-  if (id !== null) {
-    const label = labelOfId(db, id);
-    if (label !== null) return { label, id, via: "handle", other: null };
-  }
-  if (suffix) {
-    const prefix = named + LABEL_SUFFIX_SEP;
-    const rows = stmt(db.raw, "SELECT id, label FROM sources WHERE substr(label, 1, ?) = ? ORDER BY id DESC").all(prefix.length, prefix) as Array<{ id: number; label: string }>;
-    for (const r of rows) {
-      if (r.label.lastIndexOf(LABEL_SUFFIX_SEP) === named.length) return { label: r.label, id: Number(r.id), via: "suffix", other: null };
-    }
-  }
-  return { label: source, id: null, via: "none", other: null };
+  return pickIn(db, source, suffix, EVERY_ROW);
 }
 
 /** D-LABEL-HANDLE-1: the one line a reply adds when a value is a label here and another source's handle. */
