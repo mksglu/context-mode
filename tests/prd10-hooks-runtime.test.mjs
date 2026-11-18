@@ -1975,7 +1975,7 @@ describe("PRD-v2 section 10: hook entry argv and stdin handling (GP7)", () => {
     assert.ok(r.ms < HOOK_TIMEOUT_MS / 2, `hook took ${r.ms} ms under a held write lock (host kills it at ${HOOK_TIMEOUT_MS} ms); stderr: ${r.stderr}`);
     // The lock is free: the next hook in the project runs, and the row written under the lock is in the journal.
     assert.equal(timedRun(JSON.stringify({ ...warm, prompt: "after the lock" })).status, 0);
-    const bodies = readRows("SELECT body FROM events WHERE session_id = ? AND kind = 'prompt' ORDER BY id", "lk1").map((x) => x.body);
+    const bodies = readRows("SELECT body FROM events WHERE session_id = ? AND kind = 'prompt' ORDER BY seq", "lk1").map((x) => x.body);
     assert.deepEqual(bodies, ["warm", "written under the lock", "after the lock"]);
   });
 

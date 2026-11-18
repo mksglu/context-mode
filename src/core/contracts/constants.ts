@@ -135,6 +135,14 @@ export const PIPE_EOF_GRACE_MS = 250;
 // D-1337-EXIT-SETTLE-1: the most time the pipe drain may take after exit, so a survivor that keeps writing cannot hold the call.
 export const PIPE_DRAIN_MAX_MS = 2000;
 export const DB_TIMEOUT_MS = 5000; // ADR-0002, PRD §4
+// D-1401-SPOOL-1 (#1401): a hook process waits at most this long for the write lock, then puts the write in the
+// project spool. The host kills a hook at HOOK_TIMEOUT_MS, so a hook never waits DB_TIMEOUT_MS.
+export const HOOK_BUSY_MS = 250;
+export const HOOK_SPOOL_DIR = "pending"; // D-1401-SPOOL-1: <projectDir>/pending, one JSON file per waiting write
+// D-1401-SPOOL-1: a claimed spool file older than this has no live drainer (the host killed it); another hook takes it.
+export const SPOOL_CLAIM_STALE_MS = 30000;
+// D-1401-SPOOL-1: the most time one hook spends writing spool files into the store; the rest waits for the next hook.
+export const SPOOL_DRAIN_MS = 1000;
 export const DB_WAL_SUFFIX = "-wal"; // impl/02 §6.1 step 4, DEVIATIONS D-M1-T5-1: WAL sibling of context.db
 export const DB_SHM_SUFFIX = "-shm"; // impl/02 §6.1 step 4, DEVIATIONS D-M1-T5-1: shared-memory sibling of context.db
 export const DB_TMP_SUFFIX = ".tmp"; // DEVIATIONS D-M2-CI-3: private build name of a new context.db before linkSync publishes it

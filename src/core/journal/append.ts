@@ -15,10 +15,11 @@ const COST_SEQ_SQL = "SELECT seq FROM events WHERE kind = 'cost' AND session_id 
 
 /** Insert one events row and return its seq. A duplicate `cost` row returns the kept row's seq.
  * withWrite errors propagate unchanged. */
-export function appendEvent(db: DbHandle, row: NewJournalRow): number {
+export function appendEvent(db: DbHandle, row: NewJournalRow, at?: number): number {
   return withWrite(db, (h) => {
     // created_at is taken inside the write, so two writers never disagree on clock source (§10 step 1).
-    const now = Date.now();
+    // D-1401-SPOOL-1: a spooled hook row keeps the time the hook took it (`at`), not the drain time.
+    const now = at ?? Date.now();
     const isCost = row.kind === "cost";
     const res = h.raw
       .prepare(isCost ? INSERT_COST_SQL : INSERT_SQL)
