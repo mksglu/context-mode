@@ -1957,6 +1957,59 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
         }
       });
 
+      // #1390 follow-up (tester, 2.2.1: "with an unknown explicit source and a nonzero offset ctx_search still returns
+      // isError false and the zero-hit pagination line ... without the unknown-source diagnostic"): `offset` never hides
+      // the unknown-source or other-scope answer; a stored source past its last hit keeps the paging line.
+      test("ctxSearch with offset>0 and a source that names no stored source still says so (#1390)", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-se-1390c-"));
+        try {
+          const ctx = ctxFor(root);
+          const unknown = await ctxSearch.handler({ queries: ["alpha-token"], source: "nope", offset: 5 }, ctx);
+          assert.equal(unknown.isError, true, unknown.text);
+          assert.ok(unknown.text.includes('Source "nope" is not a stored source in scope "worktree".'), unknown.text);
+          // A source stored by another session of this worktree: scope "session" with offset names the worktree scope.
+          const other = { ...ctx, sessionId: "s-other" };
+          assert.equal((await ctxIndex.handler({ content: "alpha-token lives in the other session", source: "notes-wt" }, other)).isError, false);
+          const wider = await ctxSearch.handler({ queries: ["alpha-token"], scope: "session", source: "notes-wt", offset: 5 }, ctx);
+          assert.equal(wider.isError, false, wider.text);
+          assert.ok(wider.text.includes('Source "notes-wt" is stored in scope "worktree"'), wider.text);
+          // A stored source past its last hit keeps the paging line, byte for byte.
+          const past = await ctxSearch.handler({ queries: ["alpha-token"], source: "notes-wt", offset: 5 }, ctx);
+          assert.equal(past.isError, false, past.text);
+          assert.equal(past.text, 'No more hits past offset 5 in scope "worktree" across 1 source(s).');
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
+      // #1390 follow-up (tester, 2.2.1: "ambiguous diagnostics involving label/handle and suffix-alias collisions across
+      // scopes"): a source value names the stored source inside the asked scope first (label, then handle, then the
+      // "#" suffix form); a match in another scope never hides the one in this scope.
+      test("ctxSearch resolves a label, handle or suffix alias inside the asked scope first (#1390)", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-se-1390d-"));
+        try {
+          const a = ctxFor(root);
+          const b = { ...a, sessionId: "s-other" };
+          // Handle s1 belongs to session A; session B stores the label "s1".
+          const first = await ctxIndex.handler({ content: "HANDLETOKEN session a owns handle one", source: "alpha" }, a);
+          assert.equal(first.text.split(" from ")[1].split(".")[0], "s1", first.text);
+          assert.equal((await ctxIndex.handler({ content: "LABELTOKEN session b label s1", source: "s1" }, b)).isError, false);
+          const byHandle = await ctxSearch.handler({ queries: ["HANDLETOKEN"], scope: "session", source: "s1" }, a);
+          assert.equal(byHandle.isError, false, byHandle.text);
+          assert.ok(byHandle.text.includes("HANDLETOKEN session a owns handle one"), byHandle.text);
+          assert.equal(byHandle.text.includes("is stored in scope"), false, byHandle.text);
+          // Suffix alias: doc#a in session A, doc#b (newer) in session B.
+          assert.equal((await ctxIndex.handler({ content: "SUFFIXTOKEN part a of the doc", source: "doc#a" }, a)).isError, false);
+          assert.equal((await ctxIndex.handler({ content: "SUFFIXTOKEN part b of the doc", source: "doc#b" }, b)).isError, false);
+          const bySuffix = await ctxSearch.handler({ queries: ["SUFFIXTOKEN"], scope: "session", source: "doc" }, a);
+          assert.equal(bySuffix.isError, false, bySuffix.text);
+          assert.ok(bySuffix.text.includes("SUFFIXTOKEN part a of the doc"), bySuffix.text);
+          assert.equal(bySuffix.text.includes("is stored in scope"), false, bySuffix.text);
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
       test("ctxSearch finds content indexed by ctx_index in the default (worktree) scope", async () => {
         const root = mkdtempSync(join(tmpdir(), "cm-se3-"));
         try {
