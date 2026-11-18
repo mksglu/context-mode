@@ -38,6 +38,8 @@ import http, { createServer } from "node:http";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { safeFetch } from "../src/core/sandbox/fetch.ts";
+import dns from "node:dns";
+import { syncBuiltinESMExports } from "node:module";
 import { spawn, execFileSync, spawnSync } from "node:child_process";
 
 // Stage 1 (concurrent): the pure block, the HTML section and the parity section. None of them sets a proxy variable.
@@ -3123,6 +3125,45 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
   });
 });
 
+// #1403 (D-1403-PROXY-NOT-TARGET-1) seams for stage 2. withDns maps names to addresses for one call, so a test can give
+// gateway.docker.internal or an internal name a private address with no real DNS. recordingProxy is a local proxy that
+// logs every request and CONNECT it gets: a forward request answers 200 "proxied", a CONNECT answers 403.
+async function withDns(map, fn) {
+  const prev = dns.promises.lookup;
+  dns.promises.lookup = async (name, opts) => {
+    const address = map[name];
+    if (address === undefined) return prev.call(dns.promises, name, opts);
+    const r = { address, family: address.includes(":") ? 6 : 4 };
+    return opts?.all ? [r] : r;
+  };
+  syncBuiltinESMExports();
+  try { return await fn(); } finally {
+    dns.promises.lookup = prev;
+    syncBuiltinESMExports();
+  }
+}
+
+async function recordingProxy(onReq) {
+  const seen = [];
+  let conns = 0;
+  const srv = createServer((req, res) => {
+    seen.push({ method: req.method, url: req.url });
+    if (onReq && onReq(req, res)) return;
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.end("proxied");
+  });
+  srv.on("connect", (req, sock) => {
+    seen.push({ method: "CONNECT", url: req.url });
+    sock.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+  });
+  srv.on("connection", () => { conns += 1; });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  return {
+    port: srv.address().port, seen, conns: () => conns,
+    close: () => new Promise((r) => { srv.closeAllConnections(); srv.close(r); }),
+  };
+}
+
 // Stage 2 (serial): these two sections set HTTP_PROXY/NO_PROXY in process.env. A concurrent fetch or child spawn would see them,
 // so they run after stage 1 and one after the other.
 // Moved from tests/tools/index.test.mjs
@@ -3253,21 +3294,22 @@ describe("PRD-v2 section 8 / ctx_index", () => {
     }
   }
 
-  test("[M2] GP5/http-proxy-honored: ctx_index url goes to the proxy from env, SSRF-checked there (#1039, #476)", async () => {
+  test("[M2] GP5/http-proxy-honored: ctx_index url goes through a private proxy from env; the proxy is not a target (#1039, #476, #1403)", async () => {
     const root = mkdtempSync(join(tmpdir(), "cm-ix7-"));
-    let hits = 0;
-    const proxy = createServer((req, res) => { hits += 1; res.end("x"); });
-    proxy.on("connection", () => { hits += 1; });
-    await new Promise((r) => proxy.listen(0, "127.0.0.1", r));
+    const p = await recordingProxy();
     try {
-      for (const [key, url] of [["HTTP_PROXY", "http://example.com/"], ["https_proxy", "https://example.com/"]]) {
-        const out = await withProxyEnv({ [key]: `http://127.0.0.1:${proxy.address().port}` }, () => ctxIndex.handler({ url }, ctxFor(root)));
-        assert.equal(out.isError, true, key);
-        assert.equal(out.text, "Blocked private address 127.0.0.1. Fix: use a public URL.", key);
-      }
-      assert.equal(hits, 0, "no socket may reach a private proxy");
+      // The Docker sandbox case: the proxy named by env sits on a private address. The target is public.
+      const out = await withProxyEnv({ HTTP_PROXY: `http://127.0.0.1:${p.port}` }, () =>
+        ctxIndex.handler({ url: "http://docs.parity.test/page" }, ctxFor(root)));
+      assert.equal(out.isError, false, out.text);
+      assert.equal(p.seen[0]?.url, "http://docs.parity.test/page", "the proxy got the absolute URL");
+      const tls = await withDns({ "gateway.docker.internal": "127.0.0.1" }, () =>
+        withProxyEnv({ https_proxy: `http://gateway.docker.internal:${p.port}` }, () =>
+          ctxIndex.handler({ url: "https://docs.parity.test/page" }, ctxFor(root))));
+      assert.equal(tls.text, "Fetch failed: 403. Fix: check the URL or proxy.", "the CONNECT reached the proxy");
+      assert.ok(p.seen.some((x) => x.method === "CONNECT" && x.url === "docs.parity.test:443"), JSON.stringify(p.seen));
     } finally {
-      await new Promise((r) => proxy.close(r));
+      await p.close();
       rmSync(root, { recursive: true, force: true });
     }
   });
@@ -3393,28 +3435,72 @@ describe("PRD-v2 section 8 / safeFetch", () => {
     return { url: `http://127.0.0.1:${srv.address().port}`, hits: () => hits, close: () => new Promise((r) => srv.close(r)) };
   }
 
-  test("GP5/http-proxy-honored: HTTP_PROXY is the connect target and the SSRF check runs on it", async () => {
-    const p = await countingProxy();
+  test("GP5/http-proxy-honored: a private HTTP_PROXY from env is not a target; a public http target goes through it (#1403)", async () => {
+    const p = await recordingProxy();
     try {
-      await withEnv({ HTTP_PROXY: p.url }, () =>
-        assert.rejects(safeFetch("http://example.com/", new AbortController().signal), (err) => {
-          assert.equal(err.code, "SSRF");
-          assert.equal(err.message, "Blocked private address 127.0.0.1. Fix: use a public URL.");
-          return true;
-        }));
-      assert.equal(p.hits(), 0, "no socket may reach a private proxy");
+      const out = await withEnv({ HTTP_PROXY: `http://127.0.0.1:${p.port}` }, () =>
+        safeFetch("http://docs.parity.test/page", AbortSignal.timeout(5000)));
+      assert.equal(out.body.toString("utf8"), "proxied");
+      assert.deepEqual(p.seen, [{ method: "GET", url: "http://docs.parity.test/page" }]);
     } finally { await p.close(); }
   });
 
-  test("GP5/http-proxy-honored: HTTPS_PROXY and lower-case https_proxy are read for https URLs", async () => {
-    for (const key of ["HTTPS_PROXY", "https_proxy"]) {
-      await withEnv({ [key]: "http://localhost:9" }, () =>
-        assert.rejects(safeFetch("https://example.com/", new AbortController().signal), (err) => {
+  test("GP5/http-proxy-honored: HTTPS_PROXY and lower-case https_proxy on a private address get the CONNECT (#1403)", async () => {
+    const p = await recordingProxy();
+    try {
+      for (const key of ["HTTPS_PROXY", "https_proxy"]) {
+        // 127.0.0.1, and gateway.docker.internal as the Docker sandbox names its proxy (a private address).
+        for (const proxy of [`http://127.0.0.1:${p.port}`, `http://gateway.docker.internal:${p.port}`]) {
+          const before = p.seen.length;
+          await withDns({ "gateway.docker.internal": "127.0.0.1" }, () => withEnv({ [key]: proxy }, () =>
+            assert.rejects(safeFetch("https://docs.parity.test/page", AbortSignal.timeout(5000)), (err) => {
+              assert.equal(err.message, "Fetch failed: 403. Fix: check the URL or proxy.", key + " " + proxy);
+              return true;
+            })));
+          assert.deepEqual(p.seen.slice(before), [{ method: "CONNECT", url: "docs.parity.test:443" }], key + " " + proxy);
+        }
+      }
+    } finally { await p.close(); }
+  });
+
+  test("#1403: through a proxy, a private target is still blocked by name and no socket reaches the proxy", async () => {
+    // The guard checks the URL the model chose, on every hop. Literals, localhost, gateway.docker.internal as a TARGET,
+    // and a name that resolves to a private address all stay blocked, behind a private proxy and behind a public one.
+    const dnsMap = { "gateway.docker.internal": "192.168.65.254", "metadata.internal.test": "10.0.0.5", "proxy.public.test": "203.0.113.7" };
+    const targets = ["127.0.0.1", "169.254.169.254", "10.1.2.3", "localhost", "gateway.docker.internal", "metadata.internal.test"];
+    const p = await recordingProxy();
+    try {
+      for (const proxyHost of ["127.0.0.1", "proxy.public.test"]) {
+        for (const scheme of ["http", "https"]) {
+          const key = scheme === "https" ? "HTTPS_PROXY" : "HTTP_PROXY";
+          for (const host of targets) {
+            await withDns(dnsMap, () => withEnv({ [key]: `http://${proxyHost}:${p.port}` }, () =>
+              assert.rejects(safeFetch(`${scheme}://${host}/latest/meta-data`, AbortSignal.timeout(5000)), (err) => {
+                assert.equal(err.message, "Blocked private address " + host + ". Fix: use a public URL.", `${scheme} ${host} via ${proxyHost}`);
+                return true;
+              })));
+          }
+        }
+      }
+      assert.equal(p.conns(), 0, "no socket may reach the proxy for a private target: " + JSON.stringify(p.seen));
+    } finally { await p.close(); }
+  });
+
+  test("#1403: through a private proxy, a redirect to 169.254.169.254 is blocked on its hop", async () => {
+    const p = await recordingProxy((req, res) => {
+      res.writeHead(302, { location: "http://169.254.169.254/latest/meta-data" });
+      res.end();
+      return true;
+    });
+    try {
+      await withEnv({ HTTP_PROXY: `http://127.0.0.1:${p.port}` }, () =>
+        assert.rejects(safeFetch("http://docs.parity.test/start", AbortSignal.timeout(5000)), (err) => {
           assert.equal(err.code, "SSRF");
-          assert.ok(err.message.includes("localhost"), err.message);
+          assert.equal(err.message, "Blocked private address 169.254.169.254. Fix: use a public URL.");
           return true;
         }));
-    }
+      assert.deepEqual(p.seen, [{ method: "GET", url: "http://docs.parity.test/start" }], "only the first hop reaches the proxy");
+    } finally { await p.close(); }
   });
 
   test("HTTP_PROXY is not used for an https URL (per-scheme)", async () => {
@@ -3470,9 +3556,10 @@ describe("PRD-v2 section 8 / safeFetch", () => {
       }));
     }
     for (const ok of ["8.8.8.8", "100.128.0.1", "198.20.0.1", "[2001:4860:4860::8888]", "[64:ff9b::808:808]", "[2002:808:808::]"]) {
-      // Public targets pass the check: through the loopback proxy the block names the proxy, not the origin.
+      // Public targets pass the check and go on to the loopback proxy from env (#1403: the proxy is not a target), which
+      // refuses the connection on port 9.
       await withEnv({ HTTP_PROXY: "http://127.0.0.1:9" }, () => assert.rejects(safeFetch("http://" + ok + "/", new AbortController().signal), (err) => {
-        assert.equal(err.message, "Blocked private address 127.0.0.1. Fix: use a public URL.", ok);
+        assert.equal(err.message, "Fetch failed: ECONNREFUSED. Fix: check the URL or proxy.", ok);
         return true;
       }));
     }
