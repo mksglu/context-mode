@@ -352,6 +352,18 @@ describe("ADR-0009 section 2: candidates", { concurrency: CONC }, () => {
     assert.ok(!others.includes(1) && !others.includes(3) && !others.includes(4));
   });
 
+  test("[M4] candidates/body-with-leading-blank-lines-uses-first-line-with-text (#1400)", () => {
+    const rows = [
+      row({ seq: 1, kind: "prompt", turn: 1, body: "\r\n\r\nfirst ask\nmore" }),
+      row({ seq: 2, kind: "decision", key: "Q", body: "\n\nA: yes\nref: #1" }),
+      row({ seq: 3, kind: "prompt", turn: 2, body: "\n\nrun the tests" }),
+    ];
+    const out = buildCandidates(rows, "s1");
+    assert.equal(out.lastRequest.text, "now: run the tests");
+    assert.deepEqual(out.earlierRequests.map((c) => c.text), ["asked #1: first ask"]);
+    assert.deepEqual(out.decisions.map((c) => c.text), ["decided #2: A: yes"]);
+  });
+
   test("[M4] candidates/section-capped-at-85", () => {
     const rows = [];
     for (let i = 0; i < 200; i++) {
