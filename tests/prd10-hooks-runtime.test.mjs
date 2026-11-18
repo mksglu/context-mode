@@ -797,6 +797,9 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
       assert.ok(replaced.includes("SECRET-2 value=late9x7q"), "the line past the head comes back: " + replaced);
       const src = await waitRows("SELECT bytes_total FROM sources WHERE session_id = ?", [p.session_id], 1);
       assert.ok(src[0].bytes_total >= Buffer.byteLength(full) - 1, "the whole file is indexed");
+      // D-CC-POINTER-6 (#1406): the pointer names the file the host persisted, so the agent can Read it in ranges.
+      assert.ok(replaced.includes(file), "D-CC-POINTER-6: the pointer names the persisted file: " + replaced);
+      assert.ok(Buffer.byteLength(replaced) < Buffer.byteLength(full) / 10, "D-CC-POINTER-6: the replace stays small, the file is not inlined");
       const q = mainBashPost(head, "");
       q.tool_input = { command: "cat data/part2.txt" };
       q.tool_response = { stdout: head, stderr: "", interrupted: false, persistedOutputPath: join(dir, "none.txt"), persistedOutputSize: Buffer.byteLength(full) };
@@ -831,6 +834,7 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
         p.tool_response = { stdout: head, stderr: "", interrupted: false, persistedOutputPath: file, persistedOutputSize: Buffer.byteLength(secret) };
         const out = replacedText(parsed(await handleHook("claude-code", p, env)).updatedToolOutput);
         assert.equal(out.includes("k8w2p0zq"), false, "not read: " + file);
+        assert.equal(out.includes(file), false, "D-CC-POINTER-6: a refused path is not named: " + file);
       }
       assert.equal(lastHookError(env)?.stage, "persisted-output", "doctor sees the refused path in hook-errors.log");
     } finally {
