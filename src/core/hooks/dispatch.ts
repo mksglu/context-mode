@@ -9,7 +9,7 @@ import {
   COMPACTED_META_PREFIX, COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
   OWN_TOOL_PREFIX, MCP_SERVER_TOOL_PREFIX, PLUGIN_CALL_ID_PREFIX, prefixToolNames, REPLACE_CHUNK_BYTES, REPLACE_HANDLE_LINE, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, RANGE_READ_TOOLS, READ_PATH_KEYS, SKILL_LOAD_TOOLS, READ_RANGE_KEYS, SHAPE_RETURN_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
   PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RECALL_KEY, RECALL_MAX_ROWS, RECALL_SEEN_META_PREFIX, RECALL_UNIT_CANDIDATES, RECALL_UNITS_SEEN_META_PREFIX, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
-  RUN_WRAPPER_AGENT, RUN_WRAPPER_NODE, SEARCH_TWIN_LINE, SEARCH_WRAPPER_FILE, SUBAGENT_HANDLE_LINE, ECHO_MAX_BYTES, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
+  RUN_WRAPPER_AGENT, RUN_WRAPPER_NODE, PERSISTED_FILE_LINE, SEARCH_TWIN_LINE, SEARCH_WRAPPER_FILE, SUBAGENT_HANDLE_LINE, ECHO_MAX_BYTES, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
   USER_DENY_REASON_PREFIX,
   SUBAGENT_RUN_DENY, WORKSPACE_FOLDER_FLAG, PROJECTS_DIR_NAME, CLAUDE_TOOL_RESULTS_DIR_NAME, PERSISTED_OUTPUT_MAX_BYTES,
 } from "../contracts/constants.ts";
@@ -454,7 +454,8 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   const tool = ev.tool;
   if (tool === undefined || tool.canonicalName.startsWith(OWN_TOOL_PREFIX)) return ALLOW; // step 1 (ADR-0009 §0)
   const result = ev.result ?? { isError: false, bytes: 0 };
-  const text = wholeOutput(result, ev.sessionId, env);
+  const whole = wholeOutput(result, ev.sessionId, env);
+  const text = whole.text;
   if (result.persistedPath !== undefined) result.bytes = Buffer.byteLength(text);
   if (tool.canonicalName === DECISION_TOOL) askDetached(ev, project, tool, text); // ADR-0009 §8.2
   const kind = journalKind(tool, row, result.isError); // step 2
@@ -473,7 +474,7 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   };
   let decision: Decision;
   try {
-    decision = await postReplace(ev, row, project, env, tool, result, text);
+    decision = await postReplace(ev, row, project, env, tool, result, text, whole.file);
   } catch (err) {
     journal(result.bytes); // the call still gets its row; the caller turns the throw into the failure output
     throw err;
@@ -491,7 +492,7 @@ function ownRead(ev: CanonicalHookEvent, tool: ToolCall, env: NodeJS.ProcessEnv)
 }
 
 async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext, env: NodeJS.ProcessEnv,
-  tool: ToolCall, result: ToolResultInfo, text: string): Promise<Decision> {
+  tool: ToolCall, result: ToolResultInfo, text: string, persistedFile?: string): Promise<Decision> {
   // step 5: replace, DECISIONS-r9 F1 split. Subagent case B/C (ADR-0016), and the main agent on a row
   // with a replace channel ("run, then replace", D-M7-RR-1, DECISIONS-r10 (1)).
   if (result.bytes <= REPLACE_TRIGGER_BYTES) return ALLOW; // D-M7-SV-1
@@ -508,11 +509,13 @@ async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // SUBAGENT_HANDLE_LINE for case B and C. D-CC-POINTER-4: the subagent label carries the call id, as mainLabel does.
   let label: string;
   let caller: Caller = { ctx: true, shell: true, read: false };
+  let canRead = true; // D-CC-POINTER-6: the main session has Read; a subagent only when its tool set holds it
   if (isSubagentCall(ev)) {
     // #1348: toolSetSources carries the OpenCode 2.x agentTools next to the project dir and env.
     const set = toolSetForAgentType(ev, toolSetSources(ev, project, env));
     const subCase = pickSubagentCase(ev, set);
     const has = (names: readonly string[]): boolean => set !== null && names.some((n) => set.includes(n));
+    canRead = has(row.nativeTools.read ?? []);
     caller = { ctx: subCase === "A", shell: has(row.nativeTools.shell),
       read: RANGE_READ_TOOLS.includes(tool.canonicalName) && has(row.nativeTools.read ?? []) };
     // D-1382-NO-ROUTE-1 (#1382, ADR-0016 lines 11 and 16): a known tool set with no ctx tool, no shell and no ranged
@@ -562,7 +565,9 @@ async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   const budget = replaceBudget(handleLine, moreLine(intent, label));
   // D-CC-POINTER-2 (#1358): on the claude-code row a caller with a shell also gets the MCP-free search.mjs call,
   // which works when the MCP server is not connected. It sits after the budget: the selection is unchanged.
-  const pointer = handleLine + (caller.shell && ev.agent === RUN_WRAPPER_AGENT ? searchTwin(handle, intent, project) : "");
+  // D-CC-POINTER-6 (#1406): a file the host persisted and this hook read is named after the budget too, for a caller with Read.
+  const pointer = handleLine + (caller.shell && ev.agent === RUN_WRAPPER_AGENT ? searchTwin(handle, intent, project) : "")
+    + (persistedFile !== undefined && canRead ? PERSISTED_FILE_LINE(persistedFile) : "");
   const digest = shapeDigest(text, rankQuery ?? intent, SHAPE_RETURN_BYTES); // D-M2-JSON-1
   if (digest !== null) return { kind: "replace", output: replaceOutput(digest, pointer) };
   const selected = selectChunksInMemory(chunks, intent, budget, label, rankQuery);
@@ -674,18 +679,19 @@ function hostToolResult(file: string, sessionId: string, env: NodeJS.ProcessEnv)
 }
 
 // D-M2-SHAPE-2: the whole output when the host persisted it to a file; an unreadable or refused file keeps the head.
-function wholeOutput(result: ToolResultInfo, sessionId: string, env: NodeJS.ProcessEnv): string {
+// D-CC-POINTER-6: `file` is set only when the host's file was read, so a refused path is never named to the model.
+function wholeOutput(result: ToolResultInfo, sessionId: string, env: NodeJS.ProcessEnv): { text: string; file?: string } {
   const head = result.text ?? "";
-  if (result.persistedPath === undefined) return head;
+  if (result.persistedPath === undefined) return { text: head };
   try {
     if (!hostToolResult(result.persistedPath, sessionId, env)) {
       // D-SEC-PERSIST-1: doctor shows this line under "Hook errors"; the model still gets the head.
       logHookError(env, "claude-code", "persisted-output", new Error("persisted output path is outside this session's tool-results dir or too large; kept the head"));
-      return head;
+      return { text: head };
     }
-    return readFileSync(result.persistedPath, "utf8");
+    return { text: readFileSync(result.persistedPath, "utf8"), file: result.persistedPath };
   } catch {
-    return head;
+    return { text: head };
   }
 }
 

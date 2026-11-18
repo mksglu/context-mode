@@ -181,7 +181,7 @@ export function decodeClaudeShape(raw: unknown, agent: AgentId, ownPrefix: strin
 // output is an object {stdout, stderr, interrupted}, so a bare string never reached the model.
 // D-R33-CC-SHELL-1 (claude-code-1): the shell replace is the host's own object with stdout and stderr swapped, so
 // interrupted, returnCodeInterpretation and the rest reach the model as the host made them. The persisted-output fields go:
-// the replace is the whole output now.
+// the replace stands for the whole output, and its pointer names the file (D-CC-POINTER-6, PERSISTED_FILE_LINE).
 function replaceShape(ev: CanonicalHookEvent, output: string): unknown {
   const shape = ev.result?.shape;
   if (ev.tool?.canonicalName === "Bash") {

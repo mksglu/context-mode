@@ -13,7 +13,7 @@ import { ctxSearch } from "../src/core/tools/search.ts";
 import { ctxStats } from "../src/core/tools/stats.ts";
 import { chunkText } from "../src/core/index/chunk.ts";
 import { getAdapter, ADAPTERS, hasRecall, hasReplace } from "../src/adapters/table.ts";
-import { SEARCH_TWIN_LINE, SEARCH_WRAPPER_FILE, COMPACT_POINTER_LINE, OUTPUT_CAP, REPLACE_TRIGGER_BYTES, REPLACE_RETURN_BYTES, REPLACE_CHUNK_BYTES, SYNC_INDEX_MAX_BYTES, PENDING_COMPACT_META_PREFIX, DECISION_OPTION_KEY, DECISION_SOURCE, RECALL_BUDGET_BYTES, RECALL_CLOSE_TAG, RECALL_OPEN_TAG, STATE_BUDGET, HOOK_TIMEOUT_MS,D5_LAST_HOOK_ERROR, MCP_HINT_EVERY, PARSE_ERROR_DENY_LINE, POLICY_UNREADABLE_LINE, REPLACE_HANDLE_LINE, REQUIRE_SECURITY_ENV, TOOL_ORDER, prefixToolNames } from "../src/core/contracts/constants.ts";
+import { SEARCH_TWIN_LINE, PERSISTED_FILE_LINE, SEARCH_WRAPPER_FILE, COMPACT_POINTER_LINE, OUTPUT_CAP, REPLACE_TRIGGER_BYTES, REPLACE_RETURN_BYTES, REPLACE_CHUNK_BYTES, SYNC_INDEX_MAX_BYTES, PENDING_COMPACT_META_PREFIX, DECISION_OPTION_KEY, DECISION_SOURCE, RECALL_BUDGET_BYTES, RECALL_CLOSE_TAG, RECALL_OPEN_TAG, STATE_BUDGET, HOOK_TIMEOUT_MS,D5_LAST_HOOK_ERROR, MCP_HINT_EVERY, PARSE_ERROR_DENY_LINE, POLICY_UNREADABLE_LINE, REPLACE_HANDLE_LINE, REQUIRE_SECURITY_ENV, TOOL_ORDER, prefixToolNames } from "../src/core/contracts/constants.ts";
 import { answerDecisions, askOptionLabels, listOptionLabels, optionEchoDecision } from "../src/core/hooks/decision.ts";
 import { decode } from "../src/adapters/claude-code.ts";
 import { openDb, closeDb, withWrite, metaGet } from "../src/core/store/db.ts";
@@ -798,7 +798,7 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
       const src = await waitRows("SELECT bytes_total FROM sources WHERE session_id = ?", [p.session_id], 1);
       assert.ok(src[0].bytes_total >= Buffer.byteLength(full) - 1, "the whole file is indexed");
       // D-CC-POINTER-6 (#1406): the pointer names the file the host persisted, so the agent can Read it in ranges.
-      assert.ok(replaced.includes(file), "D-CC-POINTER-6: the pointer names the persisted file: " + replaced);
+      assert.ok(replaced.includes(PERSISTED_FILE_LINE(file)), "D-CC-POINTER-6: the pointer names the persisted file: " + replaced);
       assert.ok(Buffer.byteLength(replaced) < Buffer.byteLength(full) / 10, "D-CC-POINTER-6: the replace stays small, the file is not inlined");
       const q = mainBashPost(head, "");
       q.tool_input = { command: "cat data/part2.txt" };

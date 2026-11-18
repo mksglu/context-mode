@@ -72,6 +72,12 @@ export function SUBAGENT_HANDLE_LINE(handle: string, bytes: number, read: boolea
 export function SEARCH_TWIN_LINE(searchPath: string, handle: string, terms: string, projectDir: string): string {
   return " Or run: node " + shellWord(searchPath) + " " + handle + " " + shellWord(terms) + " " + shellWord(projectDir);
 }
+// D-CC-POINTER-6 (#1406): Claude Code kept the whole output in this file (D-M2-SHAPE-2) and the replace drops the host's
+// persistedOutputPath field, so the pointer names the file. A Read with offset and limit passes whole
+// (D-R41-READ-OFFSET-1), so the caller pages through the output in order.
+export function PERSISTED_FILE_LINE(file: string): string {
+  return " The whole output is also in " + JSON.stringify(file) + "; Read it with offset and limit.";
+}
 // D-CC-POINTER-5: one POSIX shell word. Inside single quotes sh, bash and Git Bash expand nothing; a ' closes the
 // quote, adds an escaped ', and opens it again.
 export function shellWord(s: string): string {
