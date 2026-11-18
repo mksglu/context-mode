@@ -501,6 +501,21 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.equal(typeof parsed(await handleHook("claude-code", read(dotdot, "toolu_link_dotdot"), env)).updatedToolOutput, "object", "a .. step through the link still replaces");
   });
 
+  // #1404: "OpenCode: the skill tool result over 4096 B is replaced by a ctx_search pointer, so skills never load in
+  // full". A skill load is instructions the model must read whole (README: "a loaded skill joins the prompt in full"),
+  // as on Claude Code, whose PostToolUse matcher leaves Skill out. A shell output of the same size still replaces.
+  test("#1404: an OpenCode skill tool result over the trigger reaches the model whole; bash still replaces", async () => {
+    const body = "<skill_content name=\"deploy\">\n# Skill: deploy\n" + bigText(REPLACE_TRIGGER_BYTES * 3) + "</skill_content>\n";
+    assert.ok(Buffer.byteLength(body) > REPLACE_TRIGGER_BYTES);
+    const after = (tool, args, callID) => ({ type: "execute.after", sessionID: "s-1404", directory: repo, tool, args, callID, output: body });
+    const skill = await handleHook("opencode", after("skill", { name: "deploy" }, "call_skill"), env);
+    assert.deepEqual(skill, { stdout: "", exitCode: 0 }, "the skill body is left as the host made it");
+    const shell = await handleHook("opencode", after("bash", { command: "cat big.md" }, "call_bash"), env);
+    assert.equal(shell.exitCode, 0);
+    assert.ok(shell.stdout.includes("ctx_search"), "a bash output of the same size still gets the pointer");
+    assert.ok(Buffer.byteLength(shell.stdout) < Buffer.byteLength(body), "savings stay: bash output shrinks");
+  });
+
   test("D-M7-RR-1: main-agent replace above SYNC_INDEX_MAX_BYTES: in-memory selection, detached index", async () => {
     const text = bigText(SYNC_INDEX_MAX_BYTES * 2);
     const p = mainBashPost(text);
