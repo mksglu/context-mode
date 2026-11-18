@@ -637,6 +637,31 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.ok(Buffer.byteLength(u.content) < Buffer.byteLength(resp.content) && u.content.includes("needle target"));
   });
 
+  // D-1402-PLUGIN-CALL-1 (#1402): a plugin mod's $.mcp.call gets a toolu_plugin_ id from the host, and its result goes
+  // back to the mod only, never to the model. The mod gets the output whole (it may JSON.parse it); the text is indexed.
+  test("D-1402-PLUGIN-CALL-1: a large MCP result of a plugin call (toolu_plugin_) reaches the mod whole and is indexed", async () => {
+    const rows = Array.from({ length: 120 }, (_, i) => ({ id: i, title: "needle target werk " + i, body: "x".repeat(40) }));
+    const text = JSON.stringify({ items: rows });
+    assert.ok(Buffer.byteLength(text) > REPLACE_TRIGGER_BYTES);
+    const p = cc({ hook_event_name: "PostToolUse", tool_name: "mcp__lazi__meine_werke_liste", tool_input: {},
+      tool_use_id: "toolu_plugin_b25e726b9ce6495b9be4eb7224a5e1b1", tool_response: [{ type: "text", text }] });
+    const out = await handleHook("claude-code", p, env);
+    assert.deepEqual(out, { stdout: "", exitCode: 0 }, "the plugin call got a replace: " + out.stdout.slice(0, 200));
+    const src = await waitRows("SELECT label FROM sources WHERE session_id = ?", [p.session_id], 1);
+    assert.equal(src.length, 1, "the plugin call output is indexed");
+    assert.ok(src[0].label.includes("toolu_plugin_b25e726b9ce6495b9be4eb7224a5e1b1"), src[0].label);
+  });
+
+  test("D-1402-PLUGIN-CALL-1: the same MCP result of a model call (toolu_01) is still replaced", async () => {
+    const rows = Array.from({ length: 120 }, (_, i) => ({ id: i, title: "needle target werk " + i, body: "x".repeat(40) }));
+    const text = JSON.stringify({ items: rows });
+    const p = cc({ hook_event_name: "PostToolUse", tool_name: "mcp__lazi__meine_werke_liste", tool_input: {},
+      tool_use_id: "toolu_01AbCdEf", tool_response: [{ type: "text", text }] });
+    const out = parsed(await handleHook("claude-code", p, env));
+    assert.ok(Array.isArray(out.updatedToolOutput) && out.updatedToolOutput[0].type === "text");
+    assert.ok(Buffer.byteLength(out.updatedToolOutput[0].text) < Buffer.byteLength(text), "the model call is replaced");
+  });
+
   test("D-M7-RR-1: rows with no replace (codex, qwen) keep their one path: large PostToolUse is the empty allow", async () => {
     for (const agent of ["codex", "qwen"]) {
       const p = mainBashPost(bigText(40000));
