@@ -227,6 +227,9 @@ export const FRONTMATTER_FENCE = "---";
 export const FRONTMATTER_TOOLS_KEY = "tools";
 export const FRONTMATTER_DISALLOWED_KEY = "disallowedTools";
 export const MCP_SERVER_TOOL_PREFIX = "mcp__"; // Claude-shape MCP name; a bare "mcp__<server>" rule covers all its tools
+// D-1402-PLUGIN-CALL-1 (#1402): Claude Code gives a plugin mod's $.mcp.call this tool_use_id prefix (2.1.322 d6n/s_r);
+// the result goes back to the mod in a virtual message, never to the model.
+export const PLUGIN_CALL_ID_PREFIX = "toolu_plugin_";
 export const MCP_NAME_JOIN = "__"; // Claude-shape join between server and tool name
 export const GEMINI_MCP_PREFIX = "mcp_"; // generateValidName(): "mcp_" + server + "_" + tool (ADR-0016 Gemini row)
 export const GEMINI_NAME_EXTRA_CHARS = "_-.:"; // kept besides A-Z a-z 0-9; any other char becomes "_"

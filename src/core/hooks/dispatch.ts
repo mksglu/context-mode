@@ -7,7 +7,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { AGENT_IDS, type AgentId } from "../contracts/agents.ts";
 import {
   COMPACTED_META_PREFIX, COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
-  OWN_TOOL_PREFIX, prefixToolNames, REPLACE_CHUNK_BYTES, REPLACE_HANDLE_LINE, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, RANGE_READ_TOOLS, READ_PATH_KEYS, SKILL_LOAD_TOOLS, READ_RANGE_KEYS, SHAPE_RETURN_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
+  OWN_TOOL_PREFIX, MCP_SERVER_TOOL_PREFIX, PLUGIN_CALL_ID_PREFIX, prefixToolNames, REPLACE_CHUNK_BYTES, REPLACE_HANDLE_LINE, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, RANGE_READ_TOOLS, READ_PATH_KEYS, SKILL_LOAD_TOOLS, READ_RANGE_KEYS, SHAPE_RETURN_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
   PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RECALL_KEY, RECALL_MAX_ROWS, RECALL_SEEN_META_PREFIX, RECALL_UNIT_CANDIDATES, RECALL_UNITS_SEEN_META_PREFIX, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
   RUN_WRAPPER_AGENT, RUN_WRAPPER_NODE, SEARCH_TWIN_LINE, SEARCH_WRAPPER_FILE, SUBAGENT_HANDLE_LINE, ECHO_MAX_BYTES, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
   USER_DENY_REASON_PREFIX,
@@ -541,6 +541,9 @@ async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
     sourceId = reserveSource(db, sourceRowOf(project, ev.sessionId, label), chunks);
     indexDetached(project, ev.sessionId, sourceId, label, text, chunks);
   }
+  // D-1402-PLUGIN-CALL-1 (#1402): a plugin mod's MCP call (host id prefix toolu_plugin_) returns to the mod, not to the
+  // model, so the mod gets the output whole (it may JSON.parse it). The text is indexed above; model calls stay replaced.
+  if (pluginMcpCall(tool)) return ALLOW;
   const handle = sourceHandle(sourceId);
   // D-M7-SV-5: rank by the intent and the session's last user prompt (any word), so a bare cat still
   // returns the line the user asked for. The more line keeps the intent. No prompt -> intent alone.
@@ -567,6 +570,11 @@ async function postReplace(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
 }
 
 type Caller = { ctx: boolean; shell: boolean; read: boolean };
+
+// D-1402-PLUGIN-CALL-1: MCP tools only. An Agent call a plugin serves for the model may carry the same id prefix.
+function pluginMcpCall(tool: ToolCall): boolean {
+  return tool.callId !== undefined && tool.callId.startsWith(PLUGIN_CALL_ID_PREFIX) && tool.name.startsWith(MCP_SERVER_TOOL_PREFIX);
+}
 
 // search.mjs sits next to hook.mjs (D-M3-arch-3, as caseB's run.mjs). A long intent is not echoed (D-NO-LOSSY-CUT-2).
 function searchTwin(handle: string, intent: string, project: ProjectContext): string {
