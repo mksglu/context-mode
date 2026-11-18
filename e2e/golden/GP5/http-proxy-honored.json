@@ -1,3 +1,12 @@
 {
-  "hits": 0
+  "blocked": [
+    "Blocked private address 169.254.169.254. Fix: use a public URL.",
+    "Blocked private address 10.0.0.5. Fix: use a public URL.",
+    "Blocked private address 127.0.0.1. Fix: use a public URL."
+  ],
+  "seen": [
+    "GET http://example.com/",
+    "CONNECT example.com:443"
+  ],
+  "tls": "Fetch failed: 403. Fix: check the URL or proxy."
 }
