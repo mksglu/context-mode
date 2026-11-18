@@ -23,10 +23,16 @@ export interface CandidateSet {
   indexedSources: SectionCandidate[];
 }
 
-/** DECISIONS-r9 M4: the body's first line only, CR folded to a space. */
+/**
+ * DECISIONS-r9 M4: one line of the body, CR folded to a space. #1400: the first line with text, so a body
+ * that starts with blank lines still names the request; a body with no text gives "" (as before).
+ */
 function firstLine(body: string): string {
-  const nl = body.indexOf("\n");
-  return (nl < 0 ? body : body.slice(0, nl)).replaceAll("\r", " ");
+  const i = body.length - body.trimStart().length; // index of the first char with text (blank lines skipped)
+  if (i === body.length) return "";
+  const start = i === 0 ? 0 : body.lastIndexOf("\n", i) + 1;
+  const nl = body.indexOf("\n", i);
+  return (start === 0 && nl < 0 ? body : body.slice(start, nl < 0 ? body.length : nl)).replaceAll("\r", " ");
 }
 
 function make(section: CandidateSection, row: JournalRow, text: string, repeatCount: number, query: string | null): SectionCandidate {
