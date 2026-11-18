@@ -1,6 +1,7 @@
 // impl/03 §6, impl/05 §4, TECH-SPEC GP5 (proxy env, SSRF per hop), DECISIONS-r3 Q19, DECISIONS-r4 A8/A52/B57,
-// DEVIATIONS D-M2-T5-2. One path: resolve the connect target, check every address, connect to the
-// checked address (no second DNS lookup), follow redirects as new hops.
+// DEVIATIONS D-M2-T5-2, D-1403-PROXY-NOT-TARGET-1. One path: resolve the URL's own host and check every address on
+// every hop (with or without a proxy), connect to the checked address or to the proxy the environment names (no second
+// DNS lookup of the target), follow redirects as new hops.
 import { readFileSync } from "node:fs";
 import { lookup } from "node:dns/promises";
 import http from "node:http";
@@ -164,9 +165,9 @@ function checkAddress(hostname: string, address: string): void {
   }
 }
 
-// Steps 2-3: resolve in this process, reject if any address is private; return the checked address.
-async function resolveTarget(u: URL, signal: AbortSignal): Promise<Target> {
-  const host = bare(u.hostname);
+// Steps 2-3: resolve in this process; for the URL's own host, reject if any address is private. The proxy the
+// environment names is where the socket goes, not a target the model chose (#1403), so it is resolved unchecked.
+async function lookupAll(host: string, signal: AbortSignal): Promise<{ address: string }[]> {
   let addrs: { address: string }[];
   try {
     addrs = await lookup(host, { all: true });
@@ -175,8 +176,30 @@ async function resolveTarget(u: URL, signal: AbortSignal): Promise<Target> {
   }
   if (signal.aborted) throw fail("ABORT_ERR");
   if (addrs.length === 0) throw fail("ENOTFOUND");
-  for (const a of addrs) checkAddress(host, a.address);
+  return addrs;
+}
+
+async function resolveTarget(u: URL, signal: AbortSignal, checked: boolean): Promise<Target> {
+  const host = bare(u.hostname);
+  const addrs = await lookupAll(host, signal);
+  if (checked) for (const a of addrs) checkAddress(host, a.address);
   return { host, port: u.port === "" ? defaultPort(u.protocol) : Number(u.port), address: addrs[0].address };
+}
+
+// D-1403-PROXY-NOT-TARGET-1: through a proxy, the target is still checked on every hop. An IP literal and a name that
+// resolves here are checked on every address; a name only the proxy can resolve (a proxy-only network) goes to the
+// proxy, as D-M2-T5-2 had it.
+async function checkProxiedTarget(u: URL, signal: AbortSignal): Promise<void> {
+  const host = bare(u.hostname);
+  if (isIP(host) !== 0) return checkAddress(host, host);
+  let addrs: { address: string }[];
+  try {
+    addrs = await lookupAll(host, signal);
+  } catch (err) {
+    if (signal.aborted) throw err;
+    return;
+  }
+  for (const a of addrs) checkAddress(host, a.address);
 }
 
 function tlsName(host: string): string | undefined {
@@ -237,10 +260,10 @@ export async function safeFetch(url: string, signal: AbortSignal): Promise<{ bod
   for (let hop = 0; ; hop += 1) {
     if (signal.aborted) throw fail("ABORT_ERR");
     const proxy = pickProxy(current);
-    // D-M2-T5-2: through a proxy the proxy resolves the origin name; an IP-literal origin is still checked here.
-    const origin = bare(current.hostname);
-    if (proxy !== undefined && isIP(origin) !== 0) checkAddress(origin, origin);
-    const conn = await resolveTarget(proxy === undefined ? current : proxy.url, signal);
+    // D-1403-PROXY-NOT-TARGET-1: the target is checked on every hop; a private proxy from env (a Docker sandbox, a
+    // corporate proxy) is where the socket goes and carries public targets only.
+    if (proxy !== undefined) await checkProxiedTarget(current, signal);
+    const conn = await resolveTarget(proxy === undefined ? current : proxy.url, signal, proxy === undefined);
     const res = await request(current, conn, proxy, signal);
     const status = res.statusCode ?? 0;
     const location = res.headers.location;
