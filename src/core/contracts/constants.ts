@@ -42,6 +42,10 @@ export const REPLACE_TRIGGER_BYTES = readReplaceTrigger(process.env[REPLACE_TRIG
 // PostToolUse lets it through whole. Claude Code, Pi, Gemini: offset/limit; VS Code read_file and Copilot view map to them.
 export const RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
 export const READ_RANGE_KEYS = Object.freeze(["offset", "limit", "view_range"]);
+// D-1404-SKILL-LOAD-1 (#1404): a skill-load tool (canonical name) returns a skill's instructions, which the model must
+// read whole: PostToolUse lets it through. Claude Code calls it Skill (its PostToolUse matcher leaves it out); OpenCode's
+// native `skill` maps to it. Every other tool output over the trigger keeps the replace.
+export const SKILL_LOAD_TOOLS = Object.freeze(["Skill"]);
 export const REPLACE_RETURN_BYTES = 96; // D-M7-SV-3: was 512 (D-M7-SV-2), 1024 before; sweeps in DEVIATIONS
 // D-M2-JSON-1: a parser-found shape digest (schema, counts, whole rows) has its own budget, independent of the handle line.
 export const SHAPE_RETURN_BYTES = 256;

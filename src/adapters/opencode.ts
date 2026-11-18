@@ -25,7 +25,10 @@ const OPENCODE_EVENTS: Readonly<Record<string, CanonicalEventName | AuxEventName
 export const SHELL_TOOL_NAME = "bash";
 export const READ_TOOL_NAME = "read"; // D-R44-OC-READ-1: OpenCode's own read tool (input filePath, or filePaths on 2.x)
 export const SHELL_TOOL_NAMES: readonly string[] = Object.freeze([SHELL_TOOL_NAME, "shell"]); // both map to canonical Bash; the table row keeps "bash" (nativeTools is the 1.19 name)
-const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { webfetch: "WebFetch", [READ_TOOL_NAME]: "Read", ...Object.fromEntries(SHELL_TOOL_NAMES.map((n) => [n, "Bash"])) };
+// D-1404-SKILL-LOAD-1 (#1404): OpenCode's skill tool (`skill`, args.name; output <skill_content name=...>, 1.19.5 binary)
+// is the canonical Skill, as on Claude Code.
+export const SKILL_TOOL_NAME = "skill";
+const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { webfetch: "WebFetch", [READ_TOOL_NAME]: "Read", [SKILL_TOOL_NAME]: "Skill", ...Object.fromEntries(SHELL_TOOL_NAMES.map((n) => [n, "Bash"])) };
 
 export function toCanonicalTool(name: string): string {
   if (name.startsWith(OWN_WIRE_PREFIX)) return name.slice(OWN_WIRE_PREFIX.length);
