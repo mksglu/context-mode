@@ -3,7 +3,7 @@
 import { test, before, after, describe } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readdirSync, existsSync, readFileSync, realpathSync, statSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { dirname, join, sep } from "node:path";
@@ -1918,6 +1918,95 @@ describe("PRD-v2 section 10: hook entry argv and stdin handling (GP7)", () => {
     } finally {
       h.close();
     }
+  });
+
+  // #1401 (impl/09 §3.2, A21, PRD P4): another process (a second session, a long PostToolUse index) holds the project
+  // context.db write lock. The hook must still answer and exit well inside the host timeout (claude-code kills it at
+  // HOOK_TIMEOUT_MS), and no write is lost: the journal row and the indexed output land once the lock is free.
+  function projectDb() {
+    const projects = join(root, ".context-mode", "projects");
+    return join(projects, readdirSync(projects)[0], "context.db");
+  }
+
+  // A second process takes BEGIN IMMEDIATE and keeps it until its stdin ends.
+  async function holdWriteLock(db) {
+    const code = "const{DatabaseSync}=require('node:sqlite');const h=new DatabaseSync(process.argv[1]);h.exec('BEGIN IMMEDIATE');" +
+      "process.stdout.write('locked\\n');process.stdin.resume();process.stdin.on('end',()=>{h.exec('COMMIT');h.close();});";
+    const child = spawn(process.execPath, ["-e", code, db], { stdio: ["pipe", "pipe", "inherit"] });
+    await new Promise((resolve, reject) => {
+      child.stdout.once("data", resolve);
+      child.once("exit", (c) => reject(new Error("lock holder exited " + c)));
+    });
+    return async () => {
+      const done = new Promise((r) => child.once("exit", r));
+      child.stdin.end();
+      await done;
+    };
+  }
+
+  function timedRun(input) {
+    const env = { PATH: process.env.PATH, HOME: root, USERPROFILE: root, CLAUDE_PROJECT_DIR: repo };
+    const t0 = Date.now();
+    const r = spawnSync(process.execPath, [ENTRY, "--agent", "claude-code"], { input, cwd: repo, env, encoding: "utf8", timeout: HOOK_TIMEOUT_MS * 3 });
+    return { ...r, ms: Date.now() - t0 };
+  }
+
+  function readRows(sql, ...args) {
+    const h = new DatabaseSync(projectDb(), { readOnly: true });
+    try {
+      return h.prepare(sql).all(...args).map((x) => ({ ...x }));
+    } finally {
+      h.close();
+    }
+  }
+
+  test("#1401: UserPromptSubmit while another process holds the write lock exits fast and keeps the prompt row", async () => {
+    const warm = { session_id: "lk1", cwd: repo, hook_event_name: "UserPromptSubmit", prompt: "warm" };
+    assert.equal(timedRun(JSON.stringify(warm)).status, 0);
+    const release = await holdWriteLock(projectDb());
+    let r;
+    try {
+      r = timedRun(JSON.stringify({ ...warm, prompt: "written under the lock" }));
+    } finally {
+      await release();
+    }
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, "");
+    assert.ok(r.ms < HOOK_TIMEOUT_MS / 2, `hook took ${r.ms} ms under a held write lock (host kills it at ${HOOK_TIMEOUT_MS} ms); stderr: ${r.stderr}`);
+    // The lock is free: the next hook in the project runs, and the row written under the lock is in the journal.
+    assert.equal(timedRun(JSON.stringify({ ...warm, prompt: "after the lock" })).status, 0);
+    const bodies = readRows("SELECT body FROM events WHERE session_id = ? AND kind = 'prompt' ORDER BY id", "lk1").map((x) => x.body);
+    assert.deepEqual(bodies, ["warm", "written under the lock", "after the lock"]);
+  });
+
+  test("#1401: a 200 KB Bash PostToolUse under a held write lock still replaces fast, and the output is indexed after", async () => {
+    const warm = { session_id: "lk2", cwd: repo, hook_event_name: "UserPromptSubmit", prompt: "show the lockneedle line" };
+    assert.equal(timedRun(JSON.stringify(warm)).status, 0);
+    const lines = [];
+    for (let i = 0; lines.join("\n").length < 200 * 1024; i++) lines.push(i === 1500 ? "row 1500 lockneedle found here" : `row ${i} plain filler text for the log`);
+    const full = lines.join("\n");
+    const post = { session_id: "lk2", cwd: repo, hook_event_name: "PostToolUse", tool_name: "Bash", tool_use_id: "toolu_lk2",
+      tool_input: { command: "cat big.log", description: "big log" }, tool_response: { stdout: full, stderr: "", interrupted: false } };
+    const release = await holdWriteLock(projectDb());
+    let r;
+    try {
+      r = timedRun(JSON.stringify(post));
+    } finally {
+      await release();
+    }
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(r.ms < HOOK_TIMEOUT_MS / 2, `hook took ${r.ms} ms under a held write lock (host kills it at ${HOOK_TIMEOUT_MS} ms); stderr: ${r.stderr}`);
+    // Savings hold under the lock: the model gets a short replace that names the indexed output, not the full 200 KB.
+    assert.notEqual(r.stdout, "", "a replace decision, not an empty answer: " + r.stderr);
+    const out = JSON.parse(r.stdout).hookSpecificOutput.updatedToolOutput;
+    assert.ok(Buffer.byteLength(out.stdout) * 10 < Buffer.byteLength(full), `replaced ${Buffer.byteLength(out.stdout)} bytes`);
+    assert.ok(out.stdout.includes("ctx_search("));
+    // The lock is free: after the next hook in the project, the whole output is stored and searchable.
+    assert.equal(timedRun(JSON.stringify({ ...warm, prompt: "next" })).status, 0);
+    const src = readRows("SELECT id, bytes_total FROM sources WHERE session_id = ?", "lk2");
+    assert.deepEqual(src.map((x) => x.bytes_total), [Buffer.byteLength(full)], "one source row for the output");
+    assert.ok(readRows("SELECT ord FROM chunks WHERE source_id = ?", src[0].id).length > 0, "chunks stored");
+    assert.ok(readRows("SELECT ord FROM line_units WHERE source_id = ?", src[0].id).length > 0, "line units stored");
   });
 
   test("GP7/codex-session-project-dir: codex sessions in X and Y write to their own project", () => {
