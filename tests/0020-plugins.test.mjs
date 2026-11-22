@@ -955,13 +955,14 @@ describe("ADR-0020 plugins", () => {
       const handlers = new Map();
       piExtension({ on: (name, fn) => handlers.set(name, fn), registerTool() {} });
       const ctx = { cwd, sessionManager: { getSessionId: () => "omp-prompt-" + ++n } };
-      return { run: (ev) => handlers.get(ev.type)(ev, ctx) };
+      return { ctx, run: (ev) => handlers.get(ev.type)(ev, ctx) };
     }
     const turn = (systemPrompt) => ({ type: "before_agent_start", systemPrompt });
     const FIRST = INSTRUCTIONS + "\n\n" + RESUME_HINT.split("{prefix}").join("");
     const once = (blocks, part) => blocks.join("\n").split(part).length - 1;
 
-    // Hook failure seam: a project that no longer resolves makes handleHook write its stderr line; a throwing
+    // Hook failure seam: a project that no longer resolves (an empty cwd -> NO_PROJECT; a missing dir resolves to
+    // its nearest existing parent since D-1409-MISSING-CWD-1) makes handleHook write its stderr line; a throwing
     // stderr makes that line throw out of handleHook, which is the entry's "hook throws" path.
     async function withThrowingHook(fn) {
       const write = process.stderr.write;
@@ -999,13 +1000,13 @@ describe("ADR-0020 plugins", () => {
       execFileSync("git", ["init", "-q", own]);
       const s = start(own);
       const first = await s.run(turn(["BASE"]));
-      rmSync(own, { recursive: true, force: true });
+      s.ctx.cwd = "";
       const out = await withThrowingHook(() => s.run(turn(["BASE", "MORE"])));
       assert.deepEqual(out.systemPrompt, ["BASE", "MORE", first.systemPrompt[1]]);
     });
 
     test("[T5] array, the hook throws before the first delivery: {} so OMP keeps its own array", async () => {
-      const out = await withThrowingHook(() => start(join(root, "missing")).run(turn(["BASE"])));
+      const out = await withThrowingHook(() => start("").run(turn(["BASE"])));
       assert.deepEqual(out, {});
     });
 
