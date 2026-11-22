@@ -1,7 +1,7 @@
 {
   "session_id": "fixture-session",
   "transcript_path": "/tmp/cm-fixture/transcript.jsonl",
-  "cwd": "/tmp/cm-fixture",
+  "cwd": "<proj>",
   "prompt_id": "fixture-prompt",
   "permission_mode": "default",
   "effort": {

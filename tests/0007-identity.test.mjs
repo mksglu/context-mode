@@ -143,6 +143,13 @@ describe("ADR-0007: resolveProject picks the project dir per host", { concurrenc
     }
   });
 
+  test("D-1409-MISSING-CWD-1: a relative name that does not exist stays NO_GIT_DIR (only an absolute dir walks up)", () => {
+    assert.throws(
+      () => resolveProject("codex", { env: {}, argv: ["--agent", "codex"], cwd: "<proj>" }),
+      (e) => e instanceof CtxError && e.code === "NO_GIT_DIR",
+    );
+  });
+
   test("GP7: two worktrees of the same repo resolve the same projectKey", () => {
     const repo = initRepo();
     execFileSync("git", ["commit", "--allow-empty", "-m", "init", "-q"], { cwd: repo });
@@ -1401,10 +1408,16 @@ describe("ADR-0007: project dir cases ported from v1", () => {
   });
 
   test("the Windows-style plugin path is a plain directory name to v2: it gets no special-case branch", () => {
-    // D-1409-MISSING-CWD-1: on POSIX it is a relative name that does not exist, so like any missing dir its
-    // nearest existing parent (here process.cwd()) decides; no branch looks at the "C:\\" shape.
-    const ctx = resolveProject("codex", { env: {}, argv: [], cwd: "C:\\Users\\x\\.claude\\plugins\\cache\\context-mode" });
-    assert.equal(ctx.projectKey, resolveProject("codex", { env: {}, argv: [], cwd: process.cwd() }).projectKey);
+    // D-1409-MISSING-CWD-1: no branch looks at the "C:\\" shape. On POSIX it is a relative name that does not
+    // exist -> NO_GIT_DIR. On Windows it is an absolute dir that does not exist -> its nearest existing parent decides.
+    const win = "C:\\Users\\x\\.claude\\plugins\\cache\\context-mode";
+    if (!path.isAbsolute(win)) {
+      assert.throws(() => resolveProject("codex", { env: {}, argv: [], cwd: win }), (e) => e instanceof CtxError && e.code === "NO_GIT_DIR");
+      return;
+    }
+    let parent = win;
+    while (!existsSync(parent)) parent = path.dirname(parent);
+    assert.equal(resolveProject("codex", { env: {}, argv: [], cwd: win }).projectKey, resolveProject("codex", { env: {}, argv: [], cwd: parent }).projectKey);
   });
 
   test("compiled-ESM guard (v1 'resolver runs under Node without CommonJS require'): resolve.ts loads and runs as ESM under Node", () => {

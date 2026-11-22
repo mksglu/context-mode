@@ -574,6 +574,9 @@ describe("ADR-0020 adapters", () => {
       }
     }
 
+    // D-1409-MISSING-CWD-1: the payload cwd "/tmp/proj" does not exist, and an absolute dir that does not exist now
+    // resolves to its nearest existing parent, so every case runs in the healthy project (temp HOME, never the real one).
+    // A fresh project's first SessionStart gives the once-per-session resume hint (D-M3-H2-2); the rest stay allow.
     test("hook entry: recorded-shape payload -> allow, empty stdout, exit 0", () => {
       for (const [event, extra] of [
         ["SessionStart", { source: "startup" }],
@@ -583,9 +586,10 @@ describe("ADR-0020 adapters", () => {
       ]) {
         const payload = { ...base, hook_event_name: event, ...extra };
         const args = ["--agent", "claude-code", "--event", event];
-        const r = event === "PreToolUse" ? healthyEntry(args, payload) : runEntry(args, JSON.stringify(payload));
+        const r = healthyEntry(args, payload);
         assert.equal(r.status, 0, event + " " + r.stderr);
-        assert.equal(r.stdout, "", event);
+        if (event === "SessionStart") assert.equal(JSON.parse(r.stdout).hookSpecificOutput.hookEventName, "SessionStart", r.stdout);
+        else assert.equal(r.stdout, "", event);
       }
     });
 

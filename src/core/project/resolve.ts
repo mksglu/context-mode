@@ -4,7 +4,7 @@
 // then the hook payload cwd, then process.cwd(). Every other host: its one source; missing -> NO_PROJECT.
 // D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
 const { existsSync, readFileSync, realpathSync, statSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import type { AgentId } from "../contracts/agents.ts";
 import {
   DB_FILE_NAME, GIT_COMMONDIR_FILE, GIT_DIR_NAME, GIT_HEAD_FILE, GIT_WORKTREE_LINE_PREFIX, GITDIR_FILE_PREFIX,
@@ -74,8 +74,8 @@ function dirOf(kind: ProjectSourceKind, src: ProjectSourceInput): string | undef
 // git dir. worktree = <d>. Same answers as `git rev-parse --git-common-dir --show-toplevel`.
 // D-M7-NG-1: no .git up to the filesystem root -> null; the caller keys the project by realpath(dir).
 // D-CI-PERF-8: also returns the realpath of dir (`start`), so the non-git case does not realpath it twice.
-// D-1409-MISSING-CWD-1 (#1409): a dir that does not exist yet (Codex sends the workdir of "mkdir -p x && cd x")
-// starts the walk at its nearest existing parent; NO_GIT_DIR only when no dir up to the root exists.
+// D-1409-MISSING-CWD-1 (#1409): an absolute dir that does not exist yet (Codex sends the workdir of "mkdir -p x && cd x")
+// starts the walk at its nearest existing parent; NO_GIT_DIR for a relative name that does not exist, or when no dir up to the root exists.
 function gitDirs(dir: string): { commonDir: string; worktree: string; start: string } | { commonDir: null; start: string } {
   let cur = nearestRealDir(dir);
   const start = cur;
@@ -92,14 +92,17 @@ function gitDirs(dir: string): { commonDir: string; worktree: string; start: str
 }
 
 // realpath of dir, or of its nearest existing parent when dir does not exist yet (D-1409-MISSING-CWD-1).
+// Only an absolute dir walks up: a host sends its workdir absolute, and a relative name that does not exist
+// names no place of its own (walking it up would pick this process's own cwd), so it stays NO_GIT_DIR.
 function nearestRealDir(dir: string): string {
-  for (let d = resolve(dir); ; ) {
+  const walk = isAbsolute(dir);
+  for (let d = walk ? resolve(dir) : dir; ; ) {
     try {
       // .native: one canonical letter case, so one repo always hashes to one projectKey (review-M1 #1).
       return realpathSync.native(d);
     } catch {
       const up = dirname(d);
-      if (up === d) throw new CtxError("NO_GIT_DIR", { path: dir });
+      if (!walk || up === d) throw new CtxError("NO_GIT_DIR", { path: dir });
       d = up;
     }
   }
