@@ -26,6 +26,7 @@ function readReplaceTrigger(raw) {
 var REPLACE_TRIGGER_BYTES = readReplaceTrigger(process.env[REPLACE_TRIGGER_ENV]);
 var RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
 var READ_RANGE_KEYS = Object.freeze(["offset", "limit", "view_range"]);
+var SKILL_LOAD_TOOLS = Object.freeze(["Skill"]);
 var WEIGHT = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
 var DECAY_X1000 = Object.freeze([
   1e3,
@@ -169,6 +170,7 @@ var EXEC_LANGUAGES = Object.freeze(["shell", "powershell", "javascript", "typesc
 var SHELL_FAMILY = Object.freeze(["sh", "bash", "zsh", "dash", "ksh", "fish"]);
 var PLAIN_OUTPUT_ENV = Object.freeze({ NO_COLOR: "1", FORCE_COLOR: "0" });
 var HOST_SESSION_ENV = Object.freeze({ "claude-code": "CLAUDE_CODE_SESSION_ID" });
+var HOST_SESSION_META = Object.freeze({ zcode: "session_id" });
 var NODE_MIN = "24.15.0";
 var DATA_ROOT = "~/.context-mode";
 var DATA_DIR_ENV = "CONTEXT_MODE_DATA_DIR";
@@ -691,6 +693,7 @@ var SHELL_TOOL_NAMES = Object.freeze(["Bash", "PowerShell"]);
 var POWERSHELL_TOOL = "PowerShell";
 var SHELL_CANONICAL = "Bash";
 var CLAUDE_SHAPE_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse"];
+var FAILURE_EVENT = "PostToolUseFailure";
 var MCP_PREFIX = "mcp__";
 var MCP_SEP = "__";
 var CLAUDE_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
@@ -864,7 +867,14 @@ function requireFields(raw) {
 }
 function decode(raw) {
   requireFields(raw);
-  const ev = decodeClaudeShape(raw, "claude-code", TOOL_NAME_PREFIX, CLAUDE_SOURCES);
+  const failure = typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === FAILURE_EVENT;
+  const payload = failure ? { ...raw, hook_event_name: "PostToolUse" } : raw;
+  const ev = decodeClaudeShape(payload, "claude-code", TOOL_NAME_PREFIX, CLAUDE_SOURCES);
+  if (failure) {
+    const error = raw.error;
+    const text2 = typeof error === "string" ? error : error === void 0 ? "" : JSON.stringify(error);
+    ev.result = { isError: true, bytes: Buffer.byteLength(text2), text: text2, keep: true };
+  }
   if (ev.tool !== void 0 && ev.tool.name === POWERSHELL_TOOL) ev.tool.canonicalName = SHELL_CANONICAL;
   if (ev.cwd === "") ev.cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   if (ev.event === "PostToolUse" && ev.tool !== void 0 && ev.tool.callId === void 0) {
@@ -1043,9 +1053,9 @@ var NATIVE_TO_CANONICAL2 = {
   grep_search: "Grep",
   web_fetch: "WebFetch"
 };
-var FAILURE_EVENT = "PostToolUseFailure";
+var FAILURE_EVENT2 = "PostToolUseFailure";
 function decode4(raw) {
-  const failure = typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === FAILURE_EVENT;
+  const failure = typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === FAILURE_EVENT2;
   const payload = failure ? { ...raw, hook_event_name: "PostToolUse" } : raw;
   const ev = decodeClaudeShape(payload, "qwen", TOOL_NAME_PREFIX4, QWEN_SOURCES);
   if (ev.tool !== void 0 && Object.hasOwn(NATIVE_TO_CANONICAL2, ev.tool.name)) ev.tool.canonicalName = NATIVE_TO_CANONICAL2[ev.tool.name];
@@ -1365,12 +1375,12 @@ var TOOL_NAME_PREFIX8 = "mcp__context-mode__";
 var PLUGIN_TOOL_NAME_PREFIX = "mcp__plugin_context-mode_context-mode__";
 var ZCODE_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
 var TWINS = { hook_event_name: "hookEventName", session_id: "sessionId" };
-var FAILURE_EVENT2 = "PostToolUseFailure";
+var FAILURE_EVENT3 = "PostToolUseFailure";
 function decode8(raw) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("zcode: hook payload is not a JSON object");
   const p3 = { ...raw };
   for (const [snake2, camel] of Object.entries(TWINS)) if (p3[snake2] === void 0) p3[snake2] = p3[camel];
-  const failure = p3.hook_event_name === FAILURE_EVENT2;
+  const failure = p3.hook_event_name === FAILURE_EVENT3;
   if (failure) p3.hook_event_name = "PostToolUse";
   const toolName = typeof p3.tool_name === "string" ? p3.tool_name : "";
   const prefix = toolName.startsWith(PLUGIN_TOOL_NAME_PREFIX) ? PLUGIN_TOOL_NAME_PREFIX : TOOL_NAME_PREFIX8;
@@ -1461,7 +1471,8 @@ var OPENCODE_EVENTS = {
 var SHELL_TOOL_NAME = "bash";
 var READ_TOOL_NAME = "read";
 var SHELL_TOOL_NAMES5 = Object.freeze([SHELL_TOOL_NAME, "shell"]);
-var NATIVE_TO_CANONICAL7 = { webfetch: "WebFetch", [READ_TOOL_NAME]: "Read", ...Object.fromEntries(SHELL_TOOL_NAMES5.map((n3) => [n3, "Bash"])) };
+var SKILL_TOOL_NAME = "skill";
+var NATIVE_TO_CANONICAL7 = { webfetch: "WebFetch", [READ_TOOL_NAME]: "Read", [SKILL_TOOL_NAME]: "Skill", ...Object.fromEntries(SHELL_TOOL_NAMES5.map((n3) => [n3, "Bash"])) };
 function toCanonicalTool(name) {
   if (name.startsWith(OWN_WIRE_PREFIX)) return name.slice(OWN_WIRE_PREFIX.length);
   return Object.prototype.hasOwnProperty.call(NATIVE_TO_CANONICAL7, name) ? NATIVE_TO_CANONICAL7[name] : name;

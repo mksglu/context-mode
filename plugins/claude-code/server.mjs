@@ -28075,6 +28075,7 @@ function readReplaceTrigger(raw) {
 var REPLACE_TRIGGER_BYTES = readReplaceTrigger(process.env[REPLACE_TRIGGER_ENV]);
 var RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
 var READ_RANGE_KEYS = Object.freeze(["offset", "limit", "view_range"]);
+var SKILL_LOAD_TOOLS = Object.freeze(["Skill"]);
 var MAX_CHUNK_BYTES = 4096;
 var SEARCH_PAGE_SIZE = 20;
 var MEMORY_LABEL_PREFIX = "memory ";
@@ -28268,6 +28269,7 @@ var PLAIN_OUTPUT_ENV = Object.freeze({ NO_COLOR: "1", FORCE_COLOR: "0" });
 var RUN_LABEL_PREFIX = "run.mjs:";
 var RUN_SESSION_PREFIX = "mcp:";
 var HOST_SESSION_ENV = Object.freeze({ "claude-code": "CLAUDE_CODE_SESSION_ID" });
+var HOST_SESSION_META = Object.freeze({ zcode: "session_id" });
 var NODE_MIN = "24.15.0";
 var DATA_ROOT = "~/.context-mode";
 var DATA_DIR_ENV = "CONTEXT_MODE_DATA_DIR";
@@ -28451,7 +28453,7 @@ function PURGE_SUMMARY(rows, scope) {
 var DECISION_SOURCE = "decision";
 var DECISION_USER_LABEL = "decision (user)";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
-var BUNDLE_SHA = true ? "1fce537096e8e2b7d1924c2b5ff2b83287f157ee" : void 0;
+var BUNDLE_SHA = true ? "ae2e1bb106e462a19ab3c042e371cd8a7f691074" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10", "D11"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -28562,6 +28564,10 @@ function D7_DETAIL(got) {
   return `resolved project source ${got} does not match the host's actual cwd`;
 }
 var D7_FIX = "restart the agent in the correct directory";
+function D7_NO_PROJECT_DETAIL(kind) {
+  return `Project source ${kind} is missing`;
+}
+var DOCTOR_NEEDS_PROJECT_DETAIL = "runs once the project resolves; D7 names the project source";
 function D8_STALE_SCHEMA_DETAIL(got, want) {
   return `stale schema (v${got}, expected v${want})`;
 }
@@ -29474,9 +29480,9 @@ var COLUMNS = "events(session_id, worktree, agent, kind, tool, key, path, ok, ex
 var INSERT_SQL = "INSERT INTO " + COLUMNS;
 var INSERT_COST_SQL = "INSERT OR IGNORE INTO " + COLUMNS;
 var COST_SEQ_SQL = "SELECT seq FROM events WHERE kind = 'cost' AND session_id = ? AND turn = ?";
-function appendEvent(db, row5) {
+function appendEvent(db, row5, at) {
   return withWrite(db, (h) => {
-    const now = Date.now();
+    const now = at ?? Date.now();
     const isCost = row5.kind === "cost";
     const res = h.raw.prepare(isCost ? INSERT_COST_SQL : INSERT_SQL).run(
       row5.session_id,
@@ -29717,7 +29723,7 @@ function resolveConfigDir(env) {
 }
 
 // src/core/project/resolve.ts
-import { basename as basename2, dirname as dirname3, join as join3, resolve as resolve3 } from "node:path";
+import { basename as basename2, dirname as dirname3, isAbsolute as isAbsolute2, join as join3, resolve as resolve3 } from "node:path";
 
 // src/core/project/contain.ts
 import { dirname as dirname2, isAbsolute, join as join2, relative, resolve as resolve2, sep } from "node:path";
@@ -29929,12 +29935,7 @@ function dirOf(kind, src) {
   }
 }
 function gitDirs(dir) {
-  let cur;
-  try {
-    cur = realpathSync3.native(dir);
-  } catch {
-    throw new CtxError("NO_GIT_DIR", { path: dir });
-  }
+  let cur = nearestRealDir(dir);
   const start = cur;
   for (; ; ) {
     const gitDir = gitDirAt(join3(cur, GIT_DIR_NAME));
@@ -29945,6 +29946,18 @@ function gitDirs(dir) {
     const up = dirname3(cur);
     if (up === cur) return { commonDir: null, start };
     cur = up;
+  }
+}
+function nearestRealDir(dir) {
+  const walk2 = isAbsolute2(dir);
+  for (let d = walk2 ? resolve3(dir) : dir; ; ) {
+    try {
+      return realpathSync3.native(d);
+    } catch {
+      const up = dirname3(d);
+      if (!walk2 || up === d) throw new CtxError("NO_GIT_DIR", { path: dir });
+      d = up;
+    }
   }
 }
 function gitDirAt(dotGit) {
@@ -30009,7 +30022,7 @@ function resolveProject(agent, src) {
     },
     worktree,
     get containmentRoot() {
-      root ??= plain ?? containmentRootOf(dir, commonDir);
+      root ??= plain ?? containmentRootOf(worktree, commonDir);
       return root;
     },
     agent,
@@ -32454,42 +32467,52 @@ function parseSourceHandle(s) {
 function pathLabel(p) {
   return p.includes("\\") ? p.split("\\").join("/") : p;
 }
-function labelStored(db, label2) {
-  return stmt(db.raw, "SELECT 1 AS x FROM sources WHERE label = ? LIMIT 1").get(label2) !== void 0;
+var EVERY_ROW = { scope: "project", sessionId: "", worktree: "" };
+var IN_SCOPE = "(:scope <> 'session' OR session_id = :session_id) AND (:scope <> 'worktree' OR worktree = :worktree)";
+var scopeArgs = (w) => ({ scope: w.scope, session_id: w.sessionId, worktree: w.worktree });
+function labelStored(db, label2, w) {
+  return stmt(db.raw, "SELECT 1 AS x FROM sources WHERE label = :label AND " + IN_SCOPE + " LIMIT 1").get({ label: label2, ...scopeArgs(w) }) !== void 0;
 }
-function storedLabel(db, source) {
-  if (labelStored(db, source)) return source;
+function storedLabel(db, source, w = EVERY_ROW) {
+  if (labelStored(db, source, w)) return source;
   const canon = pathLabel(source);
-  return canon !== source && labelStored(db, canon) ? canon : source;
+  return canon !== source && labelStored(db, canon, w) ? canon : source;
 }
-function newestId(db, label2) {
-  const row5 = stmt(db.raw, "SELECT id FROM sources WHERE label = ? ORDER BY id DESC LIMIT 1").get(label2);
+function newestId(db, label2, w) {
+  const row5 = stmt(db.raw, "SELECT id FROM sources WHERE label = :label AND " + IN_SCOPE + " ORDER BY id DESC LIMIT 1").get({ label: label2, ...scopeArgs(w) });
   return row5 === void 0 ? null : Number(row5.id);
 }
-function labelOfId(db, id) {
-  const row5 = stmt(db.raw, "SELECT label FROM sources WHERE id = ?").get(id);
+function labelOfId(db, id, w) {
+  const row5 = stmt(db.raw, "SELECT label FROM sources WHERE id = :id AND " + IN_SCOPE).get({ id, ...scopeArgs(w) });
   return row5 === void 0 ? null : row5.label;
 }
-function pickSource(db, source, suffix = true) {
-  const named2 = storedLabel(db, source);
+function pickIn(db, source, suffix, w) {
+  const named2 = storedLabel(db, source, w);
   const id = parseSourceHandle(source);
-  const own4 = newestId(db, named2);
+  const own4 = newestId(db, named2, w);
   if (own4 !== null) {
-    const otherLabel = id === null || id === own4 ? null : labelOfId(db, id);
+    const otherLabel = id === null || id === own4 ? null : labelOfId(db, id, EVERY_ROW);
     return { label: named2, id: own4, via: "label", other: otherLabel === null || otherLabel === named2 ? null : { id, label: otherLabel } };
   }
   if (id !== null) {
-    const label2 = labelOfId(db, id);
+    const label2 = labelOfId(db, id, w);
     if (label2 !== null) return { label: label2, id, via: "handle", other: null };
   }
   if (suffix) {
     const prefix = named2 + LABEL_SUFFIX_SEP;
-    const rows = stmt(db.raw, "SELECT id, label FROM sources WHERE substr(label, 1, ?) = ? ORDER BY id DESC").all(prefix.length, prefix);
+    const rows = stmt(db.raw, "SELECT id, label FROM sources WHERE substr(label, 1, :n) = :prefix AND " + IN_SCOPE + " ORDER BY id DESC").all({ n: prefix.length, prefix, ...scopeArgs(w) });
     for (const r of rows) {
       if (r.label.lastIndexOf(LABEL_SUFFIX_SEP) === named2.length) return { label: r.label, id: Number(r.id), via: "suffix", other: null };
     }
   }
   return { label: source, id: null, via: "none", other: null };
+}
+function pickSource(db, source, suffix = true, w = EVERY_ROW) {
+  if (w.scope !== "project") {
+    const here = pickIn(db, source, suffix, w);
+    if (here.via !== "none") return here;
+  }
+  return pickIn(db, source, suffix, EVERY_ROW);
 }
 function collisionLine(value, pick4) {
   if (pick4.other === null || pick4.id === null) return null;
@@ -44647,10 +44670,11 @@ function sourceCount(db, scope, ctx, source) {
 function zeroHits(db, scope, ctx, source, mem, nm, queries, offset = 0) {
   const inScope = sourceCount(db, scope, ctx, source);
   const n = inScope + mem.rows.length;
-  if (offset > 0) return reply("No more hits past offset " + offset + ' in scope "' + scope + '" across ' + n + " source(s).", false);
   const head = 'No hits in scope "' + scope + '" across ' + n + " source(s).";
   const pick4 = nm.pick;
-  if (pick4 === null || mem.named || inScope > 0) return reply(head, false);
+  if (pick4 === null || mem.named || inScope > 0) {
+    return reply(offset > 0 ? "No more hits past offset " + offset + ' in scope "' + scope + '" across ' + n + " source(s)." : head, false);
+  }
   if (pick4.id !== null) {
     const wider = scope === "session" && sourceCount(db, "worktree", ctx, source) > 0 ? "worktree" : "project";
     return reply(head + "\nSource " + JSON.stringify(nm.arg) + ' is stored in scope "' + wider + '": ' + callText(queries, wider, nm.arg, "") + " searches it.", false);
@@ -44935,7 +44959,8 @@ async function handler(input, ctx) {
   const db = await openDb(ctx.project, { readOnly: true });
   try {
     const given = input.source;
-    const pick4 = given !== void 0 && given !== DECISION_SOURCE ? pickSource(db, given) : null;
+    const within = { scope, sessionId: ctx.sessionId, worktree: ctx.project.worktree };
+    const pick4 = given !== void 0 && given !== DECISION_SOURCE ? pickSource(db, given, true, within) : null;
     if (pick4 !== null) input = { ...input, source: pick4.label };
     const nm = named(given, pick4);
     const indexed = pick4 !== null && pick4.id !== null;
@@ -45193,6 +45218,7 @@ var SHELL_TOOL_NAMES = Object.freeze(["Bash", "PowerShell"]);
 var POWERSHELL_TOOL = "PowerShell";
 var SHELL_CANONICAL = "Bash";
 var CLAUDE_SHAPE_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse"];
+var FAILURE_EVENT = "PostToolUseFailure";
 var MCP_PREFIX = "mcp__";
 var MCP_SEP = "__";
 var CLAUDE_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
@@ -45366,7 +45392,14 @@ function requireFields(raw) {
 }
 function decode3(raw) {
   requireFields(raw);
-  const ev = decodeClaudeShape(raw, "claude-code", TOOL_NAME_PREFIX, CLAUDE_SOURCES);
+  const failure3 = typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === FAILURE_EVENT;
+  const payload = failure3 ? { ...raw, hook_event_name: "PostToolUse" } : raw;
+  const ev = decodeClaudeShape(payload, "claude-code", TOOL_NAME_PREFIX, CLAUDE_SOURCES);
+  if (failure3) {
+    const error42 = raw.error;
+    const text = typeof error42 === "string" ? error42 : error42 === void 0 ? "" : JSON.stringify(error42);
+    ev.result = { isError: true, bytes: Buffer.byteLength(text), text, keep: true };
+  }
   if (ev.tool !== void 0 && ev.tool.name === POWERSHELL_TOOL) ev.tool.canonicalName = SHELL_CANONICAL;
   if (ev.cwd === "") ev.cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   if (ev.event === "PostToolUse" && ev.tool !== void 0 && ev.tool.callId === void 0) {
@@ -45545,9 +45578,9 @@ var NATIVE_TO_CANONICAL2 = {
   grep_search: "Grep",
   web_fetch: "WebFetch"
 };
-var FAILURE_EVENT = "PostToolUseFailure";
+var FAILURE_EVENT2 = "PostToolUseFailure";
 function decode6(raw) {
-  const failure3 = typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === FAILURE_EVENT;
+  const failure3 = typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === FAILURE_EVENT2;
   const payload = failure3 ? { ...raw, hook_event_name: "PostToolUse" } : raw;
   const ev = decodeClaudeShape(payload, "qwen", TOOL_NAME_PREFIX4, QWEN_SOURCES);
   if (ev.tool !== void 0 && Object.hasOwn(NATIVE_TO_CANONICAL2, ev.tool.name)) ev.tool.canonicalName = NATIVE_TO_CANONICAL2[ev.tool.name];
@@ -45867,12 +45900,12 @@ var TOOL_NAME_PREFIX8 = "mcp__context-mode__";
 var PLUGIN_TOOL_NAME_PREFIX = "mcp__plugin_context-mode_context-mode__";
 var ZCODE_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
 var TWINS = { hook_event_name: "hookEventName", session_id: "sessionId" };
-var FAILURE_EVENT2 = "PostToolUseFailure";
+var FAILURE_EVENT3 = "PostToolUseFailure";
 function decode10(raw) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("zcode: hook payload is not a JSON object");
   const p = { ...raw };
   for (const [snake, camel] of Object.entries(TWINS)) if (p[snake] === void 0) p[snake] = p[camel];
-  const failure3 = p.hook_event_name === FAILURE_EVENT2;
+  const failure3 = p.hook_event_name === FAILURE_EVENT3;
   if (failure3) p.hook_event_name = "PostToolUse";
   const toolName2 = typeof p.tool_name === "string" ? p.tool_name : "";
   const prefix = toolName2.startsWith(PLUGIN_TOOL_NAME_PREFIX) ? PLUGIN_TOOL_NAME_PREFIX : TOOL_NAME_PREFIX8;
@@ -45963,7 +45996,8 @@ var OPENCODE_EVENTS = {
 var SHELL_TOOL_NAME = "bash";
 var READ_TOOL_NAME = "read";
 var SHELL_TOOL_NAMES5 = Object.freeze([SHELL_TOOL_NAME, "shell"]);
-var NATIVE_TO_CANONICAL7 = { webfetch: "WebFetch", [READ_TOOL_NAME]: "Read", ...Object.fromEntries(SHELL_TOOL_NAMES5.map((n) => [n, "Bash"])) };
+var SKILL_TOOL_NAME = "skill";
+var NATIVE_TO_CANONICAL7 = { webfetch: "WebFetch", [READ_TOOL_NAME]: "Read", [SKILL_TOOL_NAME]: "Skill", ...Object.fromEntries(SHELL_TOOL_NAMES5.map((n) => [n, "Bash"])) };
 function toCanonicalTool(name) {
   if (name.startsWith(OWN_WIRE_PREFIX)) return name.slice(OWN_WIRE_PREFIX.length);
   return Object.prototype.hasOwnProperty.call(NATIVE_TO_CANONICAL7, name) ? NATIVE_TO_CANONICAL7[name] : name;
@@ -46268,7 +46302,7 @@ function ownBundleDir() {
 
 // src/core/ops/doctor-config.ts
 import { existsSync as existsSync12, readdirSync as readdirSync7, readFileSync as readFileSync11 } from "node:fs";
-import { dirname as dirname7, isAbsolute as isAbsolute4, join as join13, resolve as resolve4 } from "node:path";
+import { dirname as dirname7, isAbsolute as isAbsolute5, join as join13, resolve as resolve4 } from "node:path";
 
 // src/core/ops/host-text.ts
 var BOM_CODE = 65279;
@@ -49165,7 +49199,7 @@ function detectV1(agent, home, scope = {}) {
 
 // src/core/ops/plugin-root.ts
 import { existsSync as existsSync8, readdirSync as readdirSync6, readFileSync as readFileSync7, realpathSync as realpathSync4 } from "node:fs";
-import { dirname as dirname6, isAbsolute as isAbsolute2, join as join10, sep as sep2 } from "node:path";
+import { dirname as dirname6, isAbsolute as isAbsolute3, join as join10, sep as sep2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 function missing(agent, path8) {
   return new CtxError("PLUGIN_ROOT_MISSING", { agent, path: path8 });
@@ -49277,7 +49311,7 @@ function configEntryRoot(adapter, env) {
   const value = parseHostConfig(adapter.id, file2, current.text, current.format);
   const args = hostConfigValueAt(value, [...spec.key, MCP_ARGS_FIELD]);
   const script = Array.isArray(args) ? args[0] : void 0;
-  if (typeof script !== "string" || !isAbsolute2(script)) throw missing(adapter.id, file2);
+  if (typeof script !== "string" || !isAbsolute3(script)) throw missing(adapter.id, file2);
   return dirname6(script);
 }
 function packageDirOf(dir) {
@@ -49384,7 +49418,7 @@ function piInstalledIn(env, home, pkgDir, cwd) {
 
 // src/core/ops/doctor-env.ts
 import { existsSync as existsSync10, readFileSync as readFileSync9, realpathSync as realpathSync6 } from "node:fs";
-import { isAbsolute as isAbsolute3, join as join11, relative as relative2 } from "node:path";
+import { isAbsolute as isAbsolute4, join as join11, relative as relative2 } from "node:path";
 function pass(id, detail = DOCTOR_PASS_DETAIL) {
   return { id, label: DOCTOR_LABEL[id], status: "PASS", detail };
 }
@@ -49553,13 +49587,27 @@ function checkMcp(ctx, adapter) {
 function piCwdInside(worktree, piCwd) {
   if (piCwd === void 0 || !existsSync10(piCwd)) return false;
   const rel = relative2(worktree, realpathSync6.native(piCwd));
-  return rel === "" || !rel.startsWith("..") && !isAbsolute3(rel);
+  return rel === "" || !rel.startsWith("..") && !isAbsolute4(rel);
 }
 function checkProject(i) {
   const bad = fail("D7", D7_DETAIL(i.project.source), D7_FIX);
   if (i.project.source !== i.adapter.projectSource) return bad;
   if (i.adapter.projectSource === "pi:ctx.cwd" && !piCwdInside(i.project.worktree, i.piCwd)) return bad;
   return pass("D7");
+}
+function projectOrMissing(ctx) {
+  try {
+    return { project: ctx.project };
+  } catch (err) {
+    if (err instanceof CtxError && err.code === "NO_PROJECT") return { missing: String(err.vars.kind) };
+    throw err;
+  }
+}
+function noProjectRow(kind) {
+  return fail("D7", D7_NO_PROJECT_DETAIL(kind), D7_FIX);
+}
+function needsProjectRow(id) {
+  return unknown4(id, DOCTOR_NEEDS_PROJECT_DETAIL);
 }
 function checkMode(adapter, hostPermission) {
   if (hostPermission === "missing") return fail("D10", D10_PERMISSION_MISSING_DETAIL, D10_PERMISSION_FIX);
@@ -49878,7 +49926,7 @@ function opencodeDirPlugins(dirs) {
         const loads = lits.some((p) => {
           if (isModule(p)) return packageResolves(dirname7(f));
           const bare2 = p.startsWith(FILE_URL_PREFIX) ? p.slice(FILE_URL_PREFIX.length) : p;
-          return existsSync12(isAbsolute4(bare2) ? bare2 : resolve4(dirname7(f), bare2));
+          return existsSync12(isAbsolute5(bare2) ? bare2 : resolve4(dirname7(f), bare2));
         });
         out.push({ file: f, loads });
       }
@@ -52805,9 +52853,11 @@ function hookLogTail(env) {
 }
 async function journalRows(ctx) {
   const head = ["| kind | tool | bytes | ok | exit_code | created_at |", "|---|---|---|---|---|---|"];
-  if (!existsSync17(ctx.project.dbPath)) return [`(context.db is absent at ${ctx.project.dbPath})`];
+  const p = projectOrMissing(ctx);
+  if ("missing" in p) return [`(no project: ${D7_NO_PROJECT_DETAIL(p.missing)})`];
+  if (!existsSync17(p.project.dbPath)) return [`(context.db is absent at ${p.project.dbPath})`];
   try {
-    const db = await openDb(ctx.project, { readOnly: true });
+    const db = await openDb(p.project, { readOnly: true });
     try {
       const rows = db.raw.prepare(`SELECT kind, tool, bytes, ok, exit_code, created_at FROM events ORDER BY seq DESC LIMIT ${DOCTOR_JOURNAL_ROWS}`).all();
       const cell5 = (v) => v === null || v === void 0 ? "" : String(v);
@@ -52866,6 +52916,7 @@ async function buildIssueBody(i) {
   const failRows = i.rows.filter((r) => r.status !== "PASS");
   const envNames = DOCTOR_ENV_NAMES.map((n) => i.env[n] === void 0 ? `${n} (unset)` : `${n}=${i.env[n]}`);
   const pathTools = DOCTOR_PATH_TOOLS.map((t) => `PATH holds ${t}: ${onPath(i.env, t).join(", ") || "(absent)"}`);
+  const p = projectOrMissing(i.ctx);
   const sections = {
     "Summary": [summaryOf(agent, i.rows, i.unsupported)],
     "ctx-report": [i.table],
@@ -52876,7 +52927,7 @@ async function buildIssueBody(i) {
     ],
     "Hook errors": ["hook-errors.log, last " + DOCTOR_HOOK_LOG_LINES + " lines (UTC):", "```", ...hookLogTail(i.env), "```"],
     "Journal rows": ["events, newest first, last " + DOCTOR_JOURNAL_ROWS + " (bodies stay local):", ...await journalRows(i.ctx)],
-    "Agent config": agentConfig(i.adapter, i.env, i.ctx.project.worktree),
+    "Agent config": agentConfig(i.adapter, i.env, "project" in p ? p.project.worktree : process.cwd()),
     "Expected": ["Expected: <the agent fills this in: what should happen, with the byte count>"],
     "Steps": [
       "Reproduced: <yes (2 of 2) or 1 of 2>",
@@ -52897,7 +52948,7 @@ async function buildIssueBody(i) {
       `git: ${gitVersion(i.env)}`,
       ...pathTools,
       ...envNames,
-      `Project: ${i.ctx.project.worktree} (key ${i.ctx.project.projectKey})`,
+      "project" in p ? `Project: ${p.project.worktree} (key ${p.project.projectKey})` : `Project: ${D7_NO_PROJECT_DETAIL(p.missing)}`,
       "Filed by: <your agent name, version, model id>"
     ]
   };
@@ -52955,10 +53006,10 @@ async function guard(id, run) {
     return { id, label: DOCTOR_LABEL[id], status: "UNKNOWN", detail: lineOf(err) };
   }
 }
-async function codexDb(ctx, adapter) {
-  if (adapter.id !== "codex" || !existsSync18(ctx.project.dbPath)) return null;
+async function codexDb(project, adapter) {
+  if (adapter.id !== "codex" || !existsSync18(project.dbPath)) return null;
   try {
-    return await openDb(ctx.project, { readOnly: true });
+    return await openDb(project, { readOnly: true });
   } catch {
     return null;
   }
@@ -52969,12 +53020,12 @@ function d1UpdateCommand(agent, env, other) {
 function unsupportedRow(id, h) {
   return { id, label: DOCTOR_LABEL[id], status: "WARN", detail: UNSUPPORTED_HOST_LINE(h.name) };
 }
-async function hookRow(ctx, adapter, host) {
-  const db = await codexDb(ctx, adapter);
+async function hookRow(ctx, project, adapter, host) {
+  const db = await codexDb(project, adapter);
   const runStart = Date.now();
   try {
     const row5 = await checkHookRoundTrip({
-      worktree: ctx.project.worktree,
+      worktree: project.worktree,
       agent: adapter.id,
       bundleDir: host.bundleDir,
       env: buildChildEnv(host.env),
@@ -53003,7 +53054,9 @@ function ownServerId(configDir, projectKey) {
 async function runDoctorChecks(ctx, adapter, host0) {
   const host = adapter.id === "codex" ? { ...host0, env: { ...host0.env, CODEX_HOME: codexRunDirOf(host0.env, homeDirOf(host0.env) ?? "", host0.bundleDir) } } : host0;
   const env = host.env;
-  const project = ctx.project;
+  const p = projectOrMissing(ctx);
+  if ("missing" in p) return noProjectRows(ctx, adapter, host, p.missing);
+  const project = p.project;
   const other = adapter.installMode === "in-process" ? void 0 : unsupportedHostOf({ clientName: ctx.clientInfo?.name, bundleDir: host.bundleDir, env });
   let integrityFailed = false;
   let orphan = [];
@@ -53013,7 +53066,7 @@ async function runDoctorChecks(ctx, adapter, host0) {
     D3: () => other !== void 0 ? unsupportedRow("D3", other) : checkHostConfig(adapter, env, project.worktree),
     // D-UNSUPPORTED-HOSTS-1
     D4: () => checkV1Leftovers(adapter.id, requireHomeDir(env), { project: project.worktree, piAgentDir: piAgentDirOf(env, requireHomeDir(env)), claudeDir: claudeDirOf(env, requireHomeDir(env)), codexDir: codexDirOf(env, requireHomeDir(env)), geminiDir: geminiDirOf(env, requireHomeDir(env)), copilotDir: copilotDirOf(env, requireHomeDir(env)), kiroDir: kiroDirOf(env, requireHomeDir(env)), opencodeDir: opencodeDirOf(env, requireHomeDir(env)) }),
-    D5: () => other !== void 0 ? unsupportedRow("D5", other) : hookRow(ctx, adapter, host),
+    D5: () => other !== void 0 ? unsupportedRow("D5", other) : hookRow(ctx, project, adapter, host),
     D5b: () => checkDoubleFire(adapter.id, project.worktree),
     D6: () => checkMcp(ctx, adapter),
     D7: () => checkProject({ project, adapter, piCwd: host.piCwd }),
@@ -53043,6 +53096,28 @@ async function runDoctorChecks(ctx, adapter, host0) {
   });
   return rows;
 }
+async function noProjectRows(ctx, adapter, host, missing2) {
+  const env = host.env;
+  const other = adapter.installMode === "in-process" ? void 0 : unsupportedHostOf({ clientName: ctx.clientInfo?.name, bundleDir: host.bundleDir, env });
+  const wait = (id) => () => needsProjectRow(id);
+  const checks = {
+    D1: () => checkVersion({ bundleSha: BUNDLE_SHA, version: bundleVersion(host.bundleDir), registryUrl: D1_REGISTRY_URL, timeoutMs: DOCTOR_GIT_TIMEOUT_MS, env: buildChildEnv(env), cwd: process.cwd(), signal: ctx.signal, updateCommand: d1UpdateCommand(adapter.id, env, other) }),
+    D2: () => checkNode({ nodeVersion: process.version, bunVersion: process.versions.bun }),
+    D3: other !== void 0 ? () => unsupportedRow("D3", other) : wait("D3"),
+    D4: () => checkV1Leftovers(adapter.id, requireHomeDir(env), { piAgentDir: piAgentDirOf(env, requireHomeDir(env)), claudeDir: claudeDirOf(env, requireHomeDir(env)), codexDir: codexDirOf(env, requireHomeDir(env)), geminiDir: geminiDirOf(env, requireHomeDir(env)), copilotDir: copilotDirOf(env, requireHomeDir(env)), kiroDir: kiroDirOf(env, requireHomeDir(env)), opencodeDir: opencodeDirOf(env, requireHomeDir(env)) }),
+    D5: other !== void 0 ? () => unsupportedRow("D5", other) : wait("D5"),
+    D5b: wait("D5b"),
+    D6: () => checkMcp(ctx, adapter),
+    D7: () => noProjectRow(missing2),
+    D8: wait("D8"),
+    D9: wait("D9"),
+    D10: () => checkMode(adapter, ctx.hostPermission),
+    D11: () => checkRuntimes(env, checkShell(env))
+  };
+  const rows = [];
+  for (const id of DOCTOR_CHECK_ORDER) rows.push(await guard(id, checks[id]));
+  return rows;
+}
 function reportEnv(env) {
   const out = {};
   for (const key of Object.keys(REPORT_ENV_ENUMS)) {
@@ -53052,7 +53127,7 @@ function reportEnv(env) {
   return out;
 }
 async function doctorReply(ctx, host) {
-  const adapter = getAdapter(ctx.project.agent);
+  const adapter = getAdapter(ctx.agent ?? ctx.project.agent);
   const runtime = runtimeInfo(host.env, ctx.signal);
   const rows = await runDoctorChecks(ctx, adapter, host);
   const failed = rows.some((r) => r.status === "FAIL");
@@ -53074,9 +53149,11 @@ async function doctorReply(ctx, host) {
   const whole2 = [envLine2, table3, ...docs, ...info, ...notes].join("\n");
   const bytes5 = Buffer.byteLength(whole2, "utf8");
   if (bytes5 <= REPORT_CAP) return { text: whole2, isError: false, sandboxBytes: bytes5 };
-  const db = await openDb(ctx.project);
+  const p = projectOrMissing(ctx);
+  if ("missing" in p) return { text: whole2, isError: false, sandboxBytes: bytes5 };
+  const db = await openDb(p.project);
   try {
-    indexText(db, ctx.project, ctx.sessionId, REPORT_SOURCE_LABEL, whole2, "text");
+    indexText(db, p.project, ctx.sessionId, REPORT_SOURCE_LABEL, whole2, "text");
   } finally {
     closeDb(db);
   }
@@ -53497,6 +53574,7 @@ function globSeg(pat, name) {
 }
 
 // src/core/sandbox/fetch.ts
+import { randomBytes } from "node:crypto";
 import { readFileSync as readFileSync16 } from "node:fs";
 import { lookup } from "node:dns/promises";
 import http from "node:http";
@@ -53531,6 +53609,26 @@ var PRIVATE_RANGES = [
 ];
 var BLOCKED = new BlockList();
 for (const [net, prefix, type] of PRIVATE_RANGES) BLOCKED.addSubnet(net, prefix, type);
+var FAKE_IP_POOL = new BlockList();
+FAKE_IP_POOL.addSubnet("198.18.0.0", 15, "ipv4");
+var FAKE_IP_PROBE_TLD = ".invalid";
+var FAKE_IP_PROBE_BYTES = 8;
+var FAKE_IP_PROBE_MS = 1500;
+var fakeIpProbe;
+function inFakeIpPool(address) {
+  return isIP(address) === 4 && FAKE_IP_POOL.check(address, "ipv4");
+}
+function fakeIpResolver() {
+  fakeIpProbe ??= new Promise((resolve10) => {
+    const timer = setTimeout(() => resolve10(false), FAKE_IP_PROBE_MS);
+    timer.unref();
+    lookup(randomBytes(FAKE_IP_PROBE_BYTES).toString("hex") + FAKE_IP_PROBE_TLD, { all: true }).then(
+      (addrs) => resolve10(addrs.length > 0 && addrs.every((a) => inFakeIpPool(a.address))),
+      () => resolve10(false)
+    ).finally(() => clearTimeout(timer));
+  });
+  return fakeIpProbe;
+}
 var STATUS_OK_FIRST = 200;
 var STATUS_OK_END = 300;
 var STATUS_REDIRECT = /* @__PURE__ */ new Set([301, 302, 303, 307, 308]);
@@ -53633,8 +53731,15 @@ function checkAddress(hostname2, address) {
     throw new CtxError("SSRF", { host: hostname2 });
   }
 }
-async function resolveTarget(u, signal) {
-  const host = bare(u.hostname);
+async function checkResolved(host, addrs, signal) {
+  const pooled = isIP(host) === 0 ? addrs.filter((a) => inFakeIpPool(a.address)) : [];
+  for (const a of addrs) if (!pooled.includes(a)) checkAddress(host, a.address);
+  if (pooled.length === 0) return;
+  const fakeIp = await fakeIpResolver();
+  if (signal.aborted) throw fail5("ABORT_ERR");
+  if (!fakeIp) checkAddress(host, pooled[0].address);
+}
+async function lookupAll(host, signal) {
   let addrs;
   try {
     addrs = await lookup(host, { all: true });
@@ -53643,8 +53748,25 @@ async function resolveTarget(u, signal) {
   }
   if (signal.aborted) throw fail5("ABORT_ERR");
   if (addrs.length === 0) throw fail5("ENOTFOUND");
-  for (const a of addrs) checkAddress(host, a.address);
+  return addrs;
+}
+async function resolveTarget(u, signal, checked) {
+  const host = bare(u.hostname);
+  const addrs = await lookupAll(host, signal);
+  if (checked) await checkResolved(host, addrs, signal);
   return { host, port: u.port === "" ? defaultPort(u.protocol) : Number(u.port), address: addrs[0].address };
+}
+async function checkProxiedTarget(u, signal) {
+  const host = bare(u.hostname);
+  if (isIP(host) !== 0) return checkAddress(host, host);
+  let addrs;
+  try {
+    addrs = await lookupAll(host, signal);
+  } catch (err) {
+    if (signal.aborted) throw err;
+    return;
+  }
+  await checkResolved(host, addrs, signal);
 }
 function tlsName(host) {
   return isIP(host) === 0 ? host : void 0;
@@ -53703,9 +53825,8 @@ async function safeFetch(url4, signal) {
   for (let hop = 0; ; hop += 1) {
     if (signal.aborted) throw fail5("ABORT_ERR");
     const proxy = pickProxy(current);
-    const origin = bare(current.hostname);
-    if (proxy !== void 0 && isIP(origin) !== 0) checkAddress(origin, origin);
-    const conn = await resolveTarget(proxy === void 0 ? current : proxy.url, signal);
+    if (proxy !== void 0) await checkProxiedTarget(current, signal);
+    const conn = await resolveTarget(proxy === void 0 ? current : proxy.url, signal, proxy === void 0);
     const res = await request(current, conn, proxy, signal);
     const status = res.statusCode ?? 0;
     const location = res.headers.location;
@@ -57734,8 +57855,11 @@ var ctxPurge = Object.freeze({
 
 // src/core/compaction/candidates.ts
 function firstLine3(body) {
-  const nl = body.indexOf("\n");
-  return (nl < 0 ? body : body.slice(0, nl)).replaceAll("\r", " ");
+  const i = body.length - body.trimStart().length;
+  if (i === body.length) return "";
+  const start = i === 0 ? 0 : body.lastIndexOf("\n", i) + 1;
+  const nl = body.indexOf("\n", i);
+  return (start === 0 && nl < 0 ? body : body.slice(start, nl < 0 ? body.length : nl)).replaceAll("\r", " ");
 }
 function make(section, row5, text, repeatCount, query) {
   const bytes5 = Buffer.byteLength(text, "utf8");
@@ -58910,6 +59034,9 @@ function metaNumber(meta3, key) {
 function sessionIdOf(meta3, agent, env, serverId) {
   const fromMeta = metaString(meta3, "sessionId");
   if (fromMeta !== void 0) return fromMeta;
+  const metaKey = agent === void 0 ? void 0 : HOST_SESSION_META[agent];
+  const fromHostMeta = metaKey === void 0 ? void 0 : metaString(meta3, metaKey);
+  if (fromHostMeta !== void 0) return fromHostMeta;
   const key = agent === void 0 ? void 0 : HOST_SESSION_ENV[agent];
   const fromHost = key === void 0 ? void 0 : env[key];
   if (typeof fromHost === "string" && fromHost !== "") return fromHost;
@@ -59025,6 +59152,8 @@ async function startServer(argv, env) {
         get project() {
           return projectOf();
         },
+        ...agent === void 0 ? {} : { agent },
+        // D-1410-DOCTOR-NO-PROJECT-1
         sessionId: sessionIdOf(meta3, agent, env, serverId),
         turn: metaNumber(meta3, "turn") ?? 0,
         signal: req.mcpReq.signal,

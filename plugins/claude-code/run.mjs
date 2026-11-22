@@ -24,6 +24,7 @@ function readReplaceTrigger(raw) {
 var REPLACE_TRIGGER_BYTES = readReplaceTrigger(process.env[REPLACE_TRIGGER_ENV]);
 var RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
 var READ_RANGE_KEYS = Object.freeze(["offset", "limit", "view_range"]);
+var SKILL_LOAD_TOOLS = Object.freeze(["Skill"]);
 function shellWord(s) {
   return "'" + s.split("'").join("'\\''") + "'";
 }
@@ -202,6 +203,7 @@ var SEARCH_WRAPPER_FILE = "search.mjs";
 var RUN_WRAPPER_AGENT = "claude-code";
 var RUN_SESSION_PREFIX = "mcp:";
 var HOST_SESSION_ENV = Object.freeze({ "claude-code": "CLAUDE_CODE_SESSION_ID" });
+var HOST_SESSION_META = Object.freeze({ zcode: "session_id" });
 var NODE_MIN = "24.15.0";
 var DATA_ROOT = "~/.context-mode";
 var DATA_DIR_ENV = "CONTEXT_MODE_DATA_DIR";
@@ -675,6 +677,7 @@ var SHELL_TOOL_NAMES = Object.freeze(["Bash", "PowerShell"]);
 var POWERSHELL_TOOL = "PowerShell";
 var SHELL_CANONICAL = "Bash";
 var CLAUDE_SHAPE_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse"];
+var FAILURE_EVENT = "PostToolUseFailure";
 var MCP_PREFIX = "mcp__";
 var MCP_SEP = "__";
 var CLAUDE_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
@@ -848,7 +851,14 @@ function requireFields(raw) {
 }
 function decode(raw) {
   requireFields(raw);
-  const ev = decodeClaudeShape(raw, "claude-code", TOOL_NAME_PREFIX, CLAUDE_SOURCES);
+  const failure = typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === FAILURE_EVENT;
+  const payload = failure ? { ...raw, hook_event_name: "PostToolUse" } : raw;
+  const ev = decodeClaudeShape(payload, "claude-code", TOOL_NAME_PREFIX, CLAUDE_SOURCES);
+  if (failure) {
+    const error = raw.error;
+    const text = typeof error === "string" ? error : error === void 0 ? "" : JSON.stringify(error);
+    ev.result = { isError: true, bytes: Buffer.byteLength(text), text, keep: true };
+  }
   if (ev.tool !== void 0 && ev.tool.name === POWERSHELL_TOOL) ev.tool.canonicalName = SHELL_CANONICAL;
   if (ev.cwd === "") ev.cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   if (ev.event === "PostToolUse" && ev.tool !== void 0 && ev.tool.callId === void 0) {
@@ -1027,9 +1037,9 @@ var NATIVE_TO_CANONICAL2 = {
   grep_search: "Grep",
   web_fetch: "WebFetch"
 };
-var FAILURE_EVENT = "PostToolUseFailure";
+var FAILURE_EVENT2 = "PostToolUseFailure";
 function decode4(raw) {
-  const failure = typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === FAILURE_EVENT;
+  const failure = typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === FAILURE_EVENT2;
   const payload = failure ? { ...raw, hook_event_name: "PostToolUse" } : raw;
   const ev = decodeClaudeShape(payload, "qwen", TOOL_NAME_PREFIX4, QWEN_SOURCES);
   if (ev.tool !== void 0 && Object.hasOwn(NATIVE_TO_CANONICAL2, ev.tool.name)) ev.tool.canonicalName = NATIVE_TO_CANONICAL2[ev.tool.name];
@@ -1349,12 +1359,12 @@ var TOOL_NAME_PREFIX8 = "mcp__context-mode__";
 var PLUGIN_TOOL_NAME_PREFIX = "mcp__plugin_context-mode_context-mode__";
 var ZCODE_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
 var TWINS = { hook_event_name: "hookEventName", session_id: "sessionId" };
-var FAILURE_EVENT2 = "PostToolUseFailure";
+var FAILURE_EVENT3 = "PostToolUseFailure";
 function decode8(raw) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("zcode: hook payload is not a JSON object");
   const p = { ...raw };
   for (const [snake, camel] of Object.entries(TWINS)) if (p[snake] === void 0) p[snake] = p[camel];
-  const failure = p.hook_event_name === FAILURE_EVENT2;
+  const failure = p.hook_event_name === FAILURE_EVENT3;
   if (failure) p.hook_event_name = "PostToolUse";
   const toolName = typeof p.tool_name === "string" ? p.tool_name : "";
   const prefix = toolName.startsWith(PLUGIN_TOOL_NAME_PREFIX) ? PLUGIN_TOOL_NAME_PREFIX : TOOL_NAME_PREFIX8;
@@ -1445,7 +1455,8 @@ var OPENCODE_EVENTS = {
 var SHELL_TOOL_NAME = "bash";
 var READ_TOOL_NAME = "read";
 var SHELL_TOOL_NAMES5 = Object.freeze([SHELL_TOOL_NAME, "shell"]);
-var NATIVE_TO_CANONICAL7 = { webfetch: "WebFetch", [READ_TOOL_NAME]: "Read", ...Object.fromEntries(SHELL_TOOL_NAMES5.map((n) => [n, "Bash"])) };
+var SKILL_TOOL_NAME = "skill";
+var NATIVE_TO_CANONICAL7 = { webfetch: "WebFetch", [READ_TOOL_NAME]: "Read", [SKILL_TOOL_NAME]: "Skill", ...Object.fromEntries(SHELL_TOOL_NAMES5.map((n) => [n, "Bash"])) };
 function toCanonicalTool(name) {
   if (name.startsWith(OWN_WIRE_PREFIX)) return name.slice(OWN_WIRE_PREFIX.length);
   return Object.prototype.hasOwnProperty.call(NATIVE_TO_CANONICAL7, name) ? NATIVE_TO_CANONICAL7[name] : name;
@@ -5978,7 +5989,7 @@ function dumpTarget(name, args) {
 }
 
 // src/core/project/resolve.ts
-import { basename as basename2, dirname as dirname3, join as join6, resolve as resolve6 } from "node:path";
+import { basename as basename2, dirname as dirname3, isAbsolute as isAbsolute3, join as join6, resolve as resolve6 } from "node:path";
 
 // src/core/project/sha256.ts
 var K = new Uint32Array([
@@ -6133,12 +6144,7 @@ function dirOf(kind, src) {
   }
 }
 function gitDirs(dir) {
-  let cur;
-  try {
-    cur = realpathSync3.native(dir);
-  } catch {
-    throw new CtxError("NO_GIT_DIR", { path: dir });
-  }
+  let cur = nearestRealDir(dir);
   const start = cur;
   for (; ; ) {
     const gitDir = gitDirAt(join6(cur, GIT_DIR_NAME));
@@ -6149,6 +6155,18 @@ function gitDirs(dir) {
     const up = dirname3(cur);
     if (up === cur) return { commonDir: null, start };
     cur = up;
+  }
+}
+function nearestRealDir(dir) {
+  const walk2 = isAbsolute3(dir);
+  for (let d = walk2 ? resolve6(dir) : dir; ; ) {
+    try {
+      return realpathSync3.native(d);
+    } catch {
+      const up = dirname3(d);
+      if (!walk2 || up === d) throw new CtxError("NO_GIT_DIR", { path: dir });
+      d = up;
+    }
   }
 }
 function gitDirAt(dotGit) {
@@ -6213,7 +6231,7 @@ function resolveProject(agent, src) {
     },
     worktree,
     get containmentRoot() {
-      root ??= plain ?? containmentRootOf(dir, commonDir);
+      root ??= plain ?? containmentRootOf(worktree, commonDir);
       return root;
     },
     agent,

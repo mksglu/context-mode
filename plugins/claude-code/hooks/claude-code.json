@@ -12,6 +12,18 @@
         "matcher": "^(Bash|PowerShell|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__plugin_context-mode_context-mode__ctx_.*|mcp__.*)$"
       }
     ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hook.mjs\" --agent claude-code",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "^(Bash|PowerShell|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__plugin_context-mode_context-mode__ctx_.*)$"
+      }
+    ],
     "PreToolUse": [
       {
         "hooks": [
