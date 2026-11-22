@@ -64,7 +64,7 @@ export interface ProjectContext {
 }
 export type ProjectSourceKind = "env:CLAUDE_PROJECT_DIR" | "arg:--agent+cwd" | "arg:workspaceFolder" | "spawn-cwd" | "pi:ctx.cwd";
 
-export interface ToolContext { project: ProjectContext; sessionId: string; turn: number; signal: AbortSignal; clientInfo?: { name: string; version: string }; protocolVersion: string; piCwd?: string; hostPermission?: HostPermission; } // piCwd: Pi ctx.cwd (D-R38-PI-D7-1); hostPermission: D-1331-OC-PERM-1
+export interface ToolContext { project: ProjectContext; sessionId: string; turn: number; signal: AbortSignal; clientInfo?: { name: string; version: string }; protocolVersion: string; piCwd?: string; hostPermission?: HostPermission; agent?: AgentId; } // piCwd: Pi ctx.cwd (D-R38-PI-D7-1); hostPermission: D-1331-OC-PERM-1; agent: the --agent id, so ctx_doctor answers when project throws (D-1410-DOCTOR-NO-PROJECT-1)
 /** D-1331-OC-PERM-1: "wired" = the host permission check runs before each ctx_* tool; "missing" = the host build has no plugin permission API. */
 export type HostPermission = "wired" | "missing";
 // DEVIATIONS D-M2-2: the handler supplies the journal facts only it knows; the server stays the one

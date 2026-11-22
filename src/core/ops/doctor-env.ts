@@ -9,13 +9,14 @@ import {
   D1_GIT_NO_TAG, D1_GIT_TIMEOUT, D1_LATEST_AHEAD, D1_LATEST_PASS, D1_LATEST_UNKNOWN, D1_LATEST_UPDATE, D1_NO_VERSION, D1_NPM_CHECK_FIX,
   D1_NPM_ERROR, D1_NPM_HTTP, D1_NPM_NO_TAG, D1_NPM_TIMEOUT, D1_PACKAGE_FILE, D1_PREFIX, D1_PRERELEASE_SEP, D1_SOURCE_NPM, D1_SOURCE_TAGS,
   D10_DETAIL, D10_PERMISSION_DETAIL, D10_PERMISSION_FIX, D10_PERMISSION_MISSING_DETAIL, D11_PASS_DETAIL, D11_POSIX_DETAIL, D11_POSIX_FIX, D11_RUNTIME_DETAIL, D11_RUNTIME_FIX, D11_WIN_DETAIL, D11_WIN_FIX, D2_BUN_DETAIL, D2_NODE_DETAIL, D2_NODE_FIX,
-  D2_SQLITE_DETAIL, D2_SQLITE_FIX, D4_REASON_JOIN, D6_IN_PROCESS_DETAIL, D6_UNKNOWN_DETAIL, D7_DETAIL, D7_FIX, DOCTOR_FIX_UPGRADE,
+  D2_SQLITE_DETAIL, D2_SQLITE_FIX, D4_REASON_JOIN, D6_IN_PROCESS_DETAIL, D6_UNKNOWN_DETAIL, D7_DETAIL, D7_FIX, D7_NO_PROJECT_DETAIL, DOCTOR_FIX_UPGRADE, DOCTOR_NEEDS_PROJECT_DETAIL,
   DOCTOR_GIT_TIMEOUT_MS, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, GIT_BIN, GIT_LS_REMOTE, GIT_LS_REMOTE_TAG_ARGS, GIT_NO_PROMPT_ENV, GIT_SHA_HEX_LEN,
   LS_REMOTE_FIELD_SEP, NODE_MIN, NODE_VERSION_PREFIX, NODE_VERSION_SEP, RELEASE_REPO_URL, RELEASE_TAG_PATTERN, RELEASE_TAG_REF_PREFIX,
   EXEC_LANGUAGES,
   SQLITE_MODULE,
 } from "../contracts/constants.ts";
 import type { AdapterRow, DoctorCheckId, DoctorRow, HostPermission, ProjectContext, ToolContext } from "../contracts/types.ts";
+import { CtxError } from "../contracts/errors.ts";
 import { findRuntime, lookupRuntime } from "../sandbox/runtimes.ts";
 import { runProcess, type RunResult } from "../sandbox/spawn.ts";
 
@@ -271,6 +272,26 @@ export function checkProject(i: ProjectInput): DoctorRow {
   if (i.project.source !== i.adapter.projectSource) return bad;
   if (i.adapter.projectSource === "pi:ctx.cwd" && !piCwdInside(i.project.worktree, i.piCwd)) return bad;
   return pass("D7");
+}
+
+/** D-1410-DOCTOR-NO-PROJECT-1 (ADR-0014 §1): the project, or the source kind NO_PROJECT named. Any other error stays thrown. */
+export function projectOrMissing(ctx: Pick<ToolContext, "project">): { project: ProjectContext } | { missing: string } {
+  try {
+    return { project: ctx.project };
+  } catch (err) {
+    if (err instanceof CtxError && err.code === "NO_PROJECT") return { missing: String(err.vars.kind) };
+    throw err;
+  }
+}
+
+/** D7 when the project did not resolve: a FAIL that names the missing source, so ctx_doctor answers (D-1410-DOCTOR-NO-PROJECT-1). */
+export function noProjectRow(kind: string): DoctorRow {
+  return fail("D7", D7_NO_PROJECT_DETAIL(kind), D7_FIX);
+}
+
+/** A project-scoped check while the project did not resolve: UNKNOWN, D7 carries the cause (D-1410-DOCTOR-NO-PROJECT-1). */
+export function needsProjectRow(id: DoctorCheckId): DoctorRow {
+  return unknown(id, DOCTOR_NEEDS_PROJECT_DETAIL);
 }
 
 // D10: the adapter's denyChannel as row data, always PASS (D-M5-arch-3: no enforcement import).

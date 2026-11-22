@@ -248,6 +248,7 @@ export async function startServer(argv: string[], env: NodeJS.ProcessEnv): Promi
         get project(): ProjectContext {
           return projectOf();
         },
+        ...(agent === undefined ? {} : { agent }), // D-1410-DOCTOR-NO-PROJECT-1
         sessionId: sessionIdOf(meta, agent, env, serverId),
         turn: metaNumber(meta, "turn") ?? 0,
         signal: req.mcpReq.signal,

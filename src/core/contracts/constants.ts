@@ -621,6 +621,8 @@ export const D6_UNKNOWN_DETAIL = "no clientInfo or protocolVersion on the reques
 export const D6_IN_PROCESS_DETAIL = "in-process plugin: this call ran inside the agent, no MCP session to read"; // PASS (D-R49-DOCTOR-1339-3)
 export function D7_DETAIL(got: string): string { return `resolved project source ${got} does not match the host's actual cwd`; }
 export const D7_FIX = "restart the agent in the correct directory";
+export function D7_NO_PROJECT_DETAIL(kind: string): string { return `Project source ${kind} is missing`; } // D-1410-DOCTOR-NO-PROJECT-1
+export const DOCTOR_NEEDS_PROJECT_DETAIL = "runs once the project resolves; D7 names the project source"; // D-1410-DOCTOR-NO-PROJECT-1
 export function D8_STALE_SCHEMA_DETAIL(got: number, want: number): string { return `stale schema (v${got}, expected v${want})`; }
 export const D8_INTEGRITY_DETAIL = "integrity_check failed";
 export const D8_INTEGRITY_FIX = "doctor will heal context.db on the next run";
