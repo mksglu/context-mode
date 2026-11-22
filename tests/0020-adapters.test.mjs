@@ -509,7 +509,7 @@ describe("ADR-0020 adapters", () => {
       const ev = decode({ ...base, hook_event_name: "PostToolUseFailure", tool_name: "Glob", tool_input: { pattern: "**/*.zz" }, tool_use_id: "toolu_1", error: "Exit code 1\nno match", is_interrupt: false, duration_ms: 12 });
       assert.equal(ev.event, "PostToolUse");
       assert.deepEqual(ev.tool, { name: "Glob", canonicalName: "Glob", input: { pattern: "**/*.zz" }, callId: "toolu_1" });
-      assert.deepEqual(ev.result, { isError: true, bytes: Buffer.byteLength("Exit code 1\nno match"), text: "Exit code 1\nno match" });
+      assert.deepEqual(ev.result, { isError: true, bytes: Buffer.byteLength("Exit code 1\nno match"), text: "Exit code 1\nno match", keep: true });
     });
 
     // ---------- claude-code.ts encode ----------

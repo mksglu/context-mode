@@ -6,6 +6,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { ADAPTERS, hasReplace } from "../src/adapters/table.ts";
+import { FAILURE_EVENT as CLAUDE_FAILURE_EVENT } from "../src/adapters/claude-code.ts";
 import type { AgentId } from "../src/core/contracts/agents.ts";
 import { KIRO_TOOL_MATCHERS, NODE_MIN, RELEASE_SUMS_FILE, SERVER_KEY } from "../src/core/contracts/constants.ts";
 import type { AdapterRow } from "../src/core/contracts/types.ts";
@@ -95,6 +96,12 @@ function nestedShape(row: AdapterRow, timeout: number, withMatcher: boolean, cmd
   return { hooks };
 }
 
+// D-1408-CC-FAILURE-1 (#1408, ADR-0009 §1): Claude Code also runs the hook on PostToolUseFailure, with the PostToolUse group.
+function withFailure(shape: JsonObject): JsonObject {
+  const hooks = shape.hooks as JsonObject;
+  return { ...shape, hooks: { ...hooks, [CLAUDE_FAILURE_EVENT]: hooks.PostToolUse } };
+}
+
 // {version:1,hooks:{<Event>:[{type,command,<timeoutKey>}]}} — copilot-cli (timeoutSec), vscode (timeout).
 function flatShape(row: AdapterRow, timeoutKey: string): JsonObject {
   const hooks: JsonObject = {};
@@ -126,7 +133,7 @@ function zcodeShape(row: AdapterRow): JsonObject {
 
 // impl/10 §1.5: one host hook shape per spawn agent; pi/opencode are in-process (no file). DEVIATIONS D-M3-A7-2.
 const HOOK_SHAPES: Readonly<Record<AgentId, ((row: AdapterRow) => JsonObject) | null>> = {
-  "claude-code": (row) => nestedShape(row, seconds(row), true),
+  "claude-code": (row) => withFailure(nestedShape(row, seconds(row), true)),
   codex: (row) => nestedShape(row, seconds(row), true),
   gemini: (row) => nestedShape(row, row.hookTimeoutMs, false),
   qwen: (row) => nestedShape(row, seconds(row), true),

@@ -13,6 +13,9 @@ const POWERSHELL_TOOL = "PowerShell";
 const SHELL_CANONICAL = "Bash";
 
 const CLAUDE_SHAPE_EVENTS: readonly CanonicalEventName[] = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse"]; // impl/10 §1.4
+// D-1408-CC-FAILURE-1 (#1408, ADR-0009 §1): Claude Code also registers PostToolUseFailure, so a failed host tool gets
+// its toolerr row. Payload from the Claude Code 2.1.274 binary: tool_name, tool_input, tool_use_id, error, is_interrupt.
+export const FAILURE_EVENT = "PostToolUseFailure";
 const MCP_PREFIX = "mcp__";
 const MCP_SEP = "__";
 
@@ -241,7 +244,16 @@ function requireFields(raw: unknown): void {
 
 export function decode(raw: unknown): CanonicalHookEvent {
   requireFields(raw);
-  const ev = decodeClaudeShape(raw, "claude-code", TOOL_NAME_PREFIX, CLAUDE_SOURCES);
+  const failure = typeof raw === "object" && raw !== null && !Array.isArray(raw) && (raw as Record<string, unknown>).hook_event_name === FAILURE_EVENT;
+  const payload = failure ? { ...(raw as Record<string, unknown>), hook_event_name: "PostToolUse" } : raw;
+  const ev = decodeClaudeShape(payload, "claude-code", TOOL_NAME_PREFIX, CLAUDE_SOURCES);
+  // D-1408-CC-FAILURE-1: canonical PostToolUse with isError and the error text, as qwen and zcode (D-M3-A2-1). keep: the
+  // host takes only additionalContext on this event, so the error reaches the model as the host made it.
+  if (failure) {
+    const error = (raw as Record<string, unknown>).error;
+    const text = typeof error === "string" ? error : error === undefined ? "" : JSON.stringify(error);
+    ev.result = { isError: true, bytes: Buffer.byteLength(text), text, keep: true };
+  }
   // D-CC-PWSH-1: PowerShell keeps its native name and is decided, replaced and encoded as canonical Bash.
   if (ev.tool !== undefined && ev.tool.name === POWERSHELL_TOOL) ev.tool.canonicalName = SHELL_CANONICAL;
   // D-FU-RF-DECODE-1 defaults. cwd: the project dir Claude Code sets for its hooks, else the hook's own cwd.
