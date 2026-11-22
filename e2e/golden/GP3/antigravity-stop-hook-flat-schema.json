@@ -1,6 +1,7 @@
 {
   "claude-code": [
     "PostToolUse",
+    "PostToolUseFailure",
     "PreToolUse",
     "SessionStart",
     "UserPromptSubmit"
