@@ -504,6 +504,14 @@ describe("ADR-0020 adapters", () => {
       assert.throws(() => decode("SessionStart"));
     });
 
+    test("decode PostToolUseFailure (#1408, ADR-0009 §1): canonical PostToolUse, isError, the error text, the tool call", () => {
+      // Payload shape from the Claude Code 2.1.274 binary: tool_name, tool_input, tool_use_id, error, is_interrupt, duration_ms.
+      const ev = decode({ ...base, hook_event_name: "PostToolUseFailure", tool_name: "Glob", tool_input: { pattern: "**/*.zz" }, tool_use_id: "toolu_1", error: "Exit code 1\nno match", is_interrupt: false, duration_ms: 12 });
+      assert.equal(ev.event, "PostToolUse");
+      assert.deepEqual(ev.tool, { name: "Glob", canonicalName: "Glob", input: { pattern: "**/*.zz" }, callId: "toolu_1" });
+      assert.deepEqual(ev.result, { isError: true, bytes: Buffer.byteLength("Exit code 1\nno match"), text: "Exit code 1\nno match" });
+    });
+
     // ---------- claude-code.ts encode ----------
 
     const pre = { event: "PreToolUse", agent: "claude-code", sessionId: "s-1", cwd: "/tmp/proj" };

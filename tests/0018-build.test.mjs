@@ -379,6 +379,8 @@ describe("ADR-0018 build: manifests", () => {
     assert.deepEqual(claude.hooks.PreToolUse, [{ hooks: [{ command: claudeCmd, timeout: 5, type: "command" }], matcher: MATCHERS["claude-code"] }]);
     assert.deepEqual(claude.hooks.PostToolUse, [{ hooks: [{ command: claudeCmd, timeout: 5, type: "command" }], matcher: `^(${CC_MATCHER_NAMES}|mcp__plugin_context-mode_context-mode__ctx_.*|mcp__.*)$` }]);
     assert.deepEqual(claude.hooks.SessionStart, [{ hooks: [{ command: claudeCmd, timeout: 5, type: "command" }] }]);
+    // #1408, ADR-0009 §1: Claude Code also registers PostToolUseFailure, with the PostToolUse matcher, so host tool failures are journalled.
+    assert.deepEqual(claude.hooks.PostToolUseFailure, claude.hooks.PostToolUse);
     // D-FU-RM-QWEN-1: Qwen replaces only ${CLAUDE_PLUGIN_ROOT} in hook commands.
     const qwenCmd = 'node "${CLAUDE_PLUGIN_ROOT}/hook.mjs" --agent qwen';
     const qwen = readJson(dir, "hooks/qwen.json");

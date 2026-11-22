@@ -239,6 +239,14 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.deepEqual(rows.map((r) => ({ ...r })), [{ kind: "toolerr", ok: 0, key: 'Grep:{"path":"src","pattern":"x"}', path: "src" }]);
   });
 
+  test("PostToolUseFailure (#1408, ADR-0009 §1): a failed Claude Code host tool writes a toolerr row, hook output stays empty", async () => {
+    const p = cc({ hook_event_name: "PostToolUseFailure", tool_name: "Grep", tool_input: { pattern: "y", path: "lib" }, tool_use_id: "toolu_f1", error: "Exit code 2\nboom", is_interrupt: false, duration_ms: 7 });
+    const out = await handleHook("claude-code", p, env);
+    assert.equal(out.stdout, "");
+    const rows = await waitRows("SELECT kind, ok, key, path FROM events WHERE session_id = ?", [p.session_id], 1);
+    assert.deepEqual(rows.map((r) => ({ ...r })), [{ kind: "toolerr", ok: 0, key: 'Grep:{"path":"lib","pattern":"y"}', path: "lib" }]);
+  });
+
   test("PostToolUse Edit: edit row with the file path", async () => {
     const p = cc({ hook_event_name: "PostToolUse", tool_name: "Edit", tool_input: { file_path: "/a/b.ts" }, tool_response: "ok" });
     await handleHook("claude-code", p, env);
