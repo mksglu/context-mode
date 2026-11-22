@@ -9,7 +9,7 @@ import { McpServer, type ServerContext, type StandardSchemaWithJSON } from "@mod
 import { serveStdio, type StdioServerHandle } from "@modelcontextprotocol/server/stdio";
 import { AGENT_IDS, type AgentId } from "../core/contracts/agents.ts";
 import {
-  HOST_SESSION_ENV, INTERNAL_ERROR_LINE, NODE_MIN, OWNER_STOP_EXT, OWNERS_DIR_NAME, PROJECTS_DIR_NAME, RUN_SESSION_PREFIX, SERVER_KEY, TOOLS_TTL_MS,
+  HOST_SESSION_ENV, HOST_SESSION_META, INTERNAL_ERROR_LINE, NODE_MIN, OWNER_STOP_EXT, OWNERS_DIR_NAME, PROJECTS_DIR_NAME, RUN_SESSION_PREFIX, SERVER_KEY, TOOLS_TTL_MS,
   UPGRADE_STOP_DELAY_MS, DOCTOR_TOOL_NAME, JOURNAL_SKIPPED_LINE, ROOTS_TIMEOUT_MS, VSCODE_WORKSPACE_VAR, WORKSPACE_FOLDER_FLAG,
 } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
@@ -85,11 +85,15 @@ function metaNumber(meta: Record<string, unknown> | undefined, key: string): num
   return typeof v === "number" && Number.isSafeInteger(v) ? v : undefined;
 }
 
-// D-CR2-SID-1: _meta.sessionId, else the session id the host put in the server env (the id its hooks
-// journal under, so scope:"session" finds hook-indexed rows), else the process-local mcp:<serverId>.
+// D-CR2-SID-1: _meta.sessionId, else the host's own _meta session key (D-1411-ZCODE-SID-1: zcode session_id), else the
+// session id the host put in the server env (the id its hooks journal under, so scope:"session" finds hook-indexed rows),
+// else the process-local mcp:<serverId>.
 export function sessionIdOf(meta: Record<string, unknown> | undefined, agent: AgentId | undefined, env: NodeJS.ProcessEnv, serverId: string): string {
   const fromMeta = metaString(meta, "sessionId");
   if (fromMeta !== undefined) return fromMeta;
+  const metaKey = agent === undefined ? undefined : HOST_SESSION_META[agent];
+  const fromHostMeta = metaKey === undefined ? undefined : metaString(meta, metaKey);
+  if (fromHostMeta !== undefined) return fromHostMeta;
   const key = agent === undefined ? undefined : HOST_SESSION_ENV[agent];
   const fromHost = key === undefined ? undefined : env[key];
   if (typeof fromHost === "string" && fromHost !== "") return fromHost;

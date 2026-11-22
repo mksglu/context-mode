@@ -210,6 +210,9 @@ export const RUN_SESSION_PREFIX = "mcp:"; // §4 step 5, 00 A8: no MCP _meta, + 
 // D-CR2-SID-1: the env var a host sets in the MCP server process to the session id its hooks receive.
 // Claude Code 2.1.303 sets CLAUDE_CODE_SESSION_ID (probe: equals the hook payload session_id). A host not listed keeps mcp:<serverId>.
 export const HOST_SESSION_ENV: Readonly<Partial<Record<string, string>>> = Object.freeze({ "claude-code": "CLAUDE_CODE_SESSION_ID" });
+// D-1411-ZCODE-SID-1: the _meta key a host uses for the session id its hooks receive, when it is not sessionId.
+// ZCode (zai-org/ZCode fec97590 mcpRequestMeta) sends _meta.session_id on every tools/call and sets no session env.
+export const HOST_SESSION_META: Readonly<Partial<Record<string, string>>> = Object.freeze({ zcode: "session_id" });
 
 // Runtime
 export const NODE_MIN = "24.15.0"; // S-NODE
