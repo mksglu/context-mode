@@ -1,7 +1,8 @@
 // impl/03 §6, impl/05 §4, TECH-SPEC GP5 (proxy env, SSRF per hop), DECISIONS-r3 Q19, DECISIONS-r4 A8/A52/B57,
-// DEVIATIONS D-M2-T5-2, D-1403-PROXY-NOT-TARGET-1. One path: resolve the URL's own host and check every address on
+// DEVIATIONS D-M2-T5-2, D-1403-PROXY-NOT-TARGET-1, D-SSRF-FAKEIP-1. One path: resolve the URL's own host and check every address on
 // every hop (with or without a proxy), connect to the checked address or to the proxy the environment names (no second
 // DNS lookup of the target), follow redirects as new hops.
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { lookup } from "node:dns/promises";
 import http from "node:http";
@@ -35,6 +36,34 @@ const PRIVATE_RANGES: ReadonlyArray<readonly [string, number, "ipv4" | "ipv6"]> 
 ];
 const BLOCKED = new BlockList();
 for (const [net, prefix, type] of PRIVATE_RANGES) BLOCKED.addSubnet(net, prefix, type);
+
+// D-SSRF-FAKEIP-1 (#1403): a Fake-IP DNS (Mihomo, OpenClash, Clash) answers every name with an address in the RFC 2544
+// pool. The guard learns this once per process: it resolves a random name under .invalid, which RFC 6761 says never
+// resolves. A normal resolver answers NXDOMAIN; only an answer inside the pool turns on the exemption, and it covers
+// DNS-resolved names in the pool only. IP literals and every other range stay blocked.
+const FAKE_IP_POOL = new BlockList();
+FAKE_IP_POOL.addSubnet("198.18.0.0", 15, "ipv4");
+const FAKE_IP_PROBE_TLD = ".invalid";
+const FAKE_IP_PROBE_BYTES = 8;
+const FAKE_IP_PROBE_MS = 1500;
+let fakeIpProbe: Promise<boolean> | undefined;
+
+function inFakeIpPool(address: string): boolean {
+  return isIP(address) === 4 && FAKE_IP_POOL.check(address, "ipv4");
+}
+
+// One shared probe per process, started only when a name resolves into the pool. A timeout or an error is "no".
+function fakeIpResolver(): Promise<boolean> {
+  fakeIpProbe ??= new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => resolve(false), FAKE_IP_PROBE_MS);
+    timer.unref();
+    lookup(randomBytes(FAKE_IP_PROBE_BYTES).toString("hex") + FAKE_IP_PROBE_TLD, { all: true }).then(
+      (addrs) => resolve(addrs.length > 0 && addrs.every((a) => inFakeIpPool(a.address))),
+      () => resolve(false),
+    ).finally(() => clearTimeout(timer));
+  });
+  return fakeIpProbe;
+}
 
 // RFC 9110 status classes (fixed protocol data, D-M2-T5-2).
 const STATUS_OK_FIRST = 200;
@@ -165,6 +194,16 @@ function checkAddress(hostname: string, address: string): void {
   }
 }
 
+// Step 3 for a name: every address must pass; an address in the Fake-IP pool passes only behind a Fake-IP resolver.
+async function checkResolved(host: string, addrs: { address: string }[], signal: AbortSignal): Promise<void> {
+  const pooled = isIP(host) === 0 ? addrs.filter((a) => inFakeIpPool(a.address)) : [];
+  for (const a of addrs) if (!pooled.includes(a)) checkAddress(host, a.address);
+  if (pooled.length === 0) return;
+  const fakeIp = await fakeIpResolver();
+  if (signal.aborted) throw fail("ABORT_ERR");
+  if (!fakeIp) checkAddress(host, (pooled[0] as { address: string }).address);
+}
+
 // Steps 2-3: resolve in this process; for the URL's own host, reject if any address is private. The proxy the
 // environment names is where the socket goes, not a target the model chose (#1403), so it is resolved unchecked.
 async function lookupAll(host: string, signal: AbortSignal): Promise<{ address: string }[]> {
@@ -182,7 +221,7 @@ async function lookupAll(host: string, signal: AbortSignal): Promise<{ address: 
 async function resolveTarget(u: URL, signal: AbortSignal, checked: boolean): Promise<Target> {
   const host = bare(u.hostname);
   const addrs = await lookupAll(host, signal);
-  if (checked) for (const a of addrs) checkAddress(host, a.address);
+  if (checked) await checkResolved(host, addrs, signal);
   return { host, port: u.port === "" ? defaultPort(u.protocol) : Number(u.port), address: addrs[0].address };
 }
 
@@ -199,7 +238,7 @@ async function checkProxiedTarget(u: URL, signal: AbortSignal): Promise<void> {
     if (signal.aborted) throw err;
     return;
   }
-  for (const a of addrs) checkAddress(host, a.address);
+  await checkResolved(host, addrs, signal);
 }
 
 function tlsName(host: string): string | undefined {
