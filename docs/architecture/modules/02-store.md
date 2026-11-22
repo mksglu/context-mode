@@ -55,7 +55,7 @@ Steps:
 5. Run `git rev-parse --path-format=absolute --show-toplevel` with the same cwd for `worktree`; realpath it.
 6. Return `{ gitCommonDir, projectKey, worktree }`.
 
-Non-git dir (D-M7-NG-1, owner decision 2026-10-21): one fixed rule, not a fallback path. When no `.git` is found walking up from the project dir to the filesystem root, the project is `realpath(dir)`: `projectKey = sha256(realpath(dir))[0..PROJECT_KEY_HEX_LEN)`, `worktree = containmentRoot = realpath(dir)`, no git process runs. A nested non-git dir is its own project. The home dir and the filesystem root are projects too (no rule in this doc or ADR-0005 forbids it). `NO_GIT_DIR` stays only for a project dir that does not exist. The project source per agent (PRD §5) is unchanged.
+Non-git dir (D-M7-NG-1, owner decision 2026-10-21): one fixed rule, not a fallback path. When no `.git` is found walking up from the project dir to the filesystem root, the project is `realpath(dir)`: `projectKey = sha256(realpath(dir))[0..PROJECT_KEY_HEX_LEN)`, `worktree = containmentRoot = realpath(dir)`, no git process runs. A nested non-git dir is its own project. The home dir and the filesystem root are projects too (no rule in this doc or ADR-0005 forbids it). A project dir that does not exist yet (Codex sends the workdir of `mkdir -p x && cd x`, #1409) counts as its nearest existing parent: the walk and the key start there (D-1409-MISSING-CWD-1). `NO_GIT_DIR` stays only when no dir up to the filesystem root exists. The project source per agent (PRD §5) is unchanged.
 
 Project source per agent (D-FU-PS-1, owner decision 2026-10-21, ADR-0001: one fixed order per agent, no runtime fallback path). `src.cwd` is the payload `cwd` on the hook path (`handleHook` step 3) and `process.cwd()` on the server path.
 
@@ -67,7 +67,7 @@ Project source per agent (D-FU-PS-1, owner decision 2026-10-21, ADR-0001: one fi
 | gemini, qwen, zcode, opencode | `spawn-cwd` | `src.cwd` | `NO_PROJECT` |
 | pi, omp | `pi:ctx.cwd` | `src.piCwd` | `NO_PROJECT` |
 
-When `resolveProject` throws in `handleHook` step 3 (`NO_PROJECT`, or `NO_GIT_DIR` for a dir that does not exist), the hook answers allow and writes one stderr line `hooks: no project: <code> <message>`.
+When `resolveProject` throws in `handleHook` step 3 (`NO_PROJECT`, or `NO_GIT_DIR` when no dir up to the root exists), the hook answers allow and writes one stderr line `hooks: no project: <code> <message>`.
 
 E2E: GP7 (scope — identity shared per repo, two worktrees resolve the same `projectKey`). ADR-0017 `covers`: `src/core/project/`.
 
