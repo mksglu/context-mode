@@ -41,6 +41,7 @@ import { buildRegistry, hookRunsCheck, runDoctor, runSetup } from "../src/setup/
 import { codexRunDirOf, codexSetupHomeOf } from "../src/core/project/config-dir.ts";
 import { generateManifests } from "../build/manifests.ts";
 import { fakeCodexBin, trustedToml } from "./_lib/codex-fake.mjs";
+import { spawnBundle } from "../e2e/harness/mcp-client.mjs";
 
 // D-WIN-RM-RETRY-1 (same rule as D-M3-F-9 and tests 0002, 0007, 0009): retry the temp cleanup, and on win32 only keep a
 // folder that a child process still holds (EPERM) in the runner temp dir. Every other error still fails the test.
@@ -611,6 +612,52 @@ describe("ADR-0010 doctor D3 on Antigravity: one clear line, no Gemini CLI claim
     const d3 = await run(home, "gemini-cli-mcp-client", path.join(home, ".gemini", "extensions", "context-mode", "server"));
     assert.equal(d3.status, "FAIL");
     assert.ok(d3.detail.startsWith("wrong:"), d3.detail);
+  });
+});
+
+describe("ADR-0014 §1 ctx_doctor answers when the project does not resolve (#1410)", { concurrency: CONC }, () => {
+  // #1410 (calvinxxw, agy 1.5.14): agy stages the Gemini CLI manifest under ~/.gemini/config/plugins/context-mode and
+  // starts `node server.mjs --agent gemini` with cwd = that plugin dir. The server never takes its own dir as the project
+  // (D-C166-NATIVE-CWD-1), so every tool says "Project source spawn-cwd is missing. Fix: run ctx_doctor." ctx_doctor
+  // returned the same error, a loop. ADR-0014 §1: ctx_doctor always answers, even in a degraded start.
+  const REPO = path.resolve(import.meta.dirname, "..");
+  let home;
+  let bundleDir;
+  before(async () => {
+    home = realpathSync(mkdtempSync(path.join(tmpdir(), "cm-doctor-1410-")));
+    bundleDir = path.join(home, ".gemini", "config", "plugins", "context-mode");
+    await promisify(execFile)(process.execPath, [path.join(REPO, "build", "build.mjs"), "--out", bundleDir], { encoding: "utf8" });
+  });
+  after(() => rmSync(home, { recursive: true, force: true }));
+  async function call(agent, clientName, name) {
+    const client = spawnBundle(path.join(bundleDir, "server.mjs"), { HOME: home, USERPROFILE: home, PATH: process.env.PATH ?? "" }, ["--agent", agent], { cwd: bundleDir });
+    try {
+      await client.request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: clientName, version: "1.5.14" } });
+      client.notify("notifications/initialized", {});
+      const r = await client.request("tools/call", { name, arguments: {} });
+      return { isError: r.isError === true, text: r.content.map((c) => c.text).join("") };
+    } finally {
+      await client.close();
+    }
+  }
+
+  test("[D-1410-DOCTOR-NO-PROJECT-1] Antigravity (clientInfo antigravity-cli, spawn cwd = plugin dir): ctx_doctor returns its table with the unsupported-host line", async () => {
+    const r = await call("gemini", "antigravity-cli", "ctx_doctor");
+    assert.equal(r.isError, false, r.text);
+    assert.ok(r.text.includes("Antigravity is not a supported host today"), r.text);
+    assert.ok(r.text.includes("Project source spawn-cwd is missing"), r.text); // D7 names why the project did not resolve
+  });
+
+  test("[D-1410-DOCTOR-NO-PROJECT-1] codex started in its plugin dir with no _meta workspace: ctx_doctor still answers", async () => {
+    const r = await call("codex", "codex-mcp-client", "ctx_doctor");
+    assert.equal(r.isError, false, r.text);
+    assert.ok(r.text.includes("Project source arg:--agent+cwd is missing"), r.text);
+  });
+
+  test("[D-1410-DOCTOR-NO-PROJECT-1] the work tools keep the NO_PROJECT line and point to ctx_doctor", async () => {
+    const r = await call("gemini", "antigravity-cli", "ctx_stats");
+    assert.equal(r.isError, true, r.text);
+    assert.ok(r.text.includes("Project source spawn-cwd is missing. Fix: run ctx_doctor."), r.text);
   });
 });
 
