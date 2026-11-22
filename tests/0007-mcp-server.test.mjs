@@ -144,6 +144,17 @@ describe("ADR-0004 server entry and exit guard", () => {
     assert.equal(sessionIdOf(undefined, "gemini", env, "srv"), "mcp:srv");
     assert.equal(sessionIdOf(undefined, undefined, env, "srv"), "mcp:srv");
   });
+
+  // #1411 (D-1411-ZCODE-SID-1): ZCode (zai-org/ZCode fec97590 adapters/src/mcp/index.ts mcpRequestMeta) sends its
+  // session id on every tools/call as _meta.session_id and again under "com.zcode/request-context". It refuses a
+  // session env in the MCP config, so _meta is its one channel. The hooks journal under that same id.
+  test("sessionIdOf: zcode reads its own _meta session_id, the id its hooks journal under", async () => {
+    const { sessionIdOf } = await import("../src/entries/server.ts");
+    const meta = { trace_id: "t-1", session_id: "sess_zc_1", turn_id: "u-1", "com.zcode/request-context": { trace_id: "t-1", session_id: "sess_zc_1" } };
+    assert.equal(sessionIdOf(meta, "zcode", {}, "srv"), "sess_zc_1");
+    assert.equal(sessionIdOf({ ...meta, session_id: "" }, "zcode", {}, "srv"), "mcp:srv");
+    assert.equal(sessionIdOf(undefined, "zcode", {}, "srv"), "mcp:srv");
+  });
 });
 
   // serial: before/after set process.env.HOME
@@ -384,6 +395,27 @@ describe("ADR-0007 call shape on every host", () => {
     assert.ok(text.startsWith("Project source "), text);
     assert.ok(text.includes(". Fix: "), text);
     assert.ok(!text.includes(bundleDir), "must not name the plugin dir as the project: " + text);
+    await client.close();
+  });
+
+  // #1411: a zcode hook row and a zcode MCP call from the same ZCode session land in one session, so ctx_stats
+  // reports "This session" with the hook-journaled shell call.
+  test("zcode: a hook row and an MCP call with ZCode's _meta session_id share one session (ctx_stats This session)", async (t) => {
+    const sid = "sess_zc_e2e_1411";
+    const big = Array.from({ length: 300 }, (_, i) => `commit ${i.toString(16).padStart(40, "0")} line ${i}`).join("\n");
+    const hook = spawnSync(process.execPath, [join(bundleDir, "hook.mjs"), "--agent", "zcode"], {
+      cwd: repo, env: { ...process.env, HOME: root, USERPROFILE: root, CLAUDE_CODE_SESSION_ID: "" }, encoding: "utf8",
+      input: JSON.stringify({ hook_event_name: "PostToolUse", session_id: sid, cwd: repo, tool_name: "Bash", tool_input: { command: "git log" }, tool_use_id: "z1", tool_response: { stdout: big, stderr: "", interrupted: false, isImage: false } }),
+    });
+    assert.equal(hook.status, 0, hook.stderr);
+    const client = spawnBundle(join(bundleDir, "server.mjs"), { HOME: root, USERPROFILE: root }, ["--agent", "zcode"], { cwd: repo });
+    t.after(() => client.kill());
+    await client.request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "zcode", version: "0" } });
+    client.notify("notifications/initialized");
+    const meta = { trace_id: "t-1", session_id: sid, turn_id: "u-1", "com.zcode/request-context": { trace_id: "t-1", session_id: sid } };
+    const r = await client.request("tools/call", { name: "ctx_stats", arguments: {}, _meta: meta });
+    assert.notEqual(r.isError, true, r.content[0].text);
+    assert.ok(r.content[0].text.includes("This session · 1 call"), r.content[0].text);
     await client.close();
   });
 
