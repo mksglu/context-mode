@@ -3131,7 +3131,8 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
 async function withDns(map, fn) {
   const prev = dns.promises.lookup;
   dns.promises.lookup = async (name, opts) => {
-    const address = map[name];
+    // A function map answers any name (it may throw a DNS error or never settle); an object map answers exact names.
+    const address = typeof map === "function" ? await map(name) : map[name];
     if (address === undefined) return prev.call(dns.promises, name, opts);
     const r = { address, family: address.includes(":") ? 6 : 4 };
     return opts?.all ? [r] : r;
@@ -3582,6 +3583,148 @@ describe("PRD-v2 section 8 / safeFetch", () => {
       }));
       assert.equal(hits, 1, "only the first hop reaches the server");
     } finally { await new Promise((r) => srv.close(r)); }
+  });
+
+  // ---- #1403 Fake-IP DNS (D-SSRF-FAKEIP-1, amends D-SSRF-RANGES-1) ----
+  // Mihomo/OpenClash Fake-IP DNS answers every public name with an address in 198.18.0.0/15. safeFetch learns this once
+  // per process: it resolves a random name under .invalid (RFC 6761: never resolves). NXDOMAIN means a normal resolver;
+  // an answer inside 198.18.0.0/15 means Fake-IP, and only then does a DNS-resolved name in 198.18.0.0/15 pass.
+  // Each test imports a fresh fetch.ts, so its per-process probe cache starts empty.
+  let fakeIpRun = 0;
+  async function freshSafeFetch() {
+    fakeIpRun += 1;
+    return (await import(new URL("../src/core/sandbox/fetch.ts?fake-ip=" + fakeIpRun, import.meta.url).href)).safeFetch;
+  }
+  // probe: an address the resolver gives every *.invalid name, "nxdomain", or "hang". names: exact name -> address.
+  function fakeIpDns(probe, names) {
+    const seen = { probes: 0 };
+    const resolve = (name) => {
+      if (name.endsWith(".invalid")) {
+        seen.probes += 1;
+        if (probe === "nxdomain") throw Object.assign(new Error("queryA ENOTFOUND " + name), { code: "ENOTFOUND" });
+        if (probe === "hang") return new Promise(() => {});
+        return probe;
+      }
+      return names[name];
+    };
+    return { resolve, seen };
+  }
+  // The Fake-IP pool address has no host here: a request to it goes to the local server (the guard still runs first).
+  async function withRoute(address, fn) {
+    const prev = http.request;
+    http.request = (opts, ...rest) =>
+      prev.call(http, opts && typeof opts === "object" && opts.host === address ? { ...opts, host: "127.0.0.1" } : opts, ...rest);
+    try { return await fn(); } finally { http.request = prev; }
+  }
+  async function localServer(handler) {
+    let hits = 0;
+    const srv = createServer((req, res) => { hits += 1; handler(req, res); });
+    await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+    return { port: srv.address().port, hits: () => hits, close: () => new Promise((r) => srv.close(r)) };
+  }
+  const FAKE_POOL_HIT = "198.18.0.9";
+  const blockedText = (host) => "Blocked private address " + host + ". Fix: use a public URL.";
+
+  test("#1403 Fake-IP: a public name the Fake-IP resolver puts in 198.18.0.0/15 is fetched; the probe runs once per process", async () => {
+    const safe = await freshSafeFetch();
+    const fake = fakeIpDns("198.18.0.1", { "github.test": FAKE_POOL_HIT });
+    const srv = await localServer((req, res) => res.end("fake-ip ok"));
+    try {
+      await withDns(fake.resolve, () => withRoute(FAKE_POOL_HIT, () => withEnv({}, async () => {
+        for (let i = 0; i < 3; i += 1) {
+          const out = await safe(`http://github.test:${srv.port}/`, AbortSignal.timeout(5000));
+          assert.equal(out.body.toString("utf8"), "fake-ip ok");
+        }
+      })));
+      assert.equal(srv.hits(), 3);
+      assert.equal(fake.seen.probes, 1, "one cached probe per process, not one per request");
+    } finally { await srv.close(); }
+  });
+
+  test("#1403 Fake-IP: IP literals in 198.18.0.0/15 and names on loopback, RFC 1918, link-local and 100.64/10 stay blocked", async () => {
+    const safe = await freshSafeFetch();
+    const fake = fakeIpDns("198.18.0.1", {
+      "loop.test": "127.0.0.1", "lan.test": "10.0.0.5", "meta.test": "169.254.169.254", "cgnat.test": "100.64.0.1",
+    });
+    for (const host of ["198.18.0.9", "198.19.255.1", "loop.test", "lan.test", "meta.test", "cgnat.test"]) {
+      await withDns(fake.resolve, () => withEnv({}, () =>
+        assert.rejects(safe(`http://${host}/latest/meta-data`, AbortSignal.timeout(5000)), (err) => {
+          assert.equal(err.code, "SSRF", host);
+          assert.equal(err.message, blockedText(host), host);
+          return true;
+        })));
+    }
+  });
+
+  test("#1403 Fake-IP: when the probe gets NXDOMAIN or an address outside 198.18.0.0/15, a name in 198.18.0.0/15 stays blocked", async () => {
+    // NXDOMAIN: a normal resolver. 10.0.0.1 / 203.0.113.9: a resolver that rewrites NXDOMAIN, not a Fake-IP pool.
+    for (const probe of ["nxdomain", "10.0.0.1", "203.0.113.9"]) {
+      const safe = await freshSafeFetch();
+      const fake = fakeIpDns(probe, { "github.test": FAKE_POOL_HIT });
+      await withDns(fake.resolve, () => withEnv({}, () =>
+        assert.rejects(safe("http://github.test/", AbortSignal.timeout(5000)), (err) => {
+          assert.equal(err.message, blockedText("github.test"), probe);
+          return true;
+        })));
+    }
+  });
+
+  test("#1403 Fake-IP: a probe that never answers is bounded and gives no exemption", async () => {
+    const safe = await freshSafeFetch();
+    const fake = fakeIpDns("hang", { "github.test": FAKE_POOL_HIT });
+    const t0 = Date.now();
+    await withDns(fake.resolve, () => withEnv({}, () =>
+      assert.rejects(safe("http://github.test/", AbortSignal.timeout(15000)), (err) => {
+        assert.equal(err.message, blockedText("github.test"));
+        return true;
+      })));
+    assert.ok(Date.now() - t0 < 5000, "the probe has a short timeout: " + (Date.now() - t0) + " ms");
+  });
+
+  test("#1403 Fake-IP: the normal path sends no probe", async () => {
+    const safe = await freshSafeFetch();
+    const fake = fakeIpDns("nxdomain", {});
+    const srv = await localServer((req, res) => res.end("normal ok"));
+    try {
+      // _parity-net-shim: docs.parity.test resolves to 203.0.113.7 (public) and connects to this server.
+      await withDns(fake.resolve, () => withEnv({}, async () => {
+        const out = await safe(`http://docs.parity.test:${srv.port}/`, AbortSignal.timeout(5000));
+        assert.equal(out.body.toString("utf8"), "normal ok");
+      }));
+      assert.equal(fake.seen.probes, 0, "no address in 198.18.0.0/15, so no probe lookup");
+    } finally { await srv.close(); }
+  });
+
+  test("#1403 Fake-IP: every redirect hop is still checked (link-local, a 198.18 literal, a name on RFC 1918)", async () => {
+    const safe = await freshSafeFetch();
+    const fake = fakeIpDns("198.18.0.1", { "github.test": FAKE_POOL_HIT, "lan.test": "10.0.0.5" });
+    for (const [location, host] of [["http://169.254.169.254/latest/meta-data", "169.254.169.254"],
+      ["http://198.18.0.7/", "198.18.0.7"], ["http://lan.test/", "lan.test"]]) {
+      const srv = await localServer((req, res) => { res.writeHead(302, { location }); res.end(); });
+      try {
+        await withDns(fake.resolve, () => withRoute(FAKE_POOL_HIT, () => withEnv({}, () =>
+          assert.rejects(safe(`http://github.test:${srv.port}/start`, AbortSignal.timeout(5000)), (err) => {
+            assert.equal(err.code, "SSRF", location);
+            assert.equal(err.message, blockedText(host), location);
+            return true;
+          }))));
+        assert.equal(srv.hits(), 1, "only the first hop reaches the server: " + location);
+      } finally { await srv.close(); }
+    }
+  });
+
+  test("#1403 Fake-IP: through a proxy from env (the Mihomo mixed port), a Fake-IP name reaches the proxy", async () => {
+    const safe = await freshSafeFetch();
+    const fake = fakeIpDns("198.18.0.1", { "github.test": FAKE_POOL_HIT });
+    const p = await recordingProxy();
+    try {
+      await withDns(fake.resolve, () => withEnv({ HTTPS_PROXY: `http://127.0.0.1:${p.port}` }, () =>
+        assert.rejects(safe("https://github.test/", AbortSignal.timeout(5000)), (err) => {
+          assert.equal(err.message, "Fetch failed: 403. Fix: check the URL or proxy.");
+          return true;
+        })));
+      assert.deepEqual(p.seen, [{ method: "CONNECT", url: "github.test:443" }]);
+    } finally { await p.close(); }
   });
 
   test("GP5/fetch-error-one-line: every failure is one line, code FETCH_FAILED or SSRF", async () => {
