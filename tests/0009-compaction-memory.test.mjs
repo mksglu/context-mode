@@ -1125,9 +1125,11 @@ describe("ADR-0009 section 7: memory recall", { concurrency: CONC }, () => {
       assert.ok(after.every((u) => u.sourceId === mine), "only this session's units");
       assert.deepEqual(after.map((u) => [u.sourceId, u.ord]), db.raw.prepare(storeWideSql).all(match, "mine").map((r) => [r.sourceId, r.ord]));
       assert.deepEqual(queryUnits(db, "nobody", ASK, 64), []);
-      // The other sessions' units outside this session's rowid span are not read: at most half the store-wide cost.
+      // The other sessions' units outside this session's rowid span are not read, so the cost stays well under the store-wide
+      // cost. D-1401-UNITS-BOUND-1: CI runners measured 0.52-0.58 of store-wide (ubuntu and macOS, node 24 and 26), a laptop
+      // about 0.45; the bound is 0.7 so runner load does not fail a correct build, and a store-wide scan (1.0) still fails.
       // (Prefix terms and bm25 statistics still read the term lists of the whole table, so not the cost alone.)
-      assert.ok(withOthers < storeWide / 2, `this session: ${withOthers.toFixed(2)} ms with 40000 other units, store-wide ${storeWide.toFixed(2)} ms, ${alone.toFixed(2)} ms alone`);
+      assert.ok(withOthers < storeWide * 0.7, `this session: ${withOthers.toFixed(2)} ms with 40000 other units, store-wide ${storeWide.toFixed(2)} ms, ${alone.toFixed(2)} ms alone`);
       const bound = alone * 5 + 3;
       assert.ok(noUnits < bound, `a session with no units: ${noUnits.toFixed(2)} ms with 40000 other units (bound ${bound.toFixed(2)} ms)`);
     } finally {
