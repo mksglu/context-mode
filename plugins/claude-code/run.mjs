@@ -14,14 +14,6 @@ function prefixToolNames(text, prefix) {
 }
 var OUTPUT_CAP = 16384;
 var INDEX_WRITE_CHUNK = 1048576;
-var REPLACE_TRIGGER_BYTES_DEFAULT = 4096;
-var REPLACE_TRIGGER_ENV = "CTX_REPLACE_TRIGGER_BYTES";
-function readReplaceTrigger(raw) {
-  if (raw === void 0 || raw.trim() === "") return REPLACE_TRIGGER_BYTES_DEFAULT;
-  const n = Number(raw);
-  return Number.isSafeInteger(n) && n > 0 ? n : REPLACE_TRIGGER_BYTES_DEFAULT;
-}
-var REPLACE_TRIGGER_BYTES = readReplaceTrigger(process.env[REPLACE_TRIGGER_ENV]);
 var RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
 var READ_RANGE_KEYS = Object.freeze(["offset", "limit", "view_range"]);
 var SKILL_LOAD_TOOLS = Object.freeze(["Skill"]);
@@ -179,7 +171,7 @@ var SQLITE_NOTADB_CODE = 26;
 var HOOK_TIMEOUT_MS = 5e3;
 var IN_PROCESS_TIMEOUT_MS = 0;
 var PROJECT_KEY_HEX_LEN = 16;
-var SCHEMA_VERSION = 6;
+var SCHEMA_VERSION = 7;
 var PROJECTS_DIR_NAME = "projects";
 var DB_FILE_NAME = "context.db";
 var GIT_DIR_NAME = ".git";
@@ -1756,7 +1748,8 @@ var ERROR_TEXT = Object.freeze({
   NO_RUNTIME: "No <lang> runtime on PATH. Fix: install it or pick another language.",
   FETCH_FAILED: "Fetch failed: <code>. Fix: check the URL or proxy.",
   SSRF: "Blocked private address <host>. Fix: use a public URL.",
-  OUTSIDE_ROOT: "Path <p> is outside the project. Fix: use a path inside <root>.",
+  OUTSIDE_ROOT: "Path <p> is outside the project and the folders added to this session. Fix: use a path inside <root>, or add its folder to the session (Claude Code /add-dir, Codex --add-dir).",
+  // #1398 D-1398-HOST-ROOTS-1
   INVALID_ARGS: "Invalid argument <field>. Fix: <action>.",
   ONE_OF_INPUT: "Pass exactly one of <names>. Fix: drop the extra field.",
   SPAWN_FAILED: "Failed to start the process: <detail>. Fix: check the command and PATH.",
@@ -1915,13 +1908,22 @@ CREATE VIRTUAL TABLE line_units USING fts5(
 var DDL_V6 = `
 UPDATE sources SET label = replace(label, char(92), '/') WHERE kind = 'path' AND instr(label, char(92)) > 0;
 `;
+var DDL_V7 = `
+ALTER TABLE sources ADD COLUMN unit_lo INTEGER;
+ALTER TABLE sources ADD COLUMN unit_hi INTEGER;
+CREATE INDEX IF NOT EXISTS idx_sources_session ON sources(session_id, id);
+UPDATE sources SET unit_lo = g.lo, unit_hi = g.hi
+  FROM (SELECT source_id, MIN(rowid) AS lo, MAX(rowid) AS hi FROM line_units GROUP BY source_id) AS g
+  WHERE g.source_id = sources.id;
+`;
 var MIGRATIONS = [
   { version: 1, sql: DDL },
   { version: 2, sql: DDL_V2 },
   { version: 3, sql: DDL_V3 },
   { version: 4, sql: DDL_V4 },
   { version: 5, sql: DDL_V5 },
-  { version: 6, sql: DDL_V6 }
+  { version: 6, sql: DDL_V6 },
+  { version: 7, sql: DDL_V7 }
 ];
 function applyMigrations(db, fromVersion) {
   if (fromVersion === SCHEMA_VERSION2) return;
@@ -5540,7 +5542,7 @@ var TOOL_DESCRIPTIONS = Object.freeze({
   ctx_execute: 'Example: `ctx_execute({language:"shell",code:"git log --oneline -5"})`. Required: language, code.\nWrite code that prints only the answer, not the raw data. Runs code in a sandboxed subprocess in the project directory (shell, powershell, javascript, typescript, python, or another runtime on PATH); only what the code prints comes back. For a large file, set `file` to its local path: the code gets it in the CTX_FILE environment variable. Set `intent` when output may be large: the matching sections come back and the full output is indexed for ctx_search. `timeoutMs` defaults to and caps at 600000; then the whole process tree is killed.',
   ctx_batch: 'Example: `ctx_batch({commands:["git log --oneline -5"],queries:["recent changes"]})`. Required: commands, queries.\nRuns several shell commands, then answers several search queries over their combined output, in one call. Use it to collect facts from more than one command at once, for example test results plus recent commits, when you need specific answers rather than the full text. Returns the matching sections and a one-line footer.',
   ctx_index: 'Example: `ctx_index({path:"docs/api.md"})`. Required: one of path, content, url.\nStores content so it can be searched later: a local file or folder (nested .gitignore files are respected), raw text, or a URL, which is fetched and converted to Markdown. Use it for documentation or large files you will query more than once, then use ctx_search instead of reading the content again. Returns the source label and how many chunks were stored.',
-  ctx_search: 'Example: `ctx_search({queries:["auth middleware"]})`. Required: queries.\nSearches content stored with ctx_index and earlier sandbox output in this project. Memory files such as AGENTS.md are searched too. Pass several queries in one call. By default it searches the current worktree; set `scope` to `project` for all worktrees or `session` for this session only. Results from the current session rank first, then by relevance, ranked with measurably better recall than plain keyword search. Set `sort` to `timeline` for oldest-first order across this session, prior sessions and memory, paged with `after`; `offset` is for relevance order only. Set `source` to `decision` to search only rows where the user answered a question. Every hit names its source. When nothing matches, the reply states the scope and how many sources are indexed.',
+  ctx_search: 'Example: `ctx_search({queries:["auth middleware"]})`. Required: queries.\nSearches content stored with ctx_index and earlier sandbox output in this project. Memory files such as AGENTS.md are searched too. Pass several queries in one call. By default it searches the current worktree; set `scope` to `project` for all worktrees or `session` for this session only. Results from the current session rank first, then by relevance, ranked with measurably better recall than plain keyword search. Set `sort` to `timeline` for oldest-first order across this session, prior sessions and memory, paged with `after`; `offset` is for relevance order only. Set `source` to `decision` to search only rows where the user answered a question. Every hit names its source. Set `source` with queries `[""]` to read that source whole, in order, a full page per call; `More:` gives the next `offset`. When nothing matches, the reply states the scope and how many sources are indexed.',
   ctx_resume: "Example: `ctx_resume({})`. Required: none.\nReturns a summary of up to 2 KB for this session: the last task and user request, files changed, open errors, and search terms for ctx_search. A large row is shown as a pointer line instead of its full text; call `ctx_resume(seq: N)` with that line's number to read the full row. Call it with no `seq` to get the state block on demand. Use it after the conversation was compacted or resumed, before you repeat earlier work.",
   ctx_stats: "Example: `ctx_stats({})`. Required: none.\nReports the bytes context-mode kept out of the chat: a text report (bars, per tool, per agent) and a Markdown table. Show the text block to the user unchanged, in a code block. Use it when the user asks what it saved.",
   ctx_doctor: "Example: `ctx_doctor({})`. Required: none.\nChecks this context-mode install and reports a table with one row per check: version, Node and node:sqlite, host config and hooks for this agent, MCP connection, project and worktree, database health, index contents, and hook timing. Each failed row names its cause, the fix and a docs link. Use it when the user asks whether context-mode works, or after a context-mode error. Run each Fix first, then call ctx_doctor again. If a FAIL stays, show the user the report file it names (it holds paths and environment details) and ask before you run the printed gh issue command.\n",

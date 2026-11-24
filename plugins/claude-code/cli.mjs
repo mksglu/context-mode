@@ -16,14 +16,6 @@ import { fileURLToPath as fileURLToPath3 } from "node:url";
 var SERVER_KEY = "context-mode";
 var TOOL_ORDER = Object.freeze(["ctx_execute", "ctx_batch", "ctx_index", "ctx_search", "ctx_resume", "ctx_stats", "ctx_doctor", "ctx_upgrade", "ctx_purge"]);
 var OUTPUT_CAP = 16384;
-var REPLACE_TRIGGER_BYTES_DEFAULT = 4096;
-var REPLACE_TRIGGER_ENV = "CTX_REPLACE_TRIGGER_BYTES";
-function readReplaceTrigger(raw) {
-  if (raw === void 0 || raw.trim() === "") return REPLACE_TRIGGER_BYTES_DEFAULT;
-  const n3 = Number(raw);
-  return Number.isSafeInteger(n3) && n3 > 0 ? n3 : REPLACE_TRIGGER_BYTES_DEFAULT;
-}
-var REPLACE_TRIGGER_BYTES = readReplaceTrigger(process.env[REPLACE_TRIGGER_ENV]);
 var RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
 var READ_RANGE_KEYS = Object.freeze(["offset", "limit", "view_range"]);
 var SKILL_LOAD_TOOLS = Object.freeze(["Skill"]);
@@ -517,6 +509,7 @@ var OPENCODE_CONFIG_DIR_ENV = "OPENCODE_CONFIG_DIR";
 var APPDATA_ENV = "APPDATA";
 var VSCODE_USER_DIR_SEGMENTS = Object.freeze(["Code", "User"]);
 var XDG_CONFIG_HOME_ENV = "XDG_CONFIG_HOME";
+var PI_CONFIG_DIR_ENV = "PI_CONFIG_DIR";
 var CONFIG_TOML_FILE = "config.toml";
 var CONFIG_JSON_FILE = "config.json";
 var ZCODE_CLI_DIR = "cli";
@@ -4921,7 +4914,8 @@ var ERROR_TEXT = Object.freeze({
   NO_RUNTIME: "No <lang> runtime on PATH. Fix: install it or pick another language.",
   FETCH_FAILED: "Fetch failed: <code>. Fix: check the URL or proxy.",
   SSRF: "Blocked private address <host>. Fix: use a public URL.",
-  OUTSIDE_ROOT: "Path <p> is outside the project. Fix: use a path inside <root>.",
+  OUTSIDE_ROOT: "Path <p> is outside the project and the folders added to this session. Fix: use a path inside <root>, or add its folder to the session (Claude Code /add-dir, Codex --add-dir).",
+  // #1398 D-1398-HOST-ROOTS-1
   INVALID_ARGS: "Invalid argument <field>. Fix: <action>.",
   ONE_OF_INPUT: "Pass exactly one of <names>. Fix: drop the extra field.",
   SPAWN_FAILED: "Failed to start the process: <detail>. Fix: check the command and PATH.",
@@ -5057,6 +5051,13 @@ function opencodeDirOf(env, home) {
 function piAgentDirOf(env, home) {
   const dir = env[PI_AGENT_DIR_ENV];
   return dir !== void 0 && dir !== "" ? dir : join2(home, ...AGENT_HOME_DIR.pi, PI_AGENT_DIR);
+}
+function ompConfigRootOf(env, home) {
+  const dir = env[PI_CONFIG_DIR_ENV];
+  return dir !== void 0 && dir !== "" ? join2(home, dir) : join2(home, ...AGENT_HOME_DIR.omp);
+}
+function ompAgentDirOf(env, home) {
+  return join2(ompConfigRootOf(env, home), PI_AGENT_DIR);
 }
 function vscodeUserDirOf(env, home, platform = process.platform) {
   const set2 = (v) => v !== void 0 && v !== "";
@@ -8211,8 +8212,8 @@ var ENABLED_PROVIDERS = "enabledProviders";
 var DISABLED_PROVIDERS = "disabledProviders";
 var CLAUDE_PROVIDER = "claude";
 var ALL_PROVIDERS = ["*", "all"];
-function ompImportFiles(home) {
-  const agentDir = join11(home, ...AGENT_HOME_DIR.omp, PI_AGENT_DIR);
+function ompImportFiles(env, home) {
+  const agentDir = ompAgentDirOf(env, home);
   return { config: join11(agentDir, OMP_CONFIG_FILE), mcp: join11(agentDir, OMP_MCP_FILE), claude: join11(home, CLAUDE_USER_CONFIG_FILE) };
 }
 function readText2(file) {
@@ -8634,7 +8635,9 @@ function copyFor(ctx, id) {
 }
 var LIST = {
   "claude-code": { bin: "claude", args: ["plugin", "list"] },
-  codex: { bin: "codex", args: ["mcp", "list"] },
+  // D-1413-CODEX-LIST-1 (#1413): `mcp list` runs OAuth discovery (network, 5 s cap per server) and keyring reads for every
+  // server; `mcp get <name> --json` loads the same servers, plugin servers too, and looks up the exact name (no auth).
+  codex: { bin: "codex", args: ["mcp", "get", SERVER_KEY, "--json"], reader: "codex-mcp-get" },
   gemini: { bin: "gemini", args: ["extensions", "list"] },
   qwen: { bin: "qwen", args: ["extensions", "list"] },
   "copilot-cli": { bin: "copilot", args: ["mcp", "list"] },
@@ -8718,7 +8721,7 @@ function buildRegistry(ctx) {
       ...hookInstall.kind === "package" ? [] : [hookInstall.file],
       ...hookInstall.kind === "file" && hookInstall.trust ? [hookInstall.trust] : [],
       ...skillInstall.kind === "dir" ? skillInstall.files.map((f2) => f2.file) : [],
-      ...id === "omp" ? [ompImportFiles(ctx.home).mcp] : []
+      ...id === "omp" ? [ompImportFiles(ctx.env, ctx.home).mcp] : []
       // ADR-0026 decision 11: disabledServers, only when OMP imports us
     ];
     const out2 = {
@@ -9769,7 +9772,7 @@ function planSkills(row, edits) {
   }
 }
 function planOmpImport(row, edits, ctx) {
-  const files = ompImportFiles(ctx.home);
+  const files = ompImportFiles(ctx.env, ctx.home);
   if (!ompImportsUs(files, ctx.env)) return;
   planJsonKeys(row, edits, files.mcp, "json", (doc) => {
     const cur = Array.isArray(doc[OMP_DISABLED_SERVERS_KEY]) ? doc[OMP_DISABLED_SERVERS_KEY] : [];
@@ -9875,6 +9878,17 @@ function hostBroken(bin, out2) {
   const lines = out2.trim().split("\n");
   return `${b3.prefix}${b3.fix} (${(lines.find((l) => l.includes(b3.text)) ?? lines[0]).trim()})`;
 }
+function codexGetCheck(what, r2) {
+  let doc;
+  try {
+    doc = JSON.parse(`${r2.stdout}`);
+  } catch {
+    doc = void 0;
+  }
+  if (r2.status === 0 && isObj5(doc) && doc.name === SERVER_KEY) return { name: "list", ok: true };
+  const host = `${r2.stderr}`.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 3).join(" ") || `${r2.stdout}`.trim().split("\n")[0] || `exit ${r2.status}`;
+  return { name: "list", ok: false, detail: `${what} does not find ${SERVER_KEY}: ${host}` };
+}
 function listState(row, env) {
   const l = row.listCommand;
   if (!l || !hostBin(l.bin, env).file) return { status: void 0 };
@@ -9883,9 +9897,14 @@ function listState(row, env) {
     return { check: "major" in v ? opencodeListCheck(l.bin, v.major, env) : { name: "list", ok: false, detail: v.error }, status: void 0 };
   }
   const r2 = runBin(l.bin, l.args, env);
+  const what = `${l.bin} ${l.args.join(" ")}`;
+  if (r2.error?.code === "ETIMEDOUT") {
+    return { check: { name: "list", ok: false, detail: `${what} did not answer in ${VERIFY_TIMEOUT_MS / 1e3} s (${r2.signal ?? "timeout"}); run it in a terminal` }, status: void 0 };
+  }
+  if (l.reader === "codex-mcp-get") return { check: codexGetCheck(what, r2), status: void 0 };
   const out2 = `${r2.stdout}${r2.stderr}`;
   const ok = r2.status === 0 && out2.includes("context-mode");
-  const check = { name: "list", ok, detail: ok ? void 0 : `${l.bin} ${l.args.join(" ")} does not list context-mode` };
+  const check = { name: "list", ok, detail: ok ? void 0 : `${what} does not list context-mode` };
   return { check, status: r2.status === 0 ? statusOf(row, `${r2.stdout}`) : void 0, broken: r2.status === 0 ? void 0 : hostBroken(l.bin, out2) };
 }
 var DISABLE_ALL_HOOKS = "disableAllHooks";
@@ -10092,7 +10111,7 @@ function hookRegisteredCheck(row, env, list2) {
     const l = row.listCommand;
     if (!l) return { name: "hook-registered", ok: false, detail: `no list command for ${row.id}` };
     if (!list2) return { name: "hook-registered", ok: false, detail: `${l.bin} is not on PATH, so the hooks cannot be checked` };
-    return { name: "hook-registered", ok: list2.ok, detail: list2.ok ? void 0 : `${l.bin} ${l.args.join(" ")} does not list context-mode (hooks ship in ${h2.via})` };
+    return { name: "hook-registered", ok: list2.ok, detail: list2.ok ? void 0 : `${list2.detail ?? `${l.bin} ${l.args.join(" ")} does not list context-mode`} (hooks ship in ${h2.via})` };
   }
   const edits = [];
   try {

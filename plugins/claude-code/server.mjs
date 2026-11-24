@@ -17700,6 +17700,29 @@ var inputRequired = Object.assign(buildInputRequired, {
     return { method: "roots/list" };
   }
 });
+function inputResponse(responses, key) {
+  if (responses === void 0 || typeof responses !== "object" || responses === null) return { kind: "missing" };
+  const entry = responses[key];
+  if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return { kind: "missing" };
+  const candidate2 = entry;
+  if (candidate2["action"] === "accept" || candidate2["action"] === "decline" || candidate2["action"] === "cancel") {
+    const content = candidate2["content"];
+    return {
+      kind: "elicit",
+      action: candidate2["action"],
+      ...content !== null && typeof content === "object" && !Array.isArray(content) && { content }
+    };
+  }
+  if (Array.isArray(candidate2["roots"])) return {
+    kind: "roots",
+    roots: candidate2["roots"]
+  };
+  if (typeof candidate2["role"] === "string" && candidate2["content"] !== void 0) return {
+    kind: "sampling",
+    result: candidate2
+  };
+  return { kind: "missing" };
+}
 var REQUEST_STATE_ONLY_LEG_PACING_MS = 250;
 function inputRequiredRoundsExceededMessage(method, maxRounds) {
   return `Multi-round-trip request '${method}' still required input after ${maxRounds} rounds (inputRequired.maxRounds)`;
@@ -28065,14 +28088,8 @@ var REPORT_CAP = 4096;
 var POINTER_MIN = 640;
 var STATE_CLOSE_TAG = "</context_mode_state>";
 var INDEX_WRITE_CHUNK = 1048576;
-var REPLACE_TRIGGER_BYTES_DEFAULT = 4096;
+var REPLACE_TRIGGER_BYTES = 4096;
 var REPLACE_TRIGGER_ENV = "CTX_REPLACE_TRIGGER_BYTES";
-function readReplaceTrigger(raw) {
-  if (raw === void 0 || raw.trim() === "") return REPLACE_TRIGGER_BYTES_DEFAULT;
-  const n = Number(raw);
-  return Number.isSafeInteger(n) && n > 0 ? n : REPLACE_TRIGGER_BYTES_DEFAULT;
-}
-var REPLACE_TRIGGER_BYTES = readReplaceTrigger(process.env[REPLACE_TRIGGER_ENV]);
 var RANGE_READ_TOOLS = Object.freeze(["Read", "view"]);
 var READ_RANGE_KEYS = Object.freeze(["offset", "limit", "view_range"]);
 var SKILL_LOAD_TOOLS = Object.freeze(["Skill"]);
@@ -28243,7 +28260,7 @@ var TOOLS_TTL_MS = 36e5;
 var IN_PROCESS_TIMEOUT_MS = 0;
 var MS_PER_DAY = 864e5;
 var PROJECT_KEY_HEX_LEN = 16;
-var SCHEMA_VERSION = 6;
+var SCHEMA_VERSION = 7;
 var RETENTION_IDLE_DAYS = 30;
 var RETENTION_SIZE_CAP_BYTES = 524288e3;
 var PROJECT_DEAD_IDLE_DAYS = 14;
@@ -28285,6 +28302,7 @@ var SETTINGS_LOCAL_FILE = "settings.local.json";
 var DEFAULT_PLUGIN_SCOPE = "user";
 var PROJECT_PLUGIN_SCOPES = Object.freeze(["local", "project"]);
 var PLUGIN_SCOPE_RANK = Object.freeze({ local: 0, project: 1, user: 2, managed: 2 });
+var MCP_SERVER_TOOL_PREFIX = "mcp__";
 var MCP_HINT_EVERY_DEFAULT = 10;
 function readHintEvery(raw) {
   if (raw === void 0 || raw.trim() === "") return MCP_HINT_EVERY_DEFAULT;
@@ -28372,8 +28390,10 @@ var OWN_TOOL_PREFIX = "ctx_";
 var EDIT_TOOLS = Object.freeze(["Write", "Edit"]);
 var EDIT_PATH_KEYS = Object.freeze(["file_path", "path"]);
 var RECALL_MIN_SCORE = 5;
+var LOSTBET_META_PREFIX = "lostbet:";
 var RECALL_QUERY_MAX_TERMS = 64;
 var RECALL_UNIT_CANDIDATES = 64;
+var SUBAGENT_SOURCE_PREFIX = "subagent:";
 var AGENT_ARG = "--agent";
 var DECAY_SCALE = 1e3;
 var PERCENT_SCALE = 100;
@@ -28453,7 +28473,7 @@ function PURGE_SUMMARY(rows, scope) {
 var DECISION_SOURCE = "decision";
 var DECISION_USER_LABEL = "decision (user)";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
-var BUNDLE_SHA = true ? "ae2e1bb106e462a19ab3c042e371cd8a7f691074" : void 0;
+var BUNDLE_SHA = true ? "f41c429ae530a3fec5bda3c12a8ecdc2a5f14ada" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10", "D11"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -28892,6 +28912,7 @@ var OMP_CONTENT_INFO = "OMP keeps tool output in content; context-mode writes it
 var OMP_PRINT_MODE_INFO = "Print mode sends no prompt event. Use omp or omp --mode rpc to keep prompts.";
 var OMP_SCRIPTS_INFO = "Add < /dev/null in scripts.";
 var OMP_IMPORT_INFO = (claude, mcp) => `OMP also imports context-mode from ${claude}. To run it once, add "context-mode" to disabledServers in ${mcp}.`;
+var REPLACE_TRIGGER_RETIRED_INFO = (where) => `${REPLACE_TRIGGER_ENV} in ${where} is no longer read: context-mode stores every tool output over ${REPLACE_TRIGGER_BYTES} B whole and ctx_search reads it back. You can remove that line from ${where}.`;
 var PI_CURRENT_MAJOR = 2;
 var V1_OPENCODE_PLUGIN_SPEC = "context-mode";
 var V1_TMP_PREFIX = "context-mode-";
@@ -28911,6 +28932,10 @@ var OPENCODE_CONFIG_DIR_ENV = "OPENCODE_CONFIG_DIR";
 var APPDATA_ENV = "APPDATA";
 var VSCODE_USER_DIR_SEGMENTS = Object.freeze(["Code", "User"]);
 var XDG_CONFIG_HOME_ENV = "XDG_CONFIG_HOME";
+var XDG_DATA_HOME_ENV = "XDG_DATA_HOME";
+var PI_CONFIG_DIR_ENV = "PI_CONFIG_DIR";
+var OMP_APP_DIR = "omp";
+var OMP_PLUGINS_DIR = "plugins";
 var CONFIG_TOML_FILE = "config.toml";
 var CONFIG_JSON_FILE = "config.json";
 var ZCODE_CLI_DIR = "cli";
@@ -29128,7 +29153,8 @@ var ERROR_TEXT = Object.freeze({
   NO_RUNTIME: "No <lang> runtime on PATH. Fix: install it or pick another language.",
   FETCH_FAILED: "Fetch failed: <code>. Fix: check the URL or proxy.",
   SSRF: "Blocked private address <host>. Fix: use a public URL.",
-  OUTSIDE_ROOT: "Path <p> is outside the project. Fix: use a path inside <root>.",
+  OUTSIDE_ROOT: "Path <p> is outside the project and the folders added to this session. Fix: use a path inside <root>, or add its folder to the session (Claude Code /add-dir, Codex --add-dir).",
+  // #1398 D-1398-HOST-ROOTS-1
   INVALID_ARGS: "Invalid argument <field>. Fix: <action>.",
   ONE_OF_INPUT: "Pass exactly one of <names>. Fix: drop the extra field.",
   SPAWN_FAILED: "Failed to start the process: <detail>. Fix: check the command and PATH.",
@@ -29287,13 +29313,22 @@ CREATE VIRTUAL TABLE line_units USING fts5(
 var DDL_V6 = `
 UPDATE sources SET label = replace(label, char(92), '/') WHERE kind = 'path' AND instr(label, char(92)) > 0;
 `;
+var DDL_V7 = `
+ALTER TABLE sources ADD COLUMN unit_lo INTEGER;
+ALTER TABLE sources ADD COLUMN unit_hi INTEGER;
+CREATE INDEX IF NOT EXISTS idx_sources_session ON sources(session_id, id);
+UPDATE sources SET unit_lo = g.lo, unit_hi = g.hi
+  FROM (SELECT source_id, MIN(rowid) AS lo, MAX(rowid) AS hi FROM line_units GROUP BY source_id) AS g
+  WHERE g.source_id = sources.id;
+`;
 var MIGRATIONS = [
   { version: 1, sql: DDL },
   { version: 2, sql: DDL_V2 },
   { version: 3, sql: DDL_V3 },
   { version: 4, sql: DDL_V4 },
   { version: 5, sql: DDL_V5 },
-  { version: 6, sql: DDL_V6 }
+  { version: 6, sql: DDL_V6 },
+  { version: 7, sql: DDL_V7 }
 ];
 function applyMigrations(db, fromVersion) {
   if (fromVersion === SCHEMA_VERSION2) return;
@@ -29473,6 +29508,18 @@ function closeDb(db) {
     db.raw.close();
   } catch {
   }
+}
+function inWrite(db, fn) {
+  return db.raw.isTransaction ? fn(db) : withWrite(db, fn);
+}
+function metaGet(db, key) {
+  const row5 = db.raw.prepare("SELECT value FROM meta WHERE key = ?").get(key);
+  return row5 === void 0 ? null : row5.value;
+}
+function metaSet(db, key, v) {
+  inWrite(db, (h) => {
+    h.raw.prepare("INSERT INTO meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, v);
+  });
 }
 
 // src/core/journal/append.ts
@@ -29695,6 +29742,24 @@ function piAgentDirOf(env, home) {
   const dir = env[PI_AGENT_DIR_ENV];
   return dir !== void 0 && dir !== "" ? dir : join(home, ...AGENT_HOME_DIR.pi, PI_AGENT_DIR);
 }
+function ompConfigRootOf(env, home) {
+  const dir = env[PI_CONFIG_DIR_ENV];
+  return dir !== void 0 && dir !== "" ? join(home, dir) : join(home, ...AGENT_HOME_DIR.omp);
+}
+function ompAgentDirOf(env, home) {
+  return join(ompConfigRootOf(env, home), PI_AGENT_DIR);
+}
+function ompPluginsDirOf(env, home, platform = process.platform) {
+  const root = ompConfigRootOf(env, home);
+  const xdg = env[XDG_DATA_HOME_ENV];
+  const agent = env[PI_AGENT_DIR_ENV];
+  const defaultAgent = agent === void 0 || agent === "" || resolve(agent) === join(root, PI_AGENT_DIR);
+  if ((platform === "linux" || platform === "darwin") && defaultAgent && xdg !== void 0 && xdg !== "") {
+    const app = join(xdg, OMP_APP_DIR);
+    if (existsSync2(app)) return join(app, OMP_PLUGINS_DIR);
+  }
+  return join(root, OMP_PLUGINS_DIR);
+}
 function vscodeUserDirOf(env, home, platform = process.platform) {
   const set3 = (v) => v !== void 0 && v !== "";
   const p = platform === "win32" ? win32 : posix;
@@ -29749,6 +29814,10 @@ function isInside(root, p) {
     if (rc[i] !== qc[i]) return false;
   }
   return true;
+}
+function allowedRootOf(containmentRoot, hostRoots, p) {
+  if (isInside(containmentRoot, p)) return containmentRoot;
+  return hostRoots?.find((r) => isInside(r, p));
 }
 function commonRoot(paths) {
   const reals = paths.map(real).filter((r) => r !== void 0);
@@ -32059,11 +32128,13 @@ function deleteChunkRows(raw, scope) {
   if (scope === "all") {
     raw.exec("INSERT INTO chunks_tri(chunks_tri) VALUES ('delete-all')");
     raw.exec("DELETE FROM line_units");
+    raw.exec("UPDATE sources SET unit_lo = NULL, unit_hi = NULL WHERE unit_lo IS NOT NULL");
     return Number(raw.prepare("DELETE FROM chunks").run().changes);
   }
-  const [where, arg] = "sourceId" in scope ? ["source_id = ?", scope.sourceId] : ["source_id IN (SELECT id FROM sources WHERE label = ?)", scope.label];
+  const [where, arg, own4] = "sourceId" in scope ? ["source_id = ?", scope.sourceId, "id = ?"] : ["source_id IN (SELECT id FROM sources WHERE label = ?)", scope.label, "label = ?"];
   raw.prepare(TRI_DELETE + " WHERE " + where).run(arg);
   raw.prepare("DELETE FROM line_units WHERE " + where).run(arg);
+  raw.prepare("UPDATE sources SET unit_lo = NULL, unit_hi = NULL WHERE " + own4).run(arg);
   return Number(raw.prepare("DELETE FROM chunks WHERE " + where).run(arg).changes);
 }
 function toMatch(q) {
@@ -32591,9 +32662,15 @@ function recallQueryText(prompt) {
 function queryUnits(db, sessionId, q, limit, maxSourceId = Number.MAX_SAFE_INTEGER) {
   const match = searchTerms(q).join(" OR ");
   if (match === "" || sessionId === "") return [];
-  const rows = db.raw.prepare(
-    "SELECT u.source_id AS source_id, u.ord AS ord, u.body AS body, -bm25(line_units) AS score, s.label AS label FROM line_units u JOIN sources s ON s.id = u.source_id WHERE line_units MATCH ? AND u.session_id = ? AND s.id <= ? ORDER BY bm25(line_units) LIMIT ?"
-  ).all(match, sessionId, maxSourceId, limit);
+  const span2 = stmt(
+    db.raw,
+    "SELECT MIN(unit_lo) AS lo, MAX(unit_hi) AS hi FROM sources WHERE session_id = ? AND id <= ? AND unit_lo IS NOT NULL"
+  ).get(sessionId, maxSourceId);
+  if (span2 === void 0 || span2.lo === null || span2.hi === null) return [];
+  const rows = stmt(
+    db.raw,
+    "SELECT u.source_id AS source_id, u.ord AS ord, u.body AS body, -bm25(line_units) AS score, s.label AS label FROM line_units u JOIN sources s ON s.id = u.source_id WHERE line_units MATCH ? AND u.rowid BETWEEN ? AND ? AND u.session_id = ? AND s.id <= ? ORDER BY bm25(line_units) LIMIT ?"
+  ).all(match, span2.lo, span2.hi, sessionId, maxSourceId, limit);
   return rows.map((r) => ({ sourceId: Number(r.source_id), ord: Number(r.ord), label: r.label, body: r.body, score: r.score }));
 }
 
@@ -43887,7 +43964,7 @@ var TOOL_DESCRIPTIONS = Object.freeze({
   ctx_execute: 'Example: `ctx_execute({language:"shell",code:"git log --oneline -5"})`. Required: language, code.\nWrite code that prints only the answer, not the raw data. Runs code in a sandboxed subprocess in the project directory (shell, powershell, javascript, typescript, python, or another runtime on PATH); only what the code prints comes back. For a large file, set `file` to its local path: the code gets it in the CTX_FILE environment variable. Set `intent` when output may be large: the matching sections come back and the full output is indexed for ctx_search. `timeoutMs` defaults to and caps at 600000; then the whole process tree is killed.',
   ctx_batch: 'Example: `ctx_batch({commands:["git log --oneline -5"],queries:["recent changes"]})`. Required: commands, queries.\nRuns several shell commands, then answers several search queries over their combined output, in one call. Use it to collect facts from more than one command at once, for example test results plus recent commits, when you need specific answers rather than the full text. Returns the matching sections and a one-line footer.',
   ctx_index: 'Example: `ctx_index({path:"docs/api.md"})`. Required: one of path, content, url.\nStores content so it can be searched later: a local file or folder (nested .gitignore files are respected), raw text, or a URL, which is fetched and converted to Markdown. Use it for documentation or large files you will query more than once, then use ctx_search instead of reading the content again. Returns the source label and how many chunks were stored.',
-  ctx_search: 'Example: `ctx_search({queries:["auth middleware"]})`. Required: queries.\nSearches content stored with ctx_index and earlier sandbox output in this project. Memory files such as AGENTS.md are searched too. Pass several queries in one call. By default it searches the current worktree; set `scope` to `project` for all worktrees or `session` for this session only. Results from the current session rank first, then by relevance, ranked with measurably better recall than plain keyword search. Set `sort` to `timeline` for oldest-first order across this session, prior sessions and memory, paged with `after`; `offset` is for relevance order only. Set `source` to `decision` to search only rows where the user answered a question. Every hit names its source. When nothing matches, the reply states the scope and how many sources are indexed.',
+  ctx_search: 'Example: `ctx_search({queries:["auth middleware"]})`. Required: queries.\nSearches content stored with ctx_index and earlier sandbox output in this project. Memory files such as AGENTS.md are searched too. Pass several queries in one call. By default it searches the current worktree; set `scope` to `project` for all worktrees or `session` for this session only. Results from the current session rank first, then by relevance, ranked with measurably better recall than plain keyword search. Set `sort` to `timeline` for oldest-first order across this session, prior sessions and memory, paged with `after`; `offset` is for relevance order only. Set `source` to `decision` to search only rows where the user answered a question. Every hit names its source. Set `source` with queries `[""]` to read that source whole, in order, a full page per call; `More:` gives the next `offset`. When nothing matches, the reply states the scope and how many sources are indexed.',
   ctx_resume: "Example: `ctx_resume({})`. Required: none.\nReturns a summary of up to 2 KB for this session: the last task and user request, files changed, open errors, and search terms for ctx_search. A large row is shown as a pointer line instead of its full text; call `ctx_resume(seq: N)` with that line's number to read the full row. Call it with no `seq` to get the state block on demand. Use it after the conversation was compacted or resumed, before you repeat earlier work.",
   ctx_stats: "Example: `ctx_stats({})`. Required: none.\nReports the bytes context-mode kept out of the chat: a text report (bars, per tool, per agent) and a Markdown table. Show the text block to the user unchanged, in a code block. Use it when the user asks what it saved.",
   ctx_doctor: "Example: `ctx_doctor({})`. Required: none.\nChecks this context-mode install and reports a table with one row per check: version, Node and node:sqlite, host config and hooks for this agent, MCP connection, project and worktree, database health, index contents, and hook timing. Each failed row names its cause, the fix and a docs link. Use it when the user asks whether context-mode works, or after a context-mode error. Run each Fix first, then call ctx_doctor again. If a FAIL stays, show the user the report file it names (it holds paths and environment details) and ask before you run the printed gh issue command.\n",
@@ -44516,6 +44593,31 @@ function runProcess(argv, o) {
   });
 }
 
+// src/core/store/lost-bet.ts
+function lostKey(sessionId, key) {
+  return LOSTBET_META_PREFIX + sessionId + ":" + key;
+}
+function isLostBet(db, sessionId, key) {
+  return sessionId !== "" && metaGet(db, lostKey(sessionId, key)) !== null;
+}
+function markLostBet(db, sessionId, key, reason, source) {
+  if (sessionId === "" || key === "") return;
+  try {
+    metaSet(db, lostKey(sessionId, key), JSON.stringify({ at: Date.now(), reason, source }));
+  } catch {
+  }
+}
+function betKeyOfLabel(label2) {
+  if (label2.startsWith(SUBAGENT_SOURCE_PREFIX)) return null;
+  const hash = label2.lastIndexOf("#");
+  if (hash <= 0) return null;
+  const stem = label2.slice(0, hash);
+  const colon = stem.indexOf(":");
+  if (colon <= 0) return null;
+  if (colon + 1 < stem.length || stem.startsWith(MCP_SERVER_TOOL_PREFIX)) return stem;
+  return null;
+}
+
 // src/core/index/auto-memory.ts
 import { readdirSync as readdirSync4, readFileSync as readFileSync4, statSync as statSync4 } from "node:fs";
 import { join as join6 } from "node:path";
@@ -44701,9 +44803,9 @@ function unknownSource(db, scope, ctx, given) {
   return line + "\nStored sources, newest first: " + names.join(", ") + more + ". " + callText([], scope, void 0, 'sort:"timeline"') + " lists them all.";
 }
 function named(given, pick4) {
-  if (given === void 0 || pick4 === null) return { arg: given, note: null, pick: null };
+  if (given === void 0 || pick4 === null) return { arg: given, note: null, pick: null, lost: null };
   const arg = pick4.id !== null && isLongLabel(given) ? sourceHandle(pick4.id) : given;
-  return { arg, note: collisionLine(given, pick4), pick: pick4 };
+  return { arg, note: collisionLine(given, pick4), pick: pick4, lost: null };
 }
 function sourceCard(db, id, input, scope, arg) {
   const row5 = sourceCardRow(db, id);
@@ -44727,7 +44829,7 @@ function decisionQueries(input) {
 function pageSize(input) {
   return input.source === DECISION_SOURCE ? SEARCH_PAGE_SIZE : SEARCH_REPLY_HITS;
 }
-function page(db, q, input, scope, ctx, offset, extra = 0) {
+function page(db, q, input, scope, ctx, offset, extra = 0, h9 = { n: 0, list: true }) {
   const size = pageSize(input) + extra;
   if (input.source === DECISION_SOURCE && q.trim() === "") {
     return ftsListSource(db, DECISION_SOURCE, scope, ctx.project, ctx.sessionId, size, offset);
@@ -44736,6 +44838,8 @@ function page(db, q, input, scope, ctx, offset, extra = 0) {
   if (hits.length > 0 || input.source === void 0) return hits;
   const any3 = offset === 0 ? hits : ftsQuery(db, q, scope, ctx.project, ctx.sessionId, 1, 0, input.source);
   if (any3.length > 0) return hits;
+  h9.n++;
+  if (!h9.list) return [];
   return ftsListSource(db, input.source, scope, ctx.project, ctx.sessionId, size, offset);
 }
 var JSON_ROWS_PAGE = 5;
@@ -44824,15 +44928,27 @@ function relevance(db, given, scope, ctx, nm, ms, indexed) {
   const size = pageSize(input);
   const mem = ms.named || offset === 0 ? memoryChunks(ms.rows) : [];
   const count2 = (hits, n) => ms.named ? Math.min(n, hits.length) : contentIn(hits, n);
-  const fetched = input.queries.map((q) => {
+  const h9 = { n: 0, list: false };
+  const listed = [];
+  const fetched = input.queries.map((q, qi) => {
     if (ms.named) {
       const want = offset + size + 1;
       const content2 = indexed ? ftsQuery(db, q, scope, ctx.project, ctx.sessionId, want, 0, input.source) : [];
       return mergeMemory(content2, memoryHits(mem, q, want)).slice(offset, want);
     }
-    const content = page(db, q, input, scope, ctx, offset, 1);
+    const before = h9.n;
+    const content = page(db, q, input, scope, ctx, offset, 1, h9);
+    if (h9.n > before) listed.push(qi);
     return mem.length === 0 ? content : mergeMemory(content, memoryHits(mem, q, MEMORY_HITS));
   });
+  if (listed.length > 0 && listed.length === input.queries.length) {
+    const ordered = orderedRead(db, input, scope, ctx, nm);
+    if (ordered !== null) return ordered;
+  }
+  for (const qi of listed) {
+    const content = ftsListSource(db, input.source, scope, ctx.project, ctx.sessionId, size + 1, offset);
+    fetched[qi] = mem.length === 0 ? content : mergeMemory(content, memoryHits(mem, input.queries[qi], MEMORY_HITS));
+  }
   const take = fetched.map((h) => replyHits(h, size));
   const pages = fetched.map((h, i) => h.slice(0, take[i]));
   if (pages.every((p) => p.length === 0)) return zeroHits(db, scope, ctx, input.source, ms, nm, input.queries, offset);
@@ -44897,6 +45013,49 @@ function relevance(db, given, scope, ctx, nm, ms, indexed) {
   for (const [pos, qs] of byPos) moreLines.push("More: " + callText(qs, scope, nm.arg, "offset:" + pos));
   return reply(lines.concat(moreLines).join("\n"), false);
 }
+var ORDERED_LINE_BACK = 512;
+var SOURCE_IN_SCOPE = `
+SELECT session_id FROM sources WHERE id = :id
+  AND (:scope <> 'session' OR session_id = :session_id)
+  AND (:scope <> 'worktree' OR worktree = :worktree)`;
+function sourceText(db, id) {
+  const rows = db.raw.prepare("SELECT body FROM chunks WHERE source_id = ? ORDER BY CAST(ord AS INTEGER)").all(id);
+  const parts = [];
+  for (let i = 0; i < rows.length; i++) {
+    const body = rows[i].body;
+    parts.push(body);
+    if (i + 1 < rows.length && !body.endsWith("\n") && bytes2(body) < MAX_CHUNK_BYTES - 3) parts.push("\n\n");
+  }
+  return parts.join("");
+}
+function orderedRead(db, input, scope, ctx, nm) {
+  const pick4 = nm.pick;
+  if (pick4 === null || pick4.id === null || input.source === void 0 || input.source === DECISION_SOURCE) return null;
+  const where = { id: pick4.id, scope, session_id: ctx.sessionId, worktree: ctx.project.worktree };
+  const row5 = db.raw.prepare(SOURCE_IN_SCOPE).get(where);
+  if (row5 === void 0) return null;
+  const buf = Buffer.from(sourceText(db, pick4.id), "utf8");
+  const total = buf.length;
+  if (total === 0) return null;
+  const name = isLongLabel(pick4.label) ? shownLabel(pick4.label, pick4.id) : JSON.stringify(pick4.label);
+  let start = Math.min(input.offset ?? 0, total);
+  while (start < total && (buf[start] & 192) === 128) start++;
+  if (start >= total) return reply("No more text past offset " + start + " in source " + name + " (" + total + " B).", false);
+  const note = nm.note === null ? "" : " " + nm.note;
+  const headOf2 = (end2) => "Source " + name + " in order, bytes " + start + "-" + end2 + " of " + total + ":" + note;
+  const moreOf = (end2) => "More: " + callText([""], scope, nm.arg, "offset:" + end2);
+  let end = total;
+  if (bytes2(headOf2(total)) + 1 + (total - start) > OUTPUT_CAP) {
+    end = start + OUTPUT_CAP - bytes2(headOf2(total)) - 1 - bytes2(moreOf(total)) - 1;
+    while (end > start && (buf[end] & 192) === 128) end--;
+    const nl = buf.lastIndexOf(10, end - 1);
+    if (nl >= start && nl + 1 > end - ORDERED_LINE_BACK) end = nl + 1;
+  }
+  const text = buf.subarray(start, end).toString("utf8");
+  const key = end * 2 >= total ? betKeyOfLabel(pick4.label) : null;
+  if (key !== null && !isLostBet(db, row5.session_id, key)) nm.lost = { sessionId: row5.session_id, key, source: sourceHandle(pick4.id) };
+  return reply(headOf2(end) + "\n" + text + (end < total ? "\n" + moreOf(end) : ""), false);
+}
 function timelineLine(r) {
   const nl = r.text.indexOf("\n");
   const first = nl < 0 ? r.text : r.text.slice(0, nl);
@@ -44957,6 +45116,7 @@ async function handler(input, ctx) {
   }
   const scope = input.scope ?? "worktree";
   const db = await openDb(ctx.project, { readOnly: true });
+  let lost = null;
   try {
     const given = input.source;
     const within = { scope, sessionId: ctx.sessionId, worktree: ctx.project.worktree };
@@ -44972,11 +45132,24 @@ async function handler(input, ctx) {
       nm.note = nm.note === null ? both : nm.note + "\n" + both;
     }
     const out = answer(db, input, scope, ctx, nm, ms, indexed, sort, pick4);
+    lost = nm.lost;
     if (file2 === null || scope !== "session") return out;
     const call = callText(input.queries, "worktree", nm.arg, sort === "timeline" ? 'sort:"timeline"' : "");
     return reply(out.text + "\nMemory file " + file2.label + ' is in scope "worktree": ' + call + " searches it.", out.isError);
   } finally {
     closeDb(db);
+    if (lost !== null) await recordLostBet(ctx, lost);
+  }
+}
+async function recordLostBet(ctx, lost) {
+  try {
+    const w = await openDb(ctx.project);
+    try {
+      markLostBet(w, lost.sessionId, lost.key, "ordered-read", lost.source);
+    } finally {
+      closeDb(w);
+    }
+  } catch {
   }
 }
 var ctxSearch = Object.freeze({
@@ -49640,8 +49813,8 @@ var ENABLED_PROVIDERS = "enabledProviders";
 var DISABLED_PROVIDERS = "disabledProviders";
 var CLAUDE_PROVIDER = "claude";
 var ALL_PROVIDERS = ["*", "all"];
-function ompImportFiles(home) {
-  const agentDir = join12(home, ...AGENT_HOME_DIR.omp, PI_AGENT_DIR);
+function ompImportFiles(env, home) {
+  const agentDir = ompAgentDirOf(env, home);
   return { config: join12(agentDir, OMP_CONFIG_FILE), mcp: join12(agentDir, OMP_MCP_FILE), claude: join12(home, CLAUDE_USER_CONFIG_FILE) };
 }
 function readText2(file2) {
@@ -50024,7 +50197,7 @@ function checkHostConfig(row5, env, worktree) {
     if ("installs" in choice) return fail2("D3", D3_ROOT_DETAIL(choice.installs.map((r) => r.installPath)), D3_ROOT_FIX(choice.installs));
   }
   if (row5.id === "pi") return checkPiInstall(env, home, worktree);
-  if (row5.id === "omp") return checkOmpInstall(home);
+  if (row5.id === "omp") return checkOmpInstall(env, home);
   const parts = [...mcpWrong(row5, home, env, worktree) ? [PART_MCP] : [], ...hookParts(row5, home, env, worktree)];
   if (parts.length === 0) return pass2("D3");
   const detail = D3_DETAIL(parts);
@@ -50036,7 +50209,6 @@ function checkPiInstall(env, home, worktree) {
   if (found !== void 0) return { ...pass2("D3"), detail: found };
   return fail2("D3", D3_DETAIL([PART_MCP]) + D4_REASON_JOIN + join13(piAgentDirOf(env, home), SETTINGS_FILE), NATIVE_INSTALL.pi[0]);
 }
-var OMP_PLUGINS_DIR = "plugins";
 var OMP_LOCK_FILE = "omp-plugins.lock.json";
 function readJson2(file2) {
   try {
@@ -50050,8 +50222,8 @@ function ownEntry(doc, key) {
   const map2 = doc?.[key];
   return typeof map2 === "object" && map2 !== null ? map2[SERVER_KEY] : void 0;
 }
-function checkOmpInstall(home) {
-  const dir = join13(home, ...AGENT_HOME_DIR.omp, OMP_PLUGINS_DIR);
+function checkOmpInstall(env, home) {
+  const dir = ompPluginsDirOf(env, home);
   const lock = join13(dir, OMP_LOCK_FILE);
   const pkg = join13(dir, PI_PACKAGE_JSON_FILE);
   const entry = ownEntry(readJson2(lock), "plugins");
@@ -50067,11 +50239,25 @@ function ompInfoLines(env, version4) {
   out.push(OMP_CONTENT_INFO, OMP_PRINT_MODE_INFO, OMP_SCRIPTS_INFO);
   const home = homeDirOf(env);
   if (home === null) return out;
-  const files = ompImportFiles(home);
+  const files = ompImportFiles(env, home);
   if (!ompImportsUs(files, env)) return out;
   const listed = readJson2(files.mcp)?.[OMP_DISABLED_SERVERS_KEY];
   if (!(Array.isArray(listed) && listed.includes(SERVER_KEY))) out.push(OMP_IMPORT_INFO(files.claude, files.mcp));
   return out;
+}
+function replaceTriggerInfoLines(agent, env, project) {
+  const files = [];
+  const home = homeDirOf(env);
+  if (agent === "claude-code") {
+    if (home !== null) files.push(join13(claudeDirOf(env, home), SETTINGS_FILE));
+    if (project !== void 0 && project !== "") files.push(join13(project, HOST_CONFIG_DIR_NAME, SETTINGS_FILE));
+  }
+  const where = [...new Set(files)].filter((f) => {
+    const block = readJson2(f)?.env;
+    return typeof block === "object" && block !== null && REPLACE_TRIGGER_ENV in block;
+  });
+  if (where.length > 0) return [REPLACE_TRIGGER_RETIRED_INFO(where.join(" and "))];
+  return env[REPLACE_TRIGGER_ENV] === void 0 ? [] : [REPLACE_TRIGGER_RETIRED_INFO("the process env")];
 }
 function checkV1Leftovers(agent, home, scope = {}) {
   const findings = detectV1(agent, home, scope);
@@ -53146,10 +53332,12 @@ async function doctorReply(ctx, host) {
   const look = rows.find((r) => r.status === "FAIL") ?? rows.find((r) => r.status !== "PASS");
   const docs = look === void 0 ? [] : [DOCTOR_DOCS_LABEL + DOCTOR_DOCS_LINK(look.id)];
   const info = adapter.id === "omp" ? ompInfoLines(host.env, ctx.clientInfo?.version) : [];
+  const known = projectOrMissing(ctx);
+  info.push(...replaceTriggerInfoLines(adapter.id, host.env, "missing" in known ? host.env.CLAUDE_PROJECT_DIR : known.project.worktree));
   const whole2 = [envLine2, table3, ...docs, ...info, ...notes].join("\n");
   const bytes5 = Buffer.byteLength(whole2, "utf8");
   if (bytes5 <= REPORT_CAP) return { text: whole2, isError: false, sandboxBytes: bytes5 };
-  const p = projectOrMissing(ctx);
+  const p = known;
   if ("missing" in p) return { text: whole2, isError: false, sandboxBytes: bytes5 };
   const db = await openDb(p.project);
   try {
@@ -53300,11 +53488,11 @@ function schemaLine(issue4) {
   if (issue4.code === "unrecognized_keys") return new CtxError("UNKNOWN_FIELD", { f: issue4.keys[0] }).toLine();
   return issue4.message;
 }
-function fileError(given, abs, root) {
+function fileError(given, abs, root, hostRoots) {
   let dir = abs;
   while (!existsSync19(dir) && dirname11(dir) !== dir) dir = dirname11(dir);
-  if (isInside(root, dir)) return null;
-  return new CtxError("OUTSIDE_ROOT", { p: given, root }).toLine();
+  if (allowedRootOf(root, hostRoots, dir) !== void 0) return null;
+  return { ...fail4(new CtxError("OUTSIDE_ROOT", { p: given, root }).toLine()), outsideRoot: true };
 }
 function takesDashC(language, runtime) {
   if (language === "shell") return true;
@@ -53367,8 +53555,8 @@ async function handler3(raw, ctx) {
   const extra = { ...PLAIN_OUTPUT_ENV2 };
   if (input.file !== void 0) {
     const abs = resolve8(cwd, input.file);
-    const bad = fileError(input.file, abs, ctx.project.containmentRoot);
-    if (bad !== null) return fail4(bad);
+    const bad = fileError(input.file, abs, ctx.project.containmentRoot, ctx.hostRoots);
+    if (bad !== null) return bad;
     extra.CTX_FILE = abs;
   }
   let runtime;
@@ -57685,18 +57873,19 @@ function readUtf8(absPath) {
     return void 0;
   }
 }
-function missingOrOutside(given, abs, root) {
+function missingOrOutside(given, abs, root, hostRoots) {
   let dir = abs;
   while (!existsSync20(dir) && dirname12(dir) !== dir) dir = dirname12(dir);
-  if (dir !== abs && isInside(root, dir)) return new CtxError("INVALID_ARGS", { field: "path", action: "pass an existing file or folder" });
+  if (dir !== abs && allowedRootOf(root, hostRoots, dir) !== void 0) return new CtxError("INVALID_ARGS", { field: "path", action: "pass an existing file or folder" });
   return new CtxError("OUTSIDE_ROOT", { p: given, root });
 }
-function pathItems(input, project) {
+function pathItems(input, project, hostRoots) {
   const abs = resolve9(project.worktree, input.path);
-  if (!isInside(project.containmentRoot, abs)) throw missingOrOutside(input.path, abs, project.containmentRoot);
+  const allowed = allowedRootOf(project.containmentRoot, hostRoots, abs);
+  if (allowed === void 0) throw missingOrOutside(input.path, abs, project.containmentRoot, hostRoots);
   const base = relative3(project.worktree, abs);
   if (statSync8(abs).isDirectory()) {
-    return walkDir(abs, project.containmentRoot).map((f) => ({
+    return walkDir(abs, allowed).map((f) => ({
       sourceKind: "path",
       label: pathLabel(join22(base, f.relPath)),
       kind: kindOfPath(f.relPath),
@@ -57713,7 +57902,7 @@ async function itemsOf(input, ctx) {
     return { items: [{ sourceKind: "content", label: label3, kind, read: () => text2 }], from: label3 };
   }
   if (input.path !== void 0) {
-    const items = pathItems({ ...input, path: input.path }, ctx.project);
+    const items = pathItems({ ...input, path: input.path }, ctx.project, ctx.hostRoots);
     return { items, from: items.length === 1 ? items[0].label : pathLabel(input.path) };
   }
   const res = await safeFetch(input.url ?? "", AbortSignal.any([ctx.signal, AbortSignal.timeout(EXEC_TIMEOUT_MS)]));
@@ -57780,7 +57969,7 @@ async function handler4(input, ctx) {
       journal: { kind: "index", key: from, path: from, exit_code: null }
     };
   } catch (err) {
-    if (err instanceof CtxError) return { text: err.toLine(), isError: true, sandboxBytes: 0 };
+    if (err instanceof CtxError) return { text: err.toLine(), isError: true, sandboxBytes: 0, ...err.code === "OUTSIDE_ROOT" ? { outsideRoot: true } : {} };
     throw err;
   }
 }
@@ -58673,7 +58862,7 @@ function ownEntries2(agent, env) {
   }
   if (agent === "omp") {
     return [{
-      file: ompImportFiles(home).mcp,
+      file: ompImportFiles(env, home).mcp,
       key: OMP_DISABLED_SERVERS_KEY,
       shown: OMP_DISABLED_SERVERS_KEY,
       has: (v) => Array.isArray(v) && v.includes(SERVER_KEY),
@@ -59055,6 +59244,38 @@ function workspaceFromMeta(meta3) {
     return void 0;
   }
 }
+var HOST_ROOTS_INPUT_KEY = "roots";
+var WRITE_ACCESS = "write";
+function grantedFromMeta(meta3) {
+  const state = meta3?.[CODEX_SANDBOX_STATE_META];
+  const profile = typeof state === "object" && state !== null ? state.permissionProfile : void 0;
+  const fs2 = typeof profile === "object" && profile !== null ? profile.file_system : void 0;
+  const entries = typeof fs2 === "object" && fs2 !== null ? fs2.entries : void 0;
+  if (!Array.isArray(entries)) return [];
+  const out = [];
+  for (const e of entries) {
+    const path8 = e?.path;
+    if (e?.access === WRITE_ACCESS && path8?.type === "path" && typeof path8.path === "string" && path8.path !== "") out.push(path8.path);
+  }
+  return out;
+}
+function grantedFromInput(responses) {
+  const view = inputResponse(responses, HOST_ROOTS_INPUT_KEY);
+  if (view.kind !== "roots") return void 0;
+  const out = [];
+  for (const root of view.roots) {
+    if (!root.uri.startsWith(FILE_URL_PREFIX2)) continue;
+    try {
+      out.push(fileURLToPath3(root.uri));
+    } catch {
+    }
+  }
+  return out;
+}
+function listsRoots(envelope) {
+  const caps = envelope?.[CLIENT_CAPABILITIES_META_KEY];
+  return typeof caps === "object" && caps !== null && caps.roots !== void 0;
+}
 function realOrSame(p) {
   try {
     return realpathSync12.native(p);
@@ -59142,6 +59363,8 @@ async function startServer(argv, env) {
       const agent = resolveAgent(argv, env);
       const fromRoots = agent === "vscode" && !hasWorkspaceFolder(argv) ? await workspaceFromRoots(server) : void 0;
       const callArgv = fromRoots === void 0 ? argv : [...argv, WORKSPACE_FOLDER_FLAG, fromRoots];
+      const fromInput = grantedFromInput(req.mcpReq.inputResponses);
+      const hostRoots = [...grantedFromMeta(meta3), ...fromInput ?? []];
       let project;
       const projectOf = () => {
         if (agent === void 0) throw new CtxError("NO_PROJECT", { kind: "--agent" });
@@ -59154,6 +59377,8 @@ async function startServer(argv, env) {
         },
         ...agent === void 0 ? {} : { agent },
         // D-1410-DOCTOR-NO-PROJECT-1
+        ...hostRoots.length === 0 ? {} : { hostRoots },
+        // D-1398-HOST-ROOTS-1
         sessionId: sessionIdOf(meta3, agent, env, serverId),
         turn: metaNumber(meta3, "turn") ?? 0,
         signal: req.mcpReq.signal,
@@ -59170,6 +59395,9 @@ async function startServer(argv, env) {
         } catch (err) {
           reply4 = errorReply(err);
         }
+      }
+      if (reply4.outsideRoot === true && fromInput === void 0 && listsRoots(req.mcpReq.envelope)) {
+        return inputRequired({ inputRequests: { [HOST_ROOTS_INPUT_KEY]: inputRequired.listRoots() } });
       }
       if (stopRequested()) {
         setTimeout(stopSelf, UPGRADE_STOP_DELAY_MS);
