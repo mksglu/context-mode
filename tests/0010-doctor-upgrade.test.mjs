@@ -3115,6 +3115,65 @@ describe("ADR-0026 OMP doctor: agent omp, OMP plugin store, OMP verbs, host-limi
     assert.ok(b.detail.includes(pkgFile(noDep)), b.detail);
   });
 
+  // #1415 (D-OMP-STORE-PATH-1): OMP keeps its plugin store at (xdgData ?? configRoot)/plugins, configRoot = HOME/(PI_CONFIG_DIR
+  // or .omp). xdgData = $XDG_DATA_HOME/omp only on linux and darwin, only when that dir exists and the agent dir is OMP's default
+  // (PI_CODING_AGENT_DIR unset or <configRoot>/agent). mcp.json and config.yml stay in <configRoot>/agent. Expected paths come
+  // from OMP 19.1.1's own pi-utils src/dirs.ts run under the same env (oracle table, tickets/r88-1415.md), not from our code.
+  const OMP_XDG_SKIP = process.platform === "win32" && "OMP reads XDG_DATA_HOME on linux and darwin only";
+  function installIn(storeDir) {
+    put(path.join(storeDir, "omp-plugins.lock.json"), { plugins: { "context-mode": { version: "2.2.2", enabled: true } }, settings: {} });
+    put(path.join(storeDir, "package.json"), { name: "omp-plugins", private: true, dependencies: { "context-mode": "2.2.2" } });
+  }
+  const ompStoreCases = (h) => {
+    const xdg = path.join(h, ".local", "share");
+    return [
+      { label: "XDG_DATA_HOME set and $XDG_DATA_HOME/omp exists", env: { XDG_DATA_HOME: xdg }, store: path.join(xdg, "omp", "plugins") },
+      { label: "reporter: XDG_DATA_HOME + PI_CONFIG_DIR=.config/pi", env: { XDG_DATA_HOME: xdg, PI_CONFIG_DIR: ".config/pi" }, store: path.join(xdg, "omp", "plugins") },
+      { label: "PI_CONFIG_DIR=.config/pi only", env: { PI_CONFIG_DIR: ".config/pi" }, store: path.join(h, ".config", "pi", "plugins") },
+      { label: "XDG_DATA_HOME set, no $XDG_DATA_HOME/omp dir", env: { XDG_DATA_HOME: path.join(h, "nope") }, store: path.join(h, ".omp", "plugins") },
+      { label: "XDG_DATA_HOME + non-default PI_CODING_AGENT_DIR turns XDG off", env: { XDG_DATA_HOME: xdg, PI_CODING_AGENT_DIR: path.join(h, "x") }, store: path.join(h, ".omp", "plugins"), xdgDir: true },
+      { label: "XDG_DATA_HOME + PI_CODING_AGENT_DIR = OMP's default agent dir keeps XDG", env: { XDG_DATA_HOME: xdg, PI_CODING_AGENT_DIR: path.join(h, ".omp", "agent") }, store: path.join(xdg, "omp", "plugins") },
+    ];
+  };
+
+  test("[#1415] D3 reads OMP's plugin store where OMP keeps it: $XDG_DATA_HOME/omp/plugins, the PI_CONFIG_DIR root, else ~/.omp/plugins", { skip: OMP_XDG_SKIP }, (t) => {
+    for (let i = 0; i < ompStoreCases("").length; i++) {
+      const home = tmp(t);
+      const c = ompStoreCases(home)[i];
+      if (c.xdgDir) mkdirSync(path.join(c.env.XDG_DATA_HOME, "omp"), { recursive: true });
+      installIn(c.store);
+      const d3 = checkHostConfig(OMP, envOf(home, c.env), home);
+      assert.equal(d3.status, "PASS", `${c.label}: ${JSON.stringify(d3)}`);
+      assert.equal(d3.detail, path.join(c.store, "omp-plugins.lock.json"), c.label);
+    }
+  });
+
+  test("[#1415] D3 FAIL under XDG names the lock file OMP reads, and the fix is OMP's own verb", { skip: OMP_XDG_SKIP }, (t) => {
+    const home = tmp(t);
+    const xdg = path.join(home, ".local", "share");
+    mkdirSync(path.join(xdg, "omp", "plugins"), { recursive: true });
+    const d3 = checkHostConfig(OMP, envOf(home, { XDG_DATA_HOME: xdg, PI_CONFIG_DIR: ".config/pi" }), home);
+    assert.equal(d3.status, "FAIL", JSON.stringify(d3));
+    assert.equal(d3.fixCommand, "omp plugin install context-mode");
+    assert.ok(d3.detail.includes(path.join(xdg, "omp", "plugins", "omp-plugins.lock.json")), d3.detail);
+    assert.equal(d3.detail.includes(path.join(home, ".omp")), false, d3.detail);
+  });
+
+  test("[#1415] the OMP import info line reads config.yml and mcp.json in <PI_CONFIG_DIR root>/agent; XDG never moves them", async (t) => {
+    const { ompInfoLines } = await import("../src/core/ops/doctor-config.ts");
+    const home = tmp(t);
+    const agentDir = path.join(home, ".config", "pi", "agent");
+    put(path.join(agentDir, "config.yml"), "enabledProviders: [claude]\n");
+    put(path.join(home, ".claude.json"), { mcpServers: { "context-mode": { command: "node", args: ["server.mjs"] } } });
+    const xdg = path.join(home, ".local", "share");
+    mkdirSync(path.join(xdg, "omp"), { recursive: true });
+    const info = C.OMP_IMPORT_INFO(path.join(home, ".claude.json"), path.join(agentDir, "mcp.json"));
+    const lines = ompInfoLines(envOf(home, { PI_CONFIG_DIR: ".config/pi", XDG_DATA_HOME: xdg }), undefined);
+    assert.ok(lines.includes(info), lines.join("\n"));
+    put(path.join(agentDir, "mcp.json"), { disabledServers: ["context-mode"] });
+    assert.equal(ompInfoLines(envOf(home, { PI_CONFIG_DIR: ".config/pi", XDG_DATA_HOME: xdg }), undefined).includes(info), false);
+  });
+
   test("[ADR-0026 T29] lock says enabled false: D3 FAIL, fix omp plugin enable context-mode; the closing line names it", async (t) => {
     const home = tmp(t);
     install(home, { enabled: false });

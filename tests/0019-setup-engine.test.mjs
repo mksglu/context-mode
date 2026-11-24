@@ -723,6 +723,26 @@ exit 0`);
     }
   });
 
+  // #1415: OMP's agent dir is <HOME>/<PI_CONFIG_DIR or .omp>/agent (OMP 19.1.1 pi-utils src/dirs.ts); XDG_DATA_HOME moves only
+  // the plugin store, never mcp.json or config.yml. Setup and uninstall edit the mcp.json OMP reads.
+  test("T25 [#1415] PI_CONFIG_DIR=.config/pi: setup merges disabledServers into OMP's own <root>/agent/mcp.json, uninstall drops only our name; XDG_DATA_HOME never moves it", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+    const s = ompSandbox(t);
+    const agentDir = path.join(s.home, ".config", "pi", "agent");
+    const mcpJson = path.join(agentDir, "mcp.json");
+    const xdg = path.join(s.home, ".local", "share");
+    put(path.join(xdg, "omp", "plugins", "package.json"), JSON.stringify({ name: "omp-plugins", private: true }));
+    const env = { ...s.env, PI_CONFIG_DIR: ".config/pi", XDG_DATA_HOME: xdg };
+    put(path.join(agentDir, "config.yml"), "enabledProviders: [claude]\n");
+    put(path.join(s.home, ".claude.json"), CLAUDE_JSON_WITH_US);
+    put(mcpJson, JSON.stringify({ mcpServers: { x: { command: "x" } }, disabledServers: ["other"] }, null, 2));
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env, agents: ["omp"], runId: "r" });
+    assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+    assert.deepEqual(JSON.parse(readFileSync(mcpJson, "utf8")), { mcpServers: { x: { command: "x" } }, disabledServers: ["other", "context-mode"] });
+    assert.equal(existsSync(path.join(s.home, ".omp", "agent", "mcp.json")), false);
+    runUninstall({ adapter: { id: "omp", installMode: "in-process" }, project: { projectKey: "abcdef0123456789" }, env: { HOME: s.home, USERPROFILE: s.home, PI_CONFIG_DIR: ".config/pi", XDG_DATA_HOME: xdg }, confirmDelete: false });
+    assert.deepEqual(JSON.parse(readFileSync(mcpJson, "utf8")), { mcpServers: { x: { command: "x" } }, disabledServers: ["other"] });
+  });
+
   test("T26 uninstall removes only our name from OMP disabledServers (ADR-0026 M5)", (t) => {
     const s = sandbox(t);
     const mcpJson = put(path.join(s.home, ".omp", "agent", "mcp.json"), JSON.stringify({ mcpServers: { x: { command: "x" } }, disabledServers: ["other", "context-mode"] }, null, 2));
