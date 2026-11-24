@@ -2409,9 +2409,10 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
         }
       });
 
-      // H9 (OPEN-ITEMS): the replace handle line names the source and the command as the query. When no query word
-      // is in the output, a source query lists that source's chunks by position instead of "No hits".
-      test("H9: a source query whose words match nothing lists that source's chunks, first by position", async () => {
+      // H9 (OPEN-ITEMS), D-1372-ORDERED-READ-1 (#1372): the replace handle line names the source and the command (or the
+      // MCP tool name) as the query. When no query word is in the output, the source is read in order: one head line,
+      // then the stored text from byte 0, not a listing of 5 short chunks.
+      test("H9: a source query whose words match nothing reads that source in order from its first byte", async () => {
         const root = mkdtempSync(join(tmpdir(), "cm-h9-"));
         try {
           const content = Array.from({ length: 30 }, (_, i) => "## part " + i + "\n\nalpha beta gamma " + i).join("\n\n");
@@ -2420,16 +2421,90 @@ describe("PRD-v2 section 8: stage 1 (concurrent)", { concurrency: CONC }, () => 
           const r = await ctxSearch.handler({ queries: ["cat big.log"], source: "big-out" }, ctxFor(root));
           assert.equal(r.isError, false, r.text);
           const lines = r.text.split("\n");
-          assert.equal(lines[0], 'Query "cat big.log":', r.text.slice(0, 300));
-          assert.ok(lines[1].startsWith("big-out #0: "), r.text.slice(0, 300));
-          assert.ok(r.text.includes("big-out #1: "), r.text.slice(0, 300));
-          assert.ok(!r.text.includes("other #"), r.text);
+          assert.equal(lines[1], "## part 0", "the text starts right after one head line: " + r.text.slice(0, 300));
+          assert.ok(r.text.includes("alpha beta gamma 29"), "a small source comes back whole in one reply: " + r.text.slice(-300));
+          assert.ok(!r.text.includes("big-out #"), "an ordered read, not a listing of chunks: " + r.text.slice(0, 300));
+          assert.ok(!r.text.includes("More: "), "nothing is left behind a More: line: " + r.text.slice(-300));
+          assert.ok(!r.text.includes("cat big log other words"), r.text);
           // Words that do match keep the BM25 path.
           const hit = await ctxSearch.handler({ queries: ["gamma 17"], source: "big-out" }, ctxFor(root));
           assert.ok(hit.text.includes("alpha beta gamma 17"), hit.text.slice(0, 300));
           // No source: a query with no match is still zero hits.
           const none = await ctxSearch.handler({ queries: ["zzqq nothing"] }, ctxFor(root));
           assert.ok(none.text.startsWith("No hits"), none.text);
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
+      // D-1372-ORDERED-READ-1 (#1372, ADR-0009 §8.1): a source with no query words is read in order, page by page. Each
+      // reply is one head line, then the next stored bytes, then (when bytes are left) one More: line with the byte
+      // offset. The pages put together give back the stored text byte for byte, a one-line stretch too.
+      const ORDERED_LINES = Array.from({ length: 900 }, (_, i) => "ORDLINE " + String(i).padStart(4, "0") + " status=" + (i % 3 ? "open" : "closed") + " owner=team-" + (i % 7)).join("\n");
+      const ORDERED_ONE_LINE = Array.from({ length: 2400 }, (_, i) => "w" + i).join(" ");
+      const ORDERED_TEXT = ORDERED_LINES + "\n" + ORDERED_ONE_LINE;
+      // A paging line names the call to run next: its arguments as an object (keys unquoted, values JSON).
+      const callArgs = (line) => {
+        let s = line.slice(line.indexOf("({") + 1, line.lastIndexOf("})") + 1);
+        for (const k of ["queries", "scope", "source", "offset"]) s = s.split("{" + k + ":").join('{"' + k + '":').split(", " + k + ":").join(', "' + k + '":');
+        return JSON.parse(s);
+      };
+      // The text of one ordered page: the reply minus its head line and its More: line.
+      const pageText = (reply) => {
+        const body = reply.slice(reply.indexOf("\n") + 1);
+        const at = body.lastIndexOf("\nMore: ");
+        return at < 0 ? body : body.slice(0, at);
+      };
+
+      test("D-1372-ORDERED-READ-1 (#1372): a source with no query words reads back byte for byte, in full pages", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-ord-"));
+        try {
+          const c = ctxFor(root);
+          await ctxIndex.handler({ content: ORDERED_TEXT, source: "ordered-log" }, c);
+          const S = Buffer.byteLength(ORDERED_TEXT);
+          let args = { queries: [""], source: "ordered-log" };
+          let got = "";
+          let calls = 0;
+          const sizes = [];
+          while (args !== null && calls < 50) {
+            const r = await ctxSearch.handler(args, c);
+            calls++;
+            assert.equal(r.isError, false, r.text.slice(0, 300));
+            assert.ok(Buffer.byteLength(r.text) <= C.OUTPUT_CAP, "a page fits OUTPUT_CAP: " + Buffer.byteLength(r.text));
+            const page = pageText(r.text);
+            sizes.push(Buffer.byteLength(page));
+            got += page;
+            const more = r.text.split("\n").find((l) => l.startsWith("More: "));
+            args = more === undefined ? null : callArgs(more);
+            if (args !== null) assert.equal(args.offset, Buffer.byteLength(got), "the More: offset is the byte offset of the next page: " + more);
+          }
+          assert.equal(got, ORDERED_TEXT, "the pages put together are the stored text, byte for byte");
+          for (const n of sizes.slice(0, -1)) assert.ok(n >= C.OUTPUT_CAP - 1024, "every page but the last is full: " + sizes.join(", "));
+          assert.ok(calls <= Math.ceil(S / (C.OUTPUT_CAP - 1024)), calls + " calls for " + S + " B: " + sizes.join(", "));
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      });
+
+      // D-1372-ORDERED-READ-1: a query with words that match stays the ranked reply, byte for byte as on main 47b03fcc
+      // (golden: byte size and sha256 of the reply text, page 1, page 2 and a two-query call with no source).
+      test("D-1372-ORDERED-READ-1: a ranked query reply is unchanged byte for byte", async () => {
+        const root = mkdtempSync(join(tmpdir(), "cm-ord-q-"));
+        try {
+          const { createHash } = await import("node:crypto");
+          const sha = (t) => createHash("sha256").update(t).digest("hex");
+          const c = ctxFor(root);
+          await ctxIndex.handler({ content: ORDERED_LINES + "\n" + Array.from({ length: 700 }, (_, i) => "w" + i).join(" "), source: "ordered-log" }, c);
+          const golden = [
+            [{ queries: ["ORDLINE 0417 closed"], source: "ordered-log" }, 2527, "a39e8368b94e984731ea3a6e7eaeb6ca3e71ab26df9d8af5bf5018d0164ea7be"],
+            [{ queries: ["ORDLINE 0417 closed"], source: "ordered-log", offset: 3 }, 4096, "d0693d360cbe140aac0d6d925eafd814c2310f8e6a44f9cc56e19ae734818564"],
+            [{ queries: ["ORDLINE 0417 closed", "w650"] }, 2980, "9dcef037516b4b262a491051f256bf375113eb0342a6f278218357e6e7b69833"],
+          ];
+          for (const [args, size, hash] of golden) {
+            const r = await ctxSearch.handler(args, c);
+            assert.equal(r.text.split("\n")[0], 'Query "ORDLINE 0417 closed":', r.text.slice(0, 200));
+            assert.deepEqual([Buffer.byteLength(r.text), sha(r.text)], [size, hash], JSON.stringify(args) + "\n" + r.text.slice(0, 400));
+          }
         } finally {
           rmSync(root, { recursive: true, force: true });
         }

@@ -650,6 +650,72 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     assert.ok(Buffer.byteLength(u.content) < Buffer.byteLength(resp.content) && u.content.includes("needle target"));
   });
 
+  // D-1372-ORDERED-READ-1 (#1372, @limekiln): an external MCP tool returns one JSON document the agent needs whole.
+  // The replace keeps its stub (no new bytes on any replace); the way back is the pointer call, then each More: line.
+  // On main 47b03fcc that walk took 113 calls for 24,575 B (5 chunks of 48 B a page) and left 77% of a one-line JSON
+  // document unreachable. The pointer call now reads the document in order: at most ceil(S / OUTPUT_CAP) calls.
+  const DOC_RECORDS = Array.from({ length: 80 }, (_, i) => ({ id: "rec-" + String(i).padStart(4, "0"), title: "Item number " + i + " of the catalog",
+    status: i % 3 ? "open" : "closed", owner: "team-" + (i % 7), score: (i * 37) % 101, tags: ["alpha", "beta" + (i % 5)],
+    note: "end-" + String(i).padStart(4, "0") + " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod" }));
+  const DOC_PRETTY = JSON.stringify({ kind: "document", count: 80, records: DOC_RECORDS }, null, 2);
+  const DOC_COMPACT = JSON.stringify({ kind: "document", count: 80, records: DOC_RECORDS });
+  const DOC_TOOL = "mcp__example__get_document";
+  // A call line (handle line or More: line) as arguments: keys unquoted, values JSON.
+  const callArgs = (line) => {
+    let t = line.slice(line.indexOf("ctx_search({") + "ctx_search(".length);
+    t = t.slice(0, t.indexOf("})") + 1);
+    for (const k of ["queries", "scope", "source", "offset"]) t = t.split("{" + k + ":").join('{"' + k + '":').split(", " + k + ":").join(', "' + k + '":');
+    return JSON.parse(t);
+  };
+
+  function replaceDoc(text, n) {
+    return cc({ hook_event_name: "PostToolUse", tool_name: DOC_TOOL, tool_input: {}, tool_use_id: "toolu_01Doc1372" + n, tool_response: [{ type: "text", text }] });
+  }
+
+  test("D-1372-ORDERED-READ-1 (#1372): the replace stub of an MCP JSON document is unchanged, byte for byte", async () => {
+    for (const [text, body] of [[DOC_PRETTY, '      "status": "open",\n\n        "beta4"\n      ],\n\n    }\n  ]\n}\n'], [DOC_COMPACT, ""]]) {
+      const p = replaceDoc(text, text.length);
+      const out = parsed(await handleHook("claude-code", p, env));
+      const replaced = out.updatedToolOutput[0].text;
+      const src = query("SELECT id FROM sources WHERE session_id = ?", p.session_id);
+      assert.equal(src.length, 1);
+      const id = "s" + Number(src[0].id).toString(36);
+      const handle = CCP + "ctx_search({queries:[" + JSON.stringify(DOC_TOOL) + "], source:" + JSON.stringify(id) + "}) searches the whole output (" + Buffer.byteLength(text) + " B).";
+      const twin = SEARCH_TWIN_LINE(join(dirname(process.argv[1]), SEARCH_WRAPPER_FILE), id, DOC_TOOL, realpathSync.native(repo));
+      assert.equal(replaced, body + handle + twin);
+    }
+  });
+
+  test("D-1372-ORDERED-READ-1 (#1372): the pointer and its More: lines give back the whole MCP JSON document in ceil(S / OUTPUT_CAP) calls", async () => {
+    for (const text of [DOC_PRETTY, DOC_COMPACT]) {
+      const S = Buffer.byteLength(text);
+      const p = replaceDoc(text, "w" + text.length);
+      const out = parsed(await handleHook("claude-code", p, env));
+      const replaced = out.updatedToolOutput[0].text;
+      const ctx = { project: resolveProject("claude-code", { env, argv: [], cwd: repo }), sessionId: p.session_id, turn: 1, signal: new AbortController().signal };
+      let args = callArgs(replaced.slice(replaced.lastIndexOf("\n") + 1));
+      let got = "";
+      let calls = 0;
+      let bytes = 0;
+      while (args !== null && calls < 200) {
+        const r = await ctxSearch.handler(args, ctx);
+        calls++;
+        bytes += Buffer.byteLength(r.text);
+        assert.equal(r.isError, false, r.text.slice(0, 300));
+        assert.ok(Buffer.byteLength(r.text) <= OUTPUT_CAP, "a reply fits OUTPUT_CAP: " + Buffer.byteLength(r.text));
+        // An ordered page: one head line, the next stored bytes, then a More: line when bytes are left.
+        const body = r.text.slice(r.text.indexOf("\n") + 1);
+        const more = body.lastIndexOf("\nMore: ");
+        got += more < 0 ? body : body.slice(0, more);
+        args = more < 0 ? null : callArgs(body.slice(more + 1));
+      }
+      const label = S + " B " + (text === DOC_PRETTY ? "pretty" : "compact");
+      assert.ok(got === text, label + ": the agent holds the whole document, byte for byte, after " + calls + " calls (" + Buffer.byteLength(got) + " B put together)");
+      assert.ok(calls <= Math.ceil(S / OUTPUT_CAP) + 1 && calls <= 2, label + ": " + calls + " calls");
+      assert.ok(bytes <= S + calls * 512, label + ": " + bytes + " reply bytes for the document");
+    }
+  });
+
   // D-1402-PLUGIN-CALL-1 (#1402): a plugin mod's $.mcp.call gets a toolu_plugin_ id from the host, and its result goes
   // back to the mod only, never to the model. The mod gets the output whole (it may JSON.parse it); the text is indexed.
   test("D-1402-PLUGIN-CALL-1: a large MCP result of a plugin call (toolu_plugin_) reaches the mod whole and is indexed", async () => {
