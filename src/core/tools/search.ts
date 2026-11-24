@@ -8,6 +8,7 @@ import { formatError } from "../contracts/errors.ts";
 import type { CtxSearchInput, DbHandle, Hit, SearchScope, TimelineRow, ToolContext, ToolReply } from "../contracts/types.ts";
 import { capBytes } from "../sandbox/cap.ts";
 import { closeDb, openDb } from "../store/db.ts";
+import { betKeyOfLabel, isLostBet, markLostBet } from "../store/lost-bet.ts";
 import { collisionLine, ftsListSource, ftsQuery, ftsQueryTimeline, groupDigits, isLongLabel, labelPage, pickSource, rankTexts, shownLabel, sourceCardRow, sourceHandle, type SourcePick } from "../store/fts.ts";
 import { memoryChunks, memoryFileNamed, memoryHits, readAutoMemory } from "../index/auto-memory.ts";
 import { fitRow, jsonRows, namedKeys } from "../index/shape.ts";
@@ -106,12 +107,14 @@ function unknownSource(db: DbHandle, scope: SearchScope, ctx: ToolContext, given
 // handle of a long label, else what the user typed); `note` is the collision line, when the value was a label
 // here and another source's handle.
 // `pick` is the stored source the value named (null = no source, or source:"decision").
-interface Named { arg: string | undefined; note: string | null; pick: SourcePick | null }
+// `lost` is the lost bet an ordered read found (D-0027-LOSTBET-1); the handler writes it after its read-only pass.
+interface Named { arg: string | undefined; note: string | null; pick: SourcePick | null; lost: LostBet | null }
+interface LostBet { sessionId: string; key: string; source: string }
 
 function named(given: string | undefined, pick: SourcePick | null): Named {
-  if (given === undefined || pick === null) return { arg: given, note: null, pick: null };
+  if (given === undefined || pick === null) return { arg: given, note: null, pick: null, lost: null };
   const arg = pick.id !== null && isLongLabel(given) ? sourceHandle(pick.id) : given;
-  return { arg, note: collisionLine(given, pick), pick };
+  return { arg, note: collisionLine(given, pick), pick, lost: null };
 }
 
 // D-LABEL-HANDLE-2: empty `queries` on one stored source -> its card: handle, label size, chunks, bytes, then the
@@ -379,7 +382,7 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
 // back as one blank line. A query with a word in the source keeps the ranked reply.
 const ORDERED_LINE_BACK = 512; // a page ends after its last newline when one is this close to the cut
 const SOURCE_IN_SCOPE = `
-SELECT 1 AS ok FROM sources WHERE id = :id
+SELECT session_id FROM sources WHERE id = :id
   AND (:scope <> 'session' OR session_id = :session_id)
   AND (:scope <> 'worktree' OR worktree = :worktree)`;
 
@@ -399,7 +402,8 @@ function orderedRead(db: DbHandle, input: CtxSearchInput, scope: SearchScope, ct
   const pick = nm.pick;
   if (pick === null || pick.id === null || input.source === undefined || input.source === DECISION_SOURCE) return null;
   const where = { id: pick.id, scope, session_id: ctx.sessionId, worktree: ctx.project.worktree };
-  if (db.raw.prepare(SOURCE_IN_SCOPE).get(where) === undefined) return null;
+  const row = db.raw.prepare(SOURCE_IN_SCOPE).get(where) as { session_id: string } | undefined;
+  if (row === undefined) return null;
   const buf = Buffer.from(sourceText(db, pick.id), "utf8");
   const total = buf.length;
   if (total === 0) return null;
@@ -418,6 +422,10 @@ function orderedRead(db: DbHandle, input: CtxSearchInput, scope: SearchScope, ct
     if (nl >= start && nl + 1 > end - ORDERED_LINE_BACK) end = nl + 1;
   }
   const text = buf.subarray(start, end).toString("utf8");
+  // D-0027-LOSTBET-1 case a (ADR-0027 FR5): the in-order page-in of a replaced output reached 50% or more of its bytes,
+  // so the bet on its tool key (the command, or server + tool) was lost in the session that made it. Marked once.
+  const key = end * 2 >= total ? betKeyOfLabel(pick.label) : null;
+  if (key !== null && !isLostBet(db, row.session_id, key)) nm.lost = { sessionId: row.session_id, key, source: sourceHandle(pick.id) };
   return reply(headOf(end) + "\n" + text + (end < total ? "\n" + moreOf(end) : ""), false);
 }
 
@@ -494,6 +502,7 @@ async function handler(input: CtxSearchInput, ctx: ToolContext): Promise<ToolRep
   }
   const scope: SearchScope = input.scope ?? "worktree";
   const db = await openDb(ctx.project, { readOnly: true });
+  let lost: LostBet | null = null;
   try {
     // D-LABEL-HANDLE-1: a stored label wins, then a short id, then a label without its "#" suffix (pickSource),
     // inside the asked scope first (D-SEARCH-SCOPE-PICK-1, #1390).
@@ -512,12 +521,29 @@ async function handler(input: CtxSearchInput, ctx: ToolContext): Promise<ToolRep
       nm.note = nm.note === null ? both : nm.note + "\n" + both;
     }
     const out = answer(db, input, scope, ctx, nm, ms, indexed, sort, pick);
+    lost = nm.lost;
     if (file === null || scope !== "session") return out;
     // D-MEMORY-SOURCE-1: scope "session" holds no memory file; one line names the scope that holds it.
     const call = callText(input.queries, "worktree", nm.arg, sort === "timeline" ? 'sort:"timeline"' : "");
     return reply(out.text + "\nMemory file " + file.label + ' is in scope "worktree": ' + call + " searches it.", out.isError);
   } finally {
     closeDb(db);
+    if (lost !== null) await recordLostBet(ctx, lost);
+  }
+}
+
+// D-0027-LOSTBET-1: the one write of a ctx_search call, only when an ordered read found a lost bet. A failure leaves
+// the bet as today (ADR-0027 section 12) and never changes the reply.
+async function recordLostBet(ctx: ToolContext, lost: LostBet): Promise<void> {
+  try {
+    const w = await openDb(ctx.project);
+    try {
+      markLostBet(w, lost.sessionId, lost.key, "ordered-read", lost.source);
+    } finally {
+      closeDb(w);
+    }
+  } catch {
+    // never blocks the reply
   }
 }
 

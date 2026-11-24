@@ -426,7 +426,7 @@ D3 lowers p for the rest of the session to near 0 for a key that lost once, so t
 |---|---|---|---|
 | 1 | Ordered read (D-1372) | done: 113 to 2 calls, ranked replies byte-identical | main 541d7726 |
 | 2 | Remove the env var, doctor INFO line, docs (D1) | AC2, AC3, AC7 | lane r90, not on main |
-| 3 | Lost-bet memory (D3) | AC4, AC5, AC6 on the replay corpus (tickets r89 replay scripts) | new lane |
+| 3 | Lost-bet memory (D3) | AC4, AC5, AC6 on the replay corpus (tickets r89 replay scripts) | lane r92-9002, done: D-0027-LOSTBET-1, red 4cefeec7, ships with step 2 |
 | 4 | Steps 2 and 3 to main together, one release | full CI, release smoke | main |
 | 5 | Gate change (D4) after the owner's yes; then the full Read stub (D2) | task-cost gate | new lane |
 | 6 | Revisit per-model when the host adds a model field | host changelog | watch |
@@ -447,7 +447,7 @@ Rollback: each step is one commit range on main. Reverting step 3 restores today
 | ID | Action | Owner | Status |
 |---|---|---|---|
 | A1 | Ship lane r90 (D1) with step 3, not alone | Claude | lane r90 running |
-| A2 | Build lost-bet memory (D3) with RGR, replay gate and profile | Claude | next lane |
+| A2 | Build lost-bet memory (D3) with RGR, replay gate and profile | Claude | done on lane r92-9002 (D-0027-LOSTBET-1), ships with A1 |
 | A3 | Add task cost to the replay: cache read, cache write, output tokens and calls per task from transcript usage; split main and subagent | Claude | next lane |
 | A4 | Decide D4: does "saving must not drop" mean task cost (with bytes as a guard)? | Owner | open |
 | A5 | Build ADR-0025 decision 1 (ctx_execute reads a stored source) for count and filter jobs (#1325) | Claude | after A2 |

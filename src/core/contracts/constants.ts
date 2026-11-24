@@ -421,6 +421,11 @@ export const RECALL_BUDGET_BYTES = 2048; // whole recall block, wrapper included
 export const RECALL_MIN_SCORE = 5;
 export const RECALL_MAX_ROWS = 340; // newest rows read per prompt (= MAX_CANDIDATES_TOTAL)
 export const COMPACTED_META_PREFIX = "compacted:"; // meta key + session id: a compaction happened in this session
+// D-0027-LOSTBET-1 (ADR-0027 D3, FR5, 10.7): meta keys + session id + ":" + tool key. BET_META_PREFIX notes a replaced
+// full Read of a file (the bet); LOSTBET_META_PREFIX marks a lost bet, so later outputs with that key pass whole up to
+// OUTPUT_CAP for the rest of the session. A compaction clears the session's lostbet marks.
+export const BET_META_PREFIX = "bet:";
+export const LOSTBET_META_PREFIX = "lostbet:";
 export const RECALL_UNITS_SEEN_META_PREFIX = "recall_units_seen:"; // r3-ledger: JSON "source:ord" list of line units already injected
 export const UNITS_ANCESTOR_FACTOR = 8; // D-UNITS-BOUND-1: ancestor copies per output <= this x its bytes (0 of 680k units in 3520 real files drop a parent at 8)
 // D-1330-RECALL-PROMPT-1 (#1330): the recall query is the current prompt only, its first distinct words up to this
