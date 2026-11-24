@@ -2152,6 +2152,11 @@ describe("PRD-v2 section 10: hook entry argv and stdin handling (GP7)", () => {
     const full = lines.join("\n");
     const post = { session_id: "lk2", cwd: repo, hook_event_name: "PostToolUse", tool_name: "Bash", tool_use_id: "toolu_lk2",
       tool_input: { command: "cat big.log", description: "big log" }, tool_response: { stdout: full, stderr: "", interrupted: false } };
+    // D-1401-LOCK-BASELINE-1: the same 200 KB PostToolUse with no lock (another session), run before, after and once more
+    // in this test, is the baseline: runner load slows both the same way. The lock may add under HOOK_TIMEOUT_MS / 2 to
+    // the median baseline; a hook that waits for the lock (DB_TIMEOUT_MS) adds 5000 ms and fails.
+    const free = (n) => timedRun(JSON.stringify({ ...post, session_id: "lk2b", tool_use_id: "toolu_lk2b" + n }));
+    const base = [free(1)];
     const release = await holdWriteLock(projectDb());
     let r;
     try {
@@ -2159,8 +2164,12 @@ describe("PRD-v2 section 10: hook entry argv and stdin handling (GP7)", () => {
     } finally {
       await release();
     }
+    base.push(free(2), free(3));
+    for (const b of base) assert.equal(b.status, 0, b.stderr);
+    const baseMs = base.map((b) => b.ms).sort((a, b) => a - b)[1];
     assert.equal(r.status, 0, r.stderr);
-    assert.ok(r.ms < HOOK_TIMEOUT_MS / 2, `hook took ${r.ms} ms under a held write lock (host kills it at ${HOOK_TIMEOUT_MS} ms); stderr: ${r.stderr}`);
+    assert.ok(r.ms < HOOK_TIMEOUT_MS, `hook took ${r.ms} ms under a held write lock; the host kills it at ${HOOK_TIMEOUT_MS} ms; stderr: ${r.stderr}`);
+    assert.ok(r.ms - baseMs < HOOK_TIMEOUT_MS / 2, `the held lock added ${r.ms - baseMs} ms (${r.ms} ms against a median of ${baseMs} ms with no lock: ${base.map((b) => b.ms).join(", ")}); stderr: ${r.stderr}`);
     // Savings hold under the lock: the model gets a short replace that names the indexed output, not the full 200 KB.
     assert.notEqual(r.stdout, "", "a replace decision, not an empty answer: " + r.stderr);
     const out = JSON.parse(r.stdout).hookSpecificOutput.updatedToolOutput;

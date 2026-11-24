@@ -62,6 +62,7 @@ jobs:
         name: ckpt durability, kill the server right after ctx_index, reopen, search finds it (D-CKPT-LAT-1)
       # ADR-0019 D3: the one hook overhead gate (warm-up, lowest of 5 batch p95 values, 15 ms), all three OSes
       # (DEVIATIONS D-CI-PERF-1, D-CI-PERF-5). It also prints the cold first call of a fresh bundle copy as info.
+      # D-CI-D3-ROUNDS-1: over the bound after one round, one more round after a 10 s pause; the Windows node 24 leg bound is 18 ms.
       - run: node e2e/checks/setup-hook-overhead.mjs
         name: D3 hook overhead p95 <= 15 ms (perf check; cold first call is info)
       # Viet round (Windows Claude Desktop): ctx_doctor D5 FAIL 72 ms and 58 ms against 40 ms. Info only: splits the claude-code hook wall
