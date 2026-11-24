@@ -113,7 +113,8 @@ export interface CheckRow {
   hookCommand?: string[];
   config?: ConfigTarget;
   cli?: CliPlan;
-  listCommand?: { bin: string; args: string[] };
+  /** reader "codex-mcp-get": the answer is `codex mcp get <name> --json` (D-1413-CODEX-LIST-1); else a list that names us. */
+  listCommand?: { bin: string; args: string[]; reader?: "codex-mcp-get" };
   /** D-US-1: the host runs a copy of the package; `file` records the copied version, `refresh` (run with `bin`) renews it. */
   copy?: HostCopy;
   hookFiles: HookFile[];
@@ -261,9 +262,11 @@ function copyFor(ctx: SetupContext, id: AgentId): HostCopy | undefined {
     marketplace: ["plugin", "marketplace", "update", PLUGIN_MARKETPLACE_NAME], profile: claudeProfileEnv(ctx.env, ctx.platform ?? process.platform) };
 }
 
-const LIST: Partial<Record<AgentId, { bin: string; args: string[] }>> = {
+const LIST: Partial<Record<AgentId, NonNullable<CheckRow["listCommand"]>>> = {
   "claude-code": { bin: "claude", args: ["plugin", "list"] },
-  codex: { bin: "codex", args: ["mcp", "list"] },
+  // D-1413-CODEX-LIST-1 (#1413): `mcp list` runs OAuth discovery (network, 5 s cap per server) and keyring reads for every
+  // server; `mcp get <name> --json` loads the same servers, plugin servers too, and looks up the exact name (no auth).
+  codex: { bin: "codex", args: ["mcp", "get", SERVER_KEY, "--json"], reader: "codex-mcp-get" },
   gemini: { bin: "gemini", args: ["extensions", "list"] },
   qwen: { bin: "qwen", args: ["extensions", "list"] },
   "copilot-cli": { bin: "copilot", args: ["mcp", "list"] },

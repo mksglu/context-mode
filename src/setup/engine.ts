@@ -512,6 +512,16 @@ function hostBroken(bin: string, out: string): string | undefined {
   return `${b.prefix}${b.fix} (${(lines.find((l) => l.includes(b.text)) ?? lines[0]).trim()})`;
 }
 
+/** D-1413-CODEX-LIST-1 (#1413), codex-rs/cli/src/mcp_cmd.rs run_get: `codex mcp get <name> --json` prints the server
+ *  object ({ name, enabled, transport, ... }), or exits 1 with "Error: No MCP server named '<name>' found." on stderr. */
+function codexGetCheck(what: string, r: ReturnType<typeof spawnSync>): Check {
+  let doc: unknown;
+  try { doc = JSON.parse(`${r.stdout}`); } catch { doc = undefined; }
+  if (r.status === 0 && isObj(doc) && doc.name === SERVER_KEY) return { name: "list", ok: true };
+  const host = `${r.stderr}`.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 3).join(" ") || `${r.stdout}`.trim().split("\n")[0] || `exit ${r.status}`;
+  return { name: "list", ok: false, detail: `${what} does not find ${SERVER_KEY}: ${host}` };
+}
+
 type ListState = { check?: Check; status: PluginStatus; broken?: string };
 /** One run of the host list command (claude plugin list takes ~1.8 s): the list check and the plugin status share it. */
 function listState(row: CheckRow, env: SetupContext["env"]): ListState {
@@ -522,10 +532,16 @@ function listState(row: CheckRow, env: SetupContext["env"]): ListState {
     return { check: "major" in v ? opencodeListCheck(l.bin, v.major, env) : { name: "list", ok: false, detail: v.error }, status: undefined };
   }
   const r = runBin(l.bin, l.args, env);
+  const what = `${l.bin} ${l.args.join(" ")}`;
+  // D-1413-CODEX-LIST-1: a list killed at the budget says nothing about our entry; the detail names the timeout.
+  if ((r.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT") {
+    return { check: { name: "list", ok: false, detail: `${what} did not answer in ${VERIFY_TIMEOUT_MS / 1000} s (${r.signal ?? "timeout"}); run it in a terminal` }, status: undefined };
+  }
+  if (l.reader === "codex-mcp-get") return { check: codexGetCheck(what, r), status: undefined };
   // Gemini 0.65.0 writes the list to stderr (D-INST-2), so both streams count.
   const out = `${r.stdout}${r.stderr}`;
   const ok = r.status === 0 && out.includes("context-mode");
-  const check: Check = { name: "list", ok, detail: ok ? undefined : `${l.bin} ${l.args.join(" ")} does not list context-mode` };
+  const check: Check = { name: "list", ok, detail: ok ? undefined : `${what} does not list context-mode` };
   return { check, status: r.status === 0 ? statusOf(row, `${r.stdout}`) : undefined, broken: r.status === 0 ? undefined : hostBroken(l.bin, out) };
 }
 
@@ -731,7 +747,7 @@ function hookRegisteredCheck(row: CheckRow, env: SetupContext["env"], list: Chec
     const l = row.listCommand;
     if (!l) return { name: "hook-registered", ok: false, detail: `no list command for ${row.id}` };
     if (!list) return { name: "hook-registered", ok: false, detail: `${l.bin} is not on PATH, so the hooks cannot be checked` };
-    return { name: "hook-registered", ok: list.ok, detail: list.ok ? undefined : `${l.bin} ${l.args.join(" ")} does not list context-mode (hooks ship in ${h.via})` };
+    return { name: "hook-registered", ok: list.ok, detail: list.ok ? undefined : `${list.detail ?? `${l.bin} ${l.args.join(" ")} does not list context-mode`} (hooks ship in ${h.via})` };
   }
   const edits: FileEdit[] = [];
   try { planHookInstall(row, edits, env); } catch (e) { return { name: "hook-registered", ok: false, detail: (e as Error).message }; }
