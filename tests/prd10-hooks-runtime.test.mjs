@@ -716,6 +716,93 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
     }
   });
 
+  // D-0027-LOSTBET-1 (ADR-0027 D3, RC4, FR5, AC4): the hook remembers a lost bet for the rest of the session. A lost bet
+  // is (b) a ranged Read of a file after its full Read was replaced in the same session, or (a) ctx_search page-ins on a
+  // replaced source that reach 50% or more of its bytes. Then a later output with the same tool key (Read: the path,
+  // Bash: the command, MCP: server + tool) passes whole up to OUTPUT_CAP. Another key, a new session, an output over
+  // OUTPUT_CAP (ADR-0008) and the first output after a compaction are replaced as before.
+  // Repro on main e84bc8fc and npm 2.2.2 (tickets r92-9002): the second full Read of F in S1 was replaced again.
+  const lostBetSession = () => "s-lostbet-" + Math.random().toString(36).slice(2);
+  function readPost(sessionId, filePath, content, range = {}) {
+    const n = content.split("\n").length;
+    return { session_id: sessionId, cwd: repo, hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: filePath, ...range },
+      tool_use_id: "toolu_lb" + Math.random().toString(36).slice(2), tool_response: { type: "text", file: { filePath, content, numLines: n, startLine: 1, totalLines: n } } };
+  }
+  async function readOut(sessionId, filePath, content, range) {
+    return parsed(await handleHook("claude-code", readPost(sessionId, filePath, content, range), env));
+  }
+
+  test("D-0027-LOSTBET-1 (AC4 case b): after a ranged Read follows a replaced full Read of F, the next full Read of F in the session passes whole", async () => {
+    const content = bigText(REPLACE_TRIGGER_BYTES * 2);
+    assert.ok(Buffer.byteLength(content) > REPLACE_TRIGGER_BYTES && Buffer.byteLength(content) <= OUTPUT_CAP);
+    const F = join(repo, "lostbet-f.ts");
+    const G = join(repo, "lostbet-g.ts");
+    const S1 = lostBetSession();
+    assert.equal(typeof (await readOut(S1, F, content)).updatedToolOutput, "object", "the first full Read of F is a bet: replaced");
+    assert.equal(await readOut(S1, F, content, { offset: 120, limit: 40 }), null, "the ranged Read of F reaches the model whole (D-R41-READ-OFFSET-1)");
+    assert.equal(await readOut(S1, F, content), null, "the bet on F was lost in S1: the next full Read of F passes whole");
+    assert.equal(typeof (await readOut(S1, G, content)).updatedToolOutput, "object", "a full Read of another file G in S1 is still replaced");
+    assert.equal(typeof (await readOut(lostBetSession(), F, content)).updatedToolOutput, "object", "in a new session F is replaced again");
+  });
+
+  test("D-0027-LOSTBET-1 (AC4): after a lost bet, a full Read over OUTPUT_CAP is still replaced (ADR-0008)", async () => {
+    const content = bigText(OUTPUT_CAP * 2);
+    const F = join(repo, "lostbet-big.ts");
+    const S1 = lostBetSession();
+    assert.equal(typeof (await readOut(S1, F, content)).updatedToolOutput, "object");
+    assert.equal(await readOut(S1, F, content, { offset: 1, limit: 2000 }), null);
+    assert.equal(typeof (await readOut(S1, F, content)).updatedToolOutput, "object", "over OUTPUT_CAP the full Read stays replaced");
+  });
+
+  test("D-0027-LOSTBET-1 (AC4): a compaction clears the lost-bet marks of the session", async () => {
+    const content = bigText(REPLACE_TRIGGER_BYTES * 2);
+    const F = join(repo, "lostbet-compact.ts");
+    const S1 = lostBetSession();
+    assert.equal(typeof (await readOut(S1, F, content)).updatedToolOutput, "object");
+    assert.equal(await readOut(S1, F, content, { offset: 10, limit: 20 }), null);
+    assert.equal(await readOut(S1, F, content), null, "the lost bet on F holds before the compaction");
+    await handleHook("claude-code", { session_id: S1, cwd: repo, hook_event_name: "PreCompact", trigger: "auto" }, env);
+    await handleHook("claude-code", { session_id: S1, cwd: repo, hook_event_name: "SessionStart", source: "compact" }, env);
+    assert.equal(typeof (await readOut(S1, F, content)).updatedToolOutput, "object", "after the compaction the full Read of F is a bet again");
+  });
+
+  test("D-0027-LOSTBET-1 (AC4 case a): a ctx_search page-in of 50% or more of a replaced MCP or Bash output marks its tool key", async () => {
+    const doc = JSON.stringify({ kind: "document", records: DOC_RECORDS.slice(0, 30) });
+    const log = bigText(REPLACE_TRIGGER_BYTES * 2);
+    for (const s of [doc, log]) assert.ok(Buffer.byteLength(s) > REPLACE_TRIGGER_BYTES && Buffer.byteLength(s) <= OUTPUT_CAP);
+    const mcp = (sessionId, tool) => ({ session_id: sessionId, cwd: repo, hook_event_name: "PostToolUse", tool_name: tool, tool_input: {},
+      tool_use_id: "toolu_lbm" + Math.random().toString(36).slice(2), tool_response: [{ type: "text", text: doc }] });
+    const bash = (sessionId, command) => ({ session_id: sessionId, cwd: repo, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command },
+      tool_use_id: "toolu_lbb" + Math.random().toString(36).slice(2), tool_response: { stdout: log, stderr: "", interrupted: false, isImage: false } });
+    const pointerText = (out) => (Array.isArray(out.updatedToolOutput) ? out.updatedToolOutput[0].text : replacedText(out.updatedToolOutput));
+    const cases = [
+      { name: "MCP", same: (sid) => mcp(sid, "mcp__lostbet__get_document"), other: (sid) => mcp(sid, "mcp__lostbet__list_documents") },
+      { name: "Bash", same: (sid) => bash(sid, "make lostbet-build"), other: (sid) => bash(sid, "make lostbet-check") },
+    ];
+    for (const c of cases) {
+      const S1 = lostBetSession();
+      const first = parsed(await handleHook("claude-code", c.same(S1), env));
+      assert.notEqual(first, null, c.name + ": the first output is a bet: replaced");
+      const pointer = pointerText(first).split("\n").find((l) => l.includes(CCP + "ctx_search({"));
+      assert.ok(pointer !== undefined, c.name + ": the stub names the ctx_search call");
+      const ctx = { project: resolveProject("claude-code", { env, argv: [], cwd: repo }), sessionId: S1, turn: 2, signal: new AbortController().signal };
+      let args = callArgs(pointer);
+      let paged = 0;
+      for (let calls = 0; args !== null && calls < 4; calls++) {
+        const r = await ctxSearch.handler(args, ctx);
+        assert.equal(r.isError, false, r.text.slice(0, 300));
+        const more = r.text.lastIndexOf("\nMore: ");
+        paged += Buffer.byteLength(r.text.slice(r.text.indexOf("\n") + 1, more < 0 ? undefined : more));
+        args = more < 0 ? null : callArgs(r.text.slice(more + 1));
+      }
+      const size = Buffer.byteLength(c.name === "MCP" ? doc : log);
+      assert.ok(paged * 2 >= size, c.name + ": the page-in reached " + paged + " of " + size + " B, a lost bet");
+      assert.equal(parsed(await handleHook("claude-code", c.same(S1), env)), null, c.name + ": the bet on this key was lost in S1: the next output passes whole");
+      assert.notEqual(parsed(await handleHook("claude-code", c.other(S1), env)), null, c.name + ": another key in S1 is still replaced");
+      assert.notEqual(parsed(await handleHook("claude-code", c.same(lostBetSession()), env)), null, c.name + ": in a new session the key is replaced again");
+    }
+  });
+
   // D-1402-PLUGIN-CALL-1 (#1402): a plugin mod's $.mcp.call gets a toolu_plugin_ id from the host, and its result goes
   // back to the mod only, never to the model. The mod gets the output whole (it may JSON.parse it); the text is indexed.
   test("D-1402-PLUGIN-CALL-1: a large MCP result of a plugin call (toolu_plugin_) reaches the mod whole and is indexed", async () => {
