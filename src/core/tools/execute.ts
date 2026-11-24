@@ -14,7 +14,7 @@ import { CtxError } from "../contracts/errors.ts";
 import type { ExecuteInput, JournalFacts, ToolContext, ToolReply } from "../contracts/types.ts";
 import { moreLine, selectChunks } from "../index/select.ts";
 import { canonicalKey } from "../journal/append.ts";
-import { isInside } from "../project/contain.ts";
+import { allowedRootOf } from "../project/contain.ts";
 import { capBytes } from "../sandbox/cap.ts";
 import { buildChildEnv } from "../sandbox/env.ts";
 import { rewriteWindowsBuildTools } from "../sandbox/win-build.ts";
@@ -88,11 +88,12 @@ function schemaLine(issue: z.core.$ZodIssue): string {
 // Step 3 (D-M2-T10-5): `resolve` has already removed every "..", and a component that does not exist
 // cannot be a symlink, so the nearest existing ancestor decides containment. A file that does not exist
 // yet inside the project still runs (GP4/deleted-cwd-no-ansi); the code sees CTX_FILE and decides.
-function fileError(given: string, abs: string, root: string): string | null {
+// D-1398-HOST-ROOTS-1: a folder the host granted this call counts as inside.
+function fileError(given: string, abs: string, root: string, hostRoots: readonly string[] | undefined): ToolReply | null {
   let dir = abs;
   while (!existsSync(dir) && dirname(dir) !== dir) dir = dirname(dir);
-  if (isInside(root, dir)) return null;
-  return new CtxError("OUTSIDE_ROOT", { p: given, root }).toLine();
+  if (allowedRootOf(root, hostRoots, dir) !== undefined) return null;
+  return { ...fail(new CtxError("OUTSIDE_ROOT", { p: given, root }).toLine()), outsideRoot: true };
 }
 
 function takesDashC(language: string, runtime: string): boolean {
@@ -177,8 +178,8 @@ async function handler(raw: ExecuteInput, ctx: ToolContext): Promise<ToolReply> 
   const extra: Record<string, string> = { ...PLAIN_OUTPUT_ENV };
   if (input.file !== undefined) {
     const abs = resolve(cwd, input.file);
-    const bad = fileError(input.file, abs, ctx.project.containmentRoot);
-    if (bad !== null) return fail(bad);
+    const bad = fileError(input.file, abs, ctx.project.containmentRoot, ctx.hostRoots);
+    if (bad !== null) return bad;
     extra.CTX_FILE = abs;
   }
   // Step 4. D-1373-STAT-1: a lookup failure is a named error line, never the generic internal error.

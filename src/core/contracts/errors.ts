@@ -18,7 +18,7 @@ export const ERROR_TEXT: Readonly<Record<ErrorCode, string>> = Object.freeze({
   NO_RUNTIME: "No <lang> runtime on PATH. Fix: install it or pick another language.",
   FETCH_FAILED: "Fetch failed: <code>. Fix: check the URL or proxy.",
   SSRF: "Blocked private address <host>. Fix: use a public URL.",
-  OUTSIDE_ROOT: "Path <p> is outside the project. Fix: use a path inside <root>.",
+  OUTSIDE_ROOT: "Path <p> is outside the project and the folders added to this session. Fix: use a path inside <root>, or add its folder to the session (Claude Code /add-dir, Codex --add-dir).", // #1398 D-1398-HOST-ROOTS-1
   INVALID_ARGS: "Invalid argument <field>. Fix: <action>.",
   ONE_OF_INPUT: "Pass exactly one of <names>. Fix: drop the extra field.",
   SPAWN_FAILED: "Failed to start the process: <detail>. Fix: check the command and PATH.",

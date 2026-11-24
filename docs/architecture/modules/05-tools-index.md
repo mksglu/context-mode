@@ -108,7 +108,7 @@ export const ctxIndex: ToolDef<CtxIndexInput> = { name: "ctx_index", ... };
 | Cause | Error key | Text |
 |---|---|---|
 | none or >1 of path/content/url | `ONE_OF_INPUT` | `Give exactly one of path, content, url. Fix: pass only one.` |
-| path resolves outside the project | `OUTSIDE_ROOT` | `Path <p> is outside the project. Fix: use a path inside <root>.` |
+| path resolves outside the project | `OUTSIDE_ROOT` | `Path <p> is outside the project and the folders added to this session. Fix: use a path inside <root>, or add its folder to the session (Claude Code /add-dir, Codex --add-dir).` (D-1398-HOST-ROOTS-1) |
 | `url` fetch fails or is blocked by SSRF | `FETCH_FAILED` or `SSRF` | as in §3.3 |
 
 **E2E case:** GP5 (`ctx_index` → `ctx_search`; `ctx_fetch_and_index` naming in the GP5 row maps to `ctx_index` with a `url` field per 00-architecture Assumption A3) — `covers: ["src/core/tools/index.ts"]`.

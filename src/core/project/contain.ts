@@ -33,6 +33,13 @@ export function isInside(root: string, p: string): boolean {
   return true;
 }
 
+/** D-1398-HOST-ROOTS-1 (#1398): the allowed root that holds `p`: the project's containment root first, then a folder the
+ *  host granted this call (Claude Code roots, Codex write entries). undefined when none holds it. */
+export function allowedRootOf(containmentRoot: string, hostRoots: readonly string[] | undefined, p: string): string | undefined {
+  if (isInside(containmentRoot, p)) return containmentRoot;
+  return hostRoots?.find((r) => isInside(r, p));
+}
+
 // D-R48-OWN-FILE-1 (#1326): the realpath of a fixed dir (project root, agent config dir) is asked on every Read the
 // hooks check; only a found realpath is kept, so a dir made later is still seen.
 const rootReal = new Map<string, string>();

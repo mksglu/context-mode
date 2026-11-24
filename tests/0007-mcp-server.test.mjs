@@ -411,7 +411,7 @@ describe("ADR-0007 call shape on every host", () => {
     "io.modelcontextprotocol/clientCapabilities": { roots: { listChanged: true }, elicitation: { form: {}, url: {} } },
   };
   const ccClient = async (t) => {
-    const client = spawnBundle(join(bundleDir, "server.mjs"), { HOME: root, USERPROFILE: root, CLAUDE_PROJECT_DIR: repo }, ["--agent", "claude-code"], { cwd: repo });
+    const client = spawnBundle(join(bundleDir, "server.mjs"), { HOME: root, USERPROFILE: root, CLAUDE_PROJECT_DIR: repo, PATH: process.env.PATH ?? "" }, ["--agent", "claude-code"], { cwd: repo });
     t.after(() => client.kill());
     await client.request("server/discover", { _meta: CC_ENVELOPE });
     return client;

@@ -9,7 +9,7 @@ import { DECISION_SOURCE, DECISION_USER_LABEL, ECHO_MAX_BYTES, EXEC_TIMEOUT_MS, 
 import { CtxError } from "../contracts/errors.ts";
 import type { CtxIndexInput, DbHandle, ProjectContext, SourceKind, ToolContext, ToolReply } from "../contracts/types.ts";
 import { walkDir } from "../index/walk.ts";
-import { isInside } from "../project/contain.ts";
+import { allowedRootOf } from "../project/contain.ts";
 import { capBytes } from "../sandbox/cap.ts";
 import { safeFetch } from "../sandbox/fetch.ts";
 import { unknownField } from "./search.ts";
@@ -69,20 +69,22 @@ function readUtf8(absPath: string): string | undefined {
 // isInside is false for a path that does not exist (D-M1-T3-4). A missing path whose nearest existing
 // parent is inside the project is a bad argument, not an escape; anything else is OUTSIDE_ROOT, so the
 // reply never tells whether a path outside the project exists.
-function missingOrOutside(given: string, abs: string, root: string): CtxError {
+function missingOrOutside(given: string, abs: string, root: string, hostRoots: readonly string[] | undefined): CtxError {
   let dir = abs;
   while (!existsSync(dir) && dirname(dir) !== dir) dir = dirname(dir);
-  if (dir !== abs && isInside(root, dir)) return new CtxError("INVALID_ARGS", { field: "path", action: "pass an existing file or folder" });
+  if (dir !== abs && allowedRootOf(root, hostRoots, dir) !== undefined) return new CtxError("INVALID_ARGS", { field: "path", action: "pass an existing file or folder" });
   return new CtxError("OUTSIDE_ROOT", { p: given, root });
 }
 
-// Step 2, path branch. One containment rule for files and folders: the shared isInside (#954, #1294).
-function pathItems(input: CtxIndexInput & { path: string }, project: ProjectContext): Item[] {
+// Step 2, path branch. One containment rule for files and folders: the shared isInside (#954, #1294), over the project
+// and the folders the host granted this call (D-1398-HOST-ROOTS-1); a folder walk stays inside the root that holds it.
+function pathItems(input: CtxIndexInput & { path: string }, project: ProjectContext, hostRoots: readonly string[] | undefined): Item[] {
   const abs = resolve(project.worktree, input.path);
-  if (!isInside(project.containmentRoot, abs)) throw missingOrOutside(input.path, abs, project.containmentRoot);
+  const allowed = allowedRootOf(project.containmentRoot, hostRoots, abs);
+  if (allowed === undefined) throw missingOrOutside(input.path, abs, project.containmentRoot, hostRoots);
   const base = relative(project.worktree, abs);
   if (statSync(abs).isDirectory()) {
-    return walkDir(abs, project.containmentRoot).map((f) => ({
+    return walkDir(abs, allowed).map((f) => ({
       sourceKind: "path",
       label: pathLabel(join(base, f.relPath)),
       kind: kindOfPath(f.relPath),
@@ -101,7 +103,7 @@ async function itemsOf(input: CtxIndexInput, ctx: ToolContext): Promise<{ items:
     return { items: [{ sourceKind: "content", label, kind, read: () => text }], from: label };
   }
   if (input.path !== undefined) {
-    const items = pathItems({ ...input, path: input.path }, ctx.project);
+    const items = pathItems({ ...input, path: input.path }, ctx.project, ctx.hostRoots);
     return { items, from: items.length === 1 ? items[0].label : pathLabel(input.path) };
   }
   // url: safeFetch owns proxy env and the per-hop SSRF check; its CtxError is the reply (P1, one path).
@@ -177,7 +179,7 @@ async function handler(input: CtxIndexInput, ctx: ToolContext): Promise<ToolRepl
       journal: { kind: "index", key: from, path: from, exit_code: null },
     };
   } catch (err) {
-    if (err instanceof CtxError) return { text: err.toLine(), isError: true, sandboxBytes: 0 };
+    if (err instanceof CtxError) return { text: err.toLine(), isError: true, sandboxBytes: 0, ...(err.code === "OUTSIDE_ROOT" ? { outsideRoot: true as const } : {}) };
     throw err;
   }
 }

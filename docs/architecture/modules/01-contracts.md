@@ -142,7 +142,7 @@ export type ErrorCode =
 | `NO_RUNTIME` | `No <lang> runtime on PATH. Fix: install it or pick another language.` | PRD §9 |
 | `FETCH_FAILED` | `Fetch failed: <code>. Fix: check the URL or proxy.` | #1135 |
 | `SSRF` | `Blocked private address <host>. Fix: use a public URL.` | Q19, PRD §9 |
-| `OUTSIDE_ROOT` | `Path <p> is outside the project. Fix: use a path inside <root>.` | #954, #1294 |
+| `OUTSIDE_ROOT` | `Path <p> is outside the project and the folders added to this session. Fix: use a path inside <root>, or add its folder to the session (Claude Code /add-dir, Codex --add-dir).` | #954, #1294, #1398 (D-1398-HOST-ROOTS-1) |
 | `INVALID_ARGS` | `Invalid argument <field>. Fix: <action>.` | DECISIONS-r9 M23 |
 | `ONE_OF_INPUT` | `Pass exactly one of <names>. Fix: drop the extra field.` | DECISIONS-r9 M23 |
 | `SPAWN_FAILED` | `Failed to start the process: <detail>. Fix: check the command and PATH.` | DECISIONS-r9 M23 |

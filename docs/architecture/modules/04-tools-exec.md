@@ -14,7 +14,7 @@ All from 00 §3.3, verbatim, no new text:
 | `TIMEOUT` | `Timed out after <ms> ms. Fix: pass background: true.` |
 | `NO_RUNTIME` | `No <lang> runtime on PATH. Fix: install it or pick another language.` |
 | `FETCH_FAILED` | `Fetch failed: <code>. Fix: check the URL or proxy.` |
-| `OUTSIDE_ROOT` | `Path <p> is outside the project. Fix: use a path inside <root>.` |
+| `OUTSIDE_ROOT` | `Path <p> is outside the project and the folders added to this session. Fix: use a path inside <root>, or add its folder to the session (Claude Code /add-dir, Codex --add-dir).` (D-1398-HOST-ROOTS-1) |
 
 ## 2. `src/core/tools/execute.ts` — `ctx_execute`
 

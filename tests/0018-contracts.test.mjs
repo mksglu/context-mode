@@ -118,7 +118,7 @@ describe("ADR-0018: contracts (concurrent)", { concurrency: CONC }, () => {
       NO_GIT_BASH: "Git Bash not found. Fix: install Git for Windows.",
       FETCH_FAILED: "Fetch failed: ENOTFOUND. Fix: check the URL or proxy.",
       SSRF: "Blocked private address 127.0.0.1. Fix: use a public URL.",
-      OUTSIDE_ROOT: "Path /etc/passwd is outside the project. Fix: use a path inside /repo.",
+      OUTSIDE_ROOT: "Path /etc/passwd is outside the project and the folders added to this session. Fix: use a path inside /repo, or add its folder to the session (Claude Code /add-dir, Codex --add-dir).", // #1398
       INVALID_ARGS: 'Invalid argument offset. Fix: drop offset with sort:"timeline".',
       ONE_OF_INPUT: "Pass exactly one of code, file. Fix: drop the extra field.",
       SPAWN_FAILED: "Failed to start the process: ENOENT. Fix: check the command and PATH.",
