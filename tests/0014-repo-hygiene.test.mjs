@@ -983,7 +983,8 @@ describe("ADR-0015 repo: doc facts", () => {
   // The replace trigger is the constant 4096; no doc tells users to set CTX_REPLACE_TRIGGER_BYTES. Only the dated
   // DEVIATIONS history may name it.
   test("[D-REPLACE-TRIGGER-CONST-1] no doc names CTX_REPLACE_TRIGGER_BYTES as a setting (DEVIATIONS history only)", () => {
-    const HISTORY = new Set(["docs/architecture/DEVIATIONS.md"]);
+    // Decision records keep the name: DEVIATIONS (history) and ADR-0027 (the decision that removes the setting).
+    const HISTORY = new Set(["docs/architecture/DEVIATIONS.md", "docs/architecture/adr/0027-replace-policy.md"]);
     const docs = execFileSync("git", ["ls-files", "*.md"], { cwd: ROOT, encoding: "utf8" }).split("\n").filter((f) => f !== "" && !HISTORY.has(f));
     const naming = docs.filter((f) => existsSync(path.join(ROOT, f)) && readRoot(f).includes("CTX_REPLACE_TRIGGER_BYTES"));
     assert.deepEqual(naming, [], "these docs still name CTX_REPLACE_TRIGGER_BYTES");
