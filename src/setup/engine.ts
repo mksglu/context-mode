@@ -389,9 +389,9 @@ function planSkills(row: CheckRow, edits: FileEdit[]): void {
 }
 
 /** ADR-0026 decision 11 (D-OMP-SETUP-1): when OMP imports a context-mode server from ~/.claude.json, OMP's own
- *  denylist `disabledServers` in ~/.omp/agent/mcp.json gets our name (merge, every other key stays). Import off: no write. */
+ *  denylist `disabledServers` in <OMP agent dir>/mcp.json gets our name (merge, every other key stays). Import off: no write. */
 function planOmpImport(row: CheckRow, edits: FileEdit[], ctx: SetupContext): void {
-  const files = ompImportFiles(ctx.home);
+  const files = ompImportFiles(ctx.env, ctx.home);
   if (!ompImportsUs(files, ctx.env)) return;
   planJsonKeys(row, edits, files.mcp, "json", (doc) => {
     const cur = Array.isArray(doc[OMP_DISABLED_SERVERS_KEY]) ? doc[OMP_DISABLED_SERVERS_KEY] as unknown[] : [];

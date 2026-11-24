@@ -156,7 +156,7 @@ function ownEntries(agent: AgentId, env: NodeJS.ProcessEnv): OwnEntry[] {
   if (agent === "omp") {
     // ADR-0026 decision 11 (D-OMP-SETUP-1): setup adds our name to OMP's `disabledServers` denylist; drop only that name.
     return [{
-      file: ompImportFiles(home).mcp,
+      file: ompImportFiles(env, home).mcp,
       key: OMP_DISABLED_SERVERS_KEY,
       shown: OMP_DISABLED_SERVERS_KEY,
       has: (v) => Array.isArray(v) && v.includes(SERVER_KEY),

@@ -346,7 +346,7 @@ export function buildRegistry(ctx: SetupContext): CheckRow[] {
       ...(hookInstall.kind === "package" ? [] : [hookInstall.file]),
       ...(hookInstall.kind === "file" && hookInstall.trust ? [hookInstall.trust] : []),
       ...(skillInstall.kind === "dir" ? skillInstall.files.map((f) => f.file) : []),
-      ...(id === "omp" ? [ompImportFiles(ctx.home).mcp] : []), // ADR-0026 decision 11: disabledServers, only when OMP imports us
+      ...(id === "omp" ? [ompImportFiles(ctx.env, ctx.home).mcp] : []), // ADR-0026 decision 11: disabledServers, only when OMP imports us
     ];
     const out: CheckRow = {
       id, installMode: row.installMode, serverCommand: serverCmd(ctx, id), config, cli: cliFor(ctx, id),

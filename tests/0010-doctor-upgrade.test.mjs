@@ -3118,7 +3118,7 @@ describe("ADR-0026 OMP doctor: agent omp, OMP plugin store, OMP verbs, host-limi
   // #1415 (D-OMP-STORE-PATH-1): OMP keeps its plugin store at (xdgData ?? configRoot)/plugins, configRoot = HOME/(PI_CONFIG_DIR
   // or .omp). xdgData = $XDG_DATA_HOME/omp only on linux and darwin, only when that dir exists and the agent dir is OMP's default
   // (PI_CODING_AGENT_DIR unset or <configRoot>/agent). mcp.json and config.yml stay in <configRoot>/agent. Expected paths come
-  // from OMP 19.1.1's own pi-utils src/dirs.ts run under the same env (oracle table, tickets/r88-1415.md), not from our code.
+  // from OMP 19.1.1's own pi-utils src/dirs.ts run under the same env (the oracle table in D-OMP-STORE-PATH-1), not from our code.
   const OMP_XDG_SKIP = process.platform === "win32" && "OMP reads XDG_DATA_HOME on linux and darwin only";
   function installIn(storeDir) {
     put(path.join(storeDir, "omp-plugins.lock.json"), { plugins: { "context-mode": { version: "2.2.2", enabled: true } }, settings: {} });

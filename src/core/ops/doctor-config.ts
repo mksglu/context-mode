@@ -6,7 +6,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import {
-  AGENT_ARG, AGENT_HOME_DIR, D3_NO_SETUP_FIX, NATIVE_INSTALL, V1_REASON, D3_ROOT_DETAIL, D3_ROOT_FIX, MCP_ARGS_FIELD, MCP_COMMAND_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
+  AGENT_ARG, D3_NO_SETUP_FIX, NATIVE_INSTALL, V1_REASON, D3_ROOT_DETAIL, D3_ROOT_FIX, MCP_ARGS_FIELD, MCP_COMMAND_FIELD, PLUGIN_CACHE_DIR_NAME, SERVER_ENTRY_FILE, SERVER_KEY, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
   D5B_DETAIL, D5B_FIX, DOCTOR_FIX_UPGRADE, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_COMMAND_FIELD, HOOK_COMMAND_SEP,
   HOOK_ENTRY_FILE, HOOK_SCRIPT_SEPS, HOOK_GROUP_HOOKS_FIELD, HOOKS_JSON_FILE, HOOK_HOST_FILE, HOOK_MATCHER_FIELD, HOST_CONFIG_DIR_NAME, HOST_NODE_COMMAND, EXE_SUFFIX,
   HOOKS_KEY, MCP_ANY_MATCH, POST_TOOL_USE, KIRO_ACTION_FIELD, KIRO_TOOL_MATCHERS, KIRO_TRIGGER_FIELD, MATCHER_ALT, MATCHER_ANY, MATCHER_CLOSE, MATCHER_OPEN,
@@ -17,7 +17,7 @@ import {
 } from "../contracts/constants.ts";
 import type { AdapterRow, AgentId, DoctorRow } from "../contracts/types.ts";
 import { hasReplace } from "../../adapters/table.ts";
-import { codexDirOf, copilotDirOf, homeDirOf, kiroDirOf, opencodeDirOf, ownMcpFileOf, piAgentDirOf } from "../project/config-dir.ts";
+import { codexDirOf, copilotDirOf, homeDirOf, kiroDirOf, ompPluginsDirOf, opencodeDirOf, ownMcpFileOf, piAgentDirOf } from "../project/config-dir.ts";
 import { hostText } from "./host-text.ts";
 import { detectV1, type V1Scope } from "./detect-v1.ts";
 import { hostConfigValueAt, isNodeCommand, mergeOwnEntries, opencodePluginFile, parseHostConfig, readHostConfig } from "./host-config.ts";
@@ -407,7 +407,7 @@ export function checkHostConfig(row: AdapterRow, env: NodeJS.ProcessEnv, worktre
     if ("installs" in choice) return fail("D3", D3_ROOT_DETAIL(choice.installs.map((r) => r.installPath)), D3_ROOT_FIX(choice.installs));
   }
   if (row.id === "pi") return checkPiInstall(env, home, worktree);
-  if (row.id === "omp") return checkOmpInstall(home);
+  if (row.id === "omp") return checkOmpInstall(env, home);
   const parts: D3Part[] = [...(mcpWrong(row, home, env, worktree) ? [PART_MCP] : []), ...hookParts(row, home, env, worktree)];
   if (parts.length === 0) return pass("D3");
   const detail = D3_DETAIL(parts);
@@ -425,9 +425,9 @@ function checkPiInstall(env: NodeJS.ProcessEnv, home: string, worktree: string):
   return fail("D3", D3_DETAIL([PART_MCP]) + D4_REASON_JOIN + join(piAgentDirOf(env, home), SETTINGS_FILE), NATIVE_INSTALL.pi[0]);
 }
 
-// ADR-0026 decision 7 (D-OMP-DOCTOR-1): OMP records its plugins in ~/.omp/plugins/omp-plugins.lock.json and installs them
-// as dependencies of ~/.omp/plugins/package.json; context-mode must be in both and enabled. Fix lines are OMP's own verbs.
-const OMP_PLUGINS_DIR = "plugins";
+// ADR-0026 decision 7 (D-OMP-DOCTOR-1): OMP records its plugins in <store>/omp-plugins.lock.json and installs them as
+// dependencies of <store>/package.json; context-mode must be in both and enabled. Fix lines are OMP's own verbs.
+// #1415 D-OMP-STORE-PATH-1: <store> is where OMP itself keeps it (ompPluginsDirOf: $XDG_DATA_HOME/omp, the PI_CONFIG_DIR root, else ~/.omp).
 const OMP_LOCK_FILE = "omp-plugins.lock.json";
 function readJson(file: string): Record<string, unknown> | undefined {
   try {
@@ -439,8 +439,8 @@ function ownEntry(doc: Record<string, unknown> | undefined, key: string): unknow
   const map = doc?.[key];
   return typeof map === "object" && map !== null ? (map as Record<string, unknown>)[SERVER_KEY] : undefined;
 }
-function checkOmpInstall(home: string): DoctorRow {
-  const dir = join(home, ...AGENT_HOME_DIR.omp, OMP_PLUGINS_DIR);
+function checkOmpInstall(env: NodeJS.ProcessEnv, home: string): DoctorRow {
+  const dir = ompPluginsDirOf(env, home);
   const lock = join(dir, OMP_LOCK_FILE);
   const pkg = join(dir, PI_PACKAGE_JSON_FILE);
   const entry = ownEntry(readJson(lock), "plugins");
@@ -459,7 +459,7 @@ export function ompInfoLines(env: NodeJS.ProcessEnv, version: string | undefined
   out.push(OMP_CONTENT_INFO, OMP_PRINT_MODE_INFO, OMP_SCRIPTS_INFO);
   const home = homeDirOf(env);
   if (home === null) return out;
-  const files = ompImportFiles(home);
+  const files = ompImportFiles(env, home);
   if (!ompImportsUs(files, env)) return out;
   const listed = readJson(files.mcp)?.[OMP_DISABLED_SERVERS_KEY];
   if (!(Array.isArray(listed) && listed.includes(SERVER_KEY))) out.push(OMP_IMPORT_INFO(files.claude, files.mcp));

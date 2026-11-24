@@ -1,12 +1,14 @@
 // ADR-0026 decision 11 (O4, D-OMP-SETUP-1): OMP 18.20.0 imports user MCP servers from ~/.claude.json only when the
-// `claude` user source is on: `enabledProviders` in ~/.omp/agent/config.yml names `claude`, `*` or `all`, or
+// `claude` user source is on: `enabledProviders` in <OMP agent dir>/config.yml names `claude`, `*` or `all`, or
 // CLAUDE_CONFIG_DIR is set; `disabledProviders: [claude]` wins [src capability/index.ts:51-60,419-429,
 // discovery/claude.ts:65-69,86-99]. When it imports a `context-mode` server, OMP's own denylist
-// `disabledServers` in ~/.omp/agent/mcp.json keeps that second server off [doc docs/mcp-config.md:96,433-448].
-// Setup adds our name only in that case; uninstall drops only our name. PI_CODING_AGENT_DIR never selects these files.
+// `disabledServers` in <OMP agent dir>/mcp.json keeps that second server off [doc docs/mcp-config.md:96,433-448].
+// Setup adds our name only in that case; uninstall drops only our name. The OMP agent dir is <OMP config root>/agent
+// (ompAgentDirOf, #1415 D-OMP-STORE-PATH-1); PI_CODING_AGENT_DIR never selects these files.
 const { existsSync, readFileSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import { join } from "node:path";
-import { AGENT_HOME_DIR, CLAUDE_CONFIG_DIR_ENV, CLAUDE_USER_CONFIG_FILE, MCP_SERVERS_KEY, PI_AGENT_DIR, SERVER_KEY } from "../contracts/constants.ts";
+import { CLAUDE_CONFIG_DIR_ENV, CLAUDE_USER_CONFIG_FILE, MCP_SERVERS_KEY, SERVER_KEY } from "../contracts/constants.ts";
+import { ompAgentDirOf } from "../project/config-dir.ts";
 import { hostText } from "./host-text.ts";
 
 export const OMP_DISABLED_SERVERS_KEY = "disabledServers";
@@ -19,9 +21,9 @@ const ALL_PROVIDERS: readonly string[] = ["*", "all"];
 
 export interface OmpImportFiles { config: string; claude: string; mcp: string; }
 
-/** The three files of the O4 rule: OMP's config.yml and mcp.json under ~/.omp/agent, and Claude's ~/.claude.json. */
-export function ompImportFiles(home: string): OmpImportFiles {
-  const agentDir = join(home, ...AGENT_HOME_DIR.omp, PI_AGENT_DIR);
+/** The three files of the O4 rule: OMP's config.yml and mcp.json in OMP's agent dir, and Claude's ~/.claude.json. */
+export function ompImportFiles(env: NodeJS.ProcessEnv, home: string): OmpImportFiles {
+  const agentDir = ompAgentDirOf(env, home);
   return { config: join(agentDir, OMP_CONFIG_FILE), mcp: join(agentDir, OMP_MCP_FILE), claude: join(home, CLAUDE_USER_CONFIG_FILE) };
 }
 

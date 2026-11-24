@@ -3,7 +3,7 @@
 // D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
 const { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import { basename, dirname, join, posix, resolve, win32 } from "node:path";
-import { AGENT_HOME_DIR, UPGRADE_HOST_COMMAND, APPDATA_ENV, CONFIG_TOML_FILE, SETUP_BACKUP_DIR_NAME, SETUP_MANIFEST_FILE, CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV, COPILOT_HOME_ENV, GEMINI_CLI_HOME_ENV, DATA_DIR_ENV, DATA_ROOT, HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME, KIRO_HOME_ENV, OPENCODE_CONFIG_DIR_ENV, PI_AGENT_DIR, PI_AGENT_DIR_ENV, VSCODE_USER_DIR_SEGMENTS, XDG_CONFIG_HOME_ENV } from "../contracts/constants.ts";
+import { AGENT_HOME_DIR, UPGRADE_HOST_COMMAND, APPDATA_ENV, CONFIG_TOML_FILE, SETUP_BACKUP_DIR_NAME, SETUP_MANIFEST_FILE, CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV, COPILOT_HOME_ENV, GEMINI_CLI_HOME_ENV, DATA_DIR_ENV, DATA_ROOT, HOST_PLUGINS_DIR_NAME, PLUGIN_CACHE_DIR_NAME, KIRO_HOME_ENV, OMP_APP_DIR, OMP_PLUGINS_DIR, OPENCODE_CONFIG_DIR_ENV, PI_AGENT_DIR, PI_AGENT_DIR_ENV, PI_CONFIG_DIR_ENV, VSCODE_USER_DIR_SEGMENTS, XDG_CONFIG_HOME_ENV, XDG_DATA_HOME_ENV } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";
 
 /** The one home rule. An empty value counts as unset; null when nothing is set (D-M3-F-8).
@@ -167,6 +167,36 @@ export function opencodeDirOf(env: NodeJS.ProcessEnv, home: string): string {
 export function piAgentDirOf(env: NodeJS.ProcessEnv, home: string): string {
   const dir = env[PI_AGENT_DIR_ENV];
   return dir !== undefined && dir !== "" ? dir : join(home, ...AGENT_HOME_DIR.pi, PI_AGENT_DIR);
+}
+
+/** #1415 D-OMP-STORE-PATH-1: OMP's config root, the same rule as OMP's own pi-utils dirs.ts (getBaseConfigRoot, 19.1.1):
+ *  <home>/$PI_CONFIG_DIR when set and not empty, else <home>/.omp. Setup, doctor, ctx_upgrade and uninstall read OMP paths only
+ *  through this file; agent detection never reads PI_CONFIG_DIR. Named profiles stay out (ADR-0026 non-goal). */
+export function ompConfigRootOf(env: NodeJS.ProcessEnv, home: string): string {
+  const dir = env[PI_CONFIG_DIR_ENV];
+  return dir !== undefined && dir !== "" ? join(home, dir) : join(home, ...AGENT_HOME_DIR.omp);
+}
+
+/** #1415 D-OMP-STORE-PATH-1: OMP's agent dir for config.yml and mcp.json: <OMP config root>/agent. XDG never moves it, and
+ *  PI_CODING_AGENT_DIR never selects these files (ADR-0026 decision 11). */
+export function ompAgentDirOf(env: NodeJS.ProcessEnv, home: string): string {
+  return join(ompConfigRootOf(env, home), PI_AGENT_DIR);
+}
+
+/** #1415 D-OMP-STORE-PATH-1: OMP's plugin store, OMP's own rule (dirs.ts DirResolver + getPluginsDir, 19.1.1):
+ *  $XDG_DATA_HOME/omp/plugins on linux and darwin when $XDG_DATA_HOME is set and not empty, $XDG_DATA_HOME/omp exists and
+ *  the agent dir is OMP's default (PI_CODING_AGENT_DIR unset, or resolving to <config root>/agent); else <config root>/plugins.
+ *  `platform` is a parameter so the rule is tested on every OS. */
+export function ompPluginsDirOf(env: NodeJS.ProcessEnv, home: string, platform: NodeJS.Platform = process.platform): string {
+  const root = ompConfigRootOf(env, home);
+  const xdg = env[XDG_DATA_HOME_ENV];
+  const agent = env[PI_AGENT_DIR_ENV];
+  const defaultAgent = agent === undefined || agent === "" || resolve(agent) === join(root, PI_AGENT_DIR);
+  if ((platform === "linux" || platform === "darwin") && defaultAgent && xdg !== undefined && xdg !== "") {
+    const app = join(xdg, OMP_APP_DIR);
+    if (existsSync(app)) return join(app, OMP_PLUGINS_DIR);
+  }
+  return join(root, OMP_PLUGINS_DIR);
 }
 
 /** D-WIN-VSCODE-MCP-1: the VS Code user-profile dir (default profile, holds mcp.json and settings.json). Rule of VS Code's
