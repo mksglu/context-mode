@@ -77,18 +77,20 @@ jobs:
       # D-C166-WIN-FIRE-1: the real Codex CLI on all 3 OS, so the codex fire tests (tests/0020-fire-hook-config) run
       # on the Windows runner too. Fake local provider, temp HOME and CODEX_HOME, no login, no key.
       # A global agent CLI, not a dev install, so it does not go through scripts/ci-install.mjs.
-      - run: npm i -g @openai/codex@0.166.0
+      # D-CI-HOST-INSTALL-1: each host CLI install below runs through scripts/ci-install.mjs --npm: 3 tries, a growing wait, and one
+      # line when npm names a registry 404/5xx or network fault for a package that is not ours. All 3 red fails the step.
+      - run: node scripts/ci-install.mjs --npm i -g @openai/codex@0.166.0
         name: codex 0.166.0 for the codex fire tests (D-C166-WIN-FIRE-1)
       - run: codex --version
         name: codex version (info)
       # D-OC2-FIRE-1: both OpenCode lines on all 3 OS for the opencode fire tests (tests/0020-fire-plugin-ext). 1.19.5 is the
       # global `opencode`; 2.2.5 (npm @opencode/cli) owns the same bin name, so it goes into its own prefix, found through
       # CM_OPENCODE2_DIR. Fake local provider, temp HOME, no login, no key.
-      - run: npm i -g opencode-ai@1.19.5
+      - run: node scripts/ci-install.mjs --npm i -g opencode-ai@1.19.5
         name: opencode 1.19.5 for the opencode fire tests (D-OC2-FIRE-1)
       - run: opencode --version
         name: opencode 1.19.5 version (info)
-      - run: npm i --prefix "${{ runner.temp }}/opencode2" @opencode/cli@2.2.5
+      - run: node scripts/ci-install.mjs --npm i --prefix "${{ runner.temp }}/opencode2" @opencode/cli@2.2.5
         name: opencode 2.2.5 (@opencode/cli) for the opencode 2 fire test (D-OC2-FIRE-1)
         shell: bash
       - run: echo "CM_OPENCODE2_DIR=${{ runner.temp }}/opencode2" >> "$GITHUB_ENV"

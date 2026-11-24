@@ -4,13 +4,13 @@ import { describe, test } from "node:test";
 import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 import { HOOK_WORDS, LINE_PREFIX, agentRows, checkAgentLines, renderAgentBlocks, renderAgentLines, writeAgentLines } from "../build/readme-agents.mjs";
-import { installWithRetry, missingPackages } from "../scripts/ci-install.mjs";
+import { HOST_WAITS_MS, installWithRetry, missingPackages, registryFault, retryHostInstall } from "../scripts/ci-install.mjs";
 import { ADAPTERS } from "../src/adapters/table.ts";
 import { AGENT_IDS } from "../src/core/contracts/agents.ts";
 import { DOCTOR_CHECK_ORDER, REPORT_CAP, REPORT_SOURCE_LABEL } from "../src/core/contracts/constants.ts";
@@ -549,7 +549,64 @@ describe("ADR-0013 repo: CI install retry", () => {
   test("ci.yml: every dev install goes through scripts/ci-install.mjs, none calls npm install directly", () => {
     const y = readFileSync(root + ".github/workflows/ci.yml", "utf8");
     assert.ok(!/- run: npm install/.test(y));
-    assert.equal(y.split("- run: node scripts/ci-install.mjs").length - 1, 3);
+    // 3 dev installs; the host CLI installs use the --npm mode of the same script (D-CI-HOST-INSTALL-1).
+    assert.equal(y.split("- run: node scripts/ci-install.mjs").length - 1 - (y.split("- run: node scripts/ci-install.mjs --npm ").length - 1), 3);
+  });
+
+  // D-CI-HOST-INSTALL-1: host CLI installs (npm i -g <agent CLI>) retry with a growing wait and name a registry fault.
+  test("[host install] registryFault names the third-party package of a registry 404, 5xx or network fault, in one line", () => {
+    const pi404 = "npm error code E404\nnpm error 404 The requested resource '@aws-sdk/middleware-websocket@https://registry.npmjs.org/@aws-sdk/middleware-websocket/-/middleware-websocket-3.972.68.tgz' could not be found or you do not have permission to access it.\nnpm error 404\n";
+    assert.equal(registryFault(pi404), "npm registry fault E404 for @aws-sdk/middleware-websocket, not a context-mode package");
+    assert.equal(registryFault("npm error code E404\nnpm error 404 Not Found - GET https://registry.npmjs.org/@aws-sdk%2fmiddleware-websocket - Not found\n"),
+      "npm registry fault E404 for @aws-sdk/middleware-websocket, not a context-mode package");
+    assert.equal(registryFault("npm ERR! code E503\nnpm ERR! 503 Service Unavailable - GET https://registry.npmjs.org/opencode-ai/-/opencode-ai-1.19.5.tgz\n"),
+      "npm registry fault E503 for opencode-ai, not a context-mode package");
+    assert.equal(registryFault("npm error code ETIMEDOUT\nnpm error network request to https://registry.npmjs.org/@openai%2fcodex failed, reason: timeout\n"),
+      "npm registry fault ETIMEDOUT for @openai/codex, not a context-mode package");
+    for (const [why, t] of [["ours", "npm error code E404\nnpm error 404 Not Found - GET https://registry.npmjs.org/context-mode - Not found\n"],
+      ["not a registry fault", "npm error code EACCES\nnpm error syscall mkdir\n"], ["empty", ""], ["no npm text", "copilot: no platform package found"]]) {
+      assert.equal(registryFault(t), null, why);
+    }
+  });
+
+  test("[host install] retryHostInstall: 3 tries, a growing wait, one line per red try with the fault; green on a later try", () => {
+    assert.equal(HOST_WAITS_MS.length, 2);
+    assert.ok(HOST_WAITS_MS[0] > 0 && HOST_WAITS_MS[1] > HOST_WAITS_MS[0], "the wait grows");
+    const fault = "npm error code E404\nnpm error 404 Not Found - GET https://registry.npmjs.org/@aws-sdk%2fx - Not found\n";
+    const waits = []; const lines = []; let n = 0;
+    const ok = retryHostInstall({ label: "p", attempt: () => (++n < 3 ? { ok: false, text: fault } : { ok: true, text: "" }), sleep: (ms) => waits.push(ms), log: (l) => lines.push(l) });
+    assert.deepEqual([ok.ok, ok.tries, n], [true, 3, 3]);
+    assert.deepEqual(waits, HOST_WAITS_MS);
+    assert.equal(lines.length, 2);
+    assert.equal(lines[0], "ci-install: p try 1/3 failed: npm registry fault E404 for @aws-sdk/x, not a context-mode package, next try in " + HOST_WAITS_MS[0] / 1000 + " s");
+    assert.equal(ok.fault, "npm registry fault E404 for @aws-sdk/x, not a context-mode package");
+    const w2 = [];
+    const red = retryHostInstall({ label: "p", attempt: () => ({ ok: false, text: "npm error code EACCES\n" }), sleep: (ms) => w2.push(ms), log: () => {} });
+    assert.deepEqual([red.ok, red.tries, red.fault, w2.length], [false, 3, null, 2], "all 3 red still fails, no fault named for a local error");
+    const first = retryHostInstall({ label: "p", attempt: () => ({ ok: true, text: "" }), sleep: () => assert.fail("no wait on a green first try"), log: () => assert.fail("no line") });
+    assert.equal(first.tries, 1);
+  });
+
+  test("[host install] ci.yml host CLI installs and the windows-hosts check go through the retry", () => {
+    const y = readFileSync(root + ".github/workflows/ci.yml", "utf8");
+    for (const l of ["- run: node scripts/ci-install.mjs --npm i -g @openai/codex@0.166.0", "- run: node scripts/ci-install.mjs --npm i -g opencode-ai@1.19.5",
+      '- run: node scripts/ci-install.mjs --npm i --prefix "${{ runner.temp }}/opencode2" @opencode/cli@2.2.5']) assert.ok(y.includes(l + "\n"), l);
+    assert.ok(!y.includes("- run: npm i "), "no host CLI install calls npm directly");
+    const w = readFileSync(root + "e2e/checks/windows-hosts.mjs", "utf8");
+    assert.ok(w.includes('import { retryHostInstall } from "../../scripts/ci-install.mjs";'));
+    assert.ok(w.includes("retryHostInstall({") && w.includes("return { ok: r.status === 0 && v?.status === 0"), "install and --version are one try");
+  });
+
+  test("[host install] CLI --npm: runs npm with the given args, exit 0 on a green try", (t) => {
+    const bin = mkdtempSync(path.join(tmpdir(), "cm-hostinst-"));
+    t.after(() => rmSync(bin, { recursive: true, force: true }));
+    const out = path.join(bin, "args.txt");
+    if (process.platform === "win32") writeFileSync(path.join(bin, "npm.cmd"), "@echo %* > \"" + out + "\"\r\n@exit /b 0\r\n");
+    else { writeFileSync(path.join(bin, "npm"), "#!/bin/sh\necho \"$@\" > '" + out + "'\n"); chmodSync(path.join(bin, "npm"), 0o755); }
+    const r = spawnSync(process.execPath, [root + "scripts/ci-install.mjs", "--npm", "i", "-g", "x@1.0.0"], { encoding: "utf8", env: { ...process.env, PATH: bin + path.delimiter + process.env.PATH } });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(readFileSync(out, "utf8").trim(), "i -g x@1.0.0");
+    assert.equal(r.stderr, "");
   });
 
   test("ci.yml: repo checks after a failed install are skipped, so the install error is the only red step", () => {

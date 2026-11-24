@@ -18,6 +18,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { vscodeMcpFile } from "../harness/vscode-user-dir.mjs";
+import { retryHostInstall } from "../../scripts/ci-install.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const WIN = process.platform === "win32";
@@ -422,12 +423,22 @@ async function main() {
   record("package", "npm-i-g", ver.status === 0 && ver.stdout.trim() === VERSION, `context-mode --version -> ${ver.stdout.trim()} (exit ${ver.status}) ${tail(ver.stderr, 200)}; prefix=${prefix}`);
   if (ver.stdout.trim() !== VERSION) return;
 
-  // host CLIs, one npm call each so one bad package does not hide the others
+  // host CLIs, one npm call each so one bad package does not hide the others. D-CI-HOST-INSTALL-1: install plus
+  // `--version` is one try; 3 tries with a growing wait, and one line when npm names a registry or network fault for a
+  // package that is not ours (seen: a 404 on a transitive @aws-sdk package, a missing copilot platform package).
   for (const h of HOSTS) {
     if (!h.pkg) { record(h.id, "cli-install", true, `no npm CLI: ${h.why}`); continue; }
-    const r = run(npmBin, ["i", "-g", "--prefix", prefix, "--no-audit", "--no-fund", h.pkg], { env: baseEnv, timeout: INSTALL_TIMEOUT_MS });
-    const v = r.status === 0 ? run(path.join(WIN ? prefix : binDir, WIN ? `${h.bin}.cmd` : h.bin), ["--version"], { env: baseEnv, timeout: 60_000 }) : undefined;
-    record(h.id, "cli-install", r.status === 0 && v?.status === 0, r.status === 0 ? `${h.pkg}: ${h.bin} --version -> ${v.stdout.trim().slice(0, 80)} (exit ${v.status}) ${tail(v.stderr, 160)}` : `${h.pkg}: ${tail(r.stderr)}`);
+    let r, v;
+    const res = retryHostInstall({
+      label: h.pkg,
+      attempt: () => {
+        r = run(npmBin, ["i", "-g", "--prefix", prefix, "--no-audit", "--no-fund", h.pkg], { env: baseEnv, timeout: INSTALL_TIMEOUT_MS });
+        v = r.status === 0 ? run(path.join(WIN ? prefix : binDir, WIN ? `${h.bin}.cmd` : h.bin), ["--version"], { env: baseEnv, timeout: 60_000 }) : undefined;
+        return { ok: r.status === 0 && v?.status === 0, text: r.stderr + (v ? v.stderr : "") };
+      },
+    });
+    const tries = res.tries > 1 ? ` (try ${res.tries} of 3${res.fault ? "; " + res.fault : ""})` : "";
+    record(h.id, "cli-install", res.ok, (r.status === 0 ? `${h.pkg}: ${h.bin} --version -> ${v.stdout.trim().slice(0, 80)} (exit ${v.status}) ${tail(v.stderr, 160)}` : `${h.pkg}: ${tail(r.stderr)}`) + tries);
   }
 
   // per agent, own HOME and project
