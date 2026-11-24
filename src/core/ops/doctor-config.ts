@@ -13,11 +13,11 @@ import {
   OPENCODE_BASE_CONFIG_FILE, OPENCODE_CONFIG_FILES, OPENCODE_GIT_SPEC, OPENCODE_NPM_SPEC_PREFIX, OPENCODE_MCP_COMMAND_FIELD, OPENCODE_PACKAGE_FIELD, OPENCODE_PLUGIN_KEY, OPENCODE_PLUGIN_PATH, OPENCODE_PLUGINS_KEY, OWN_MCP_ENTRY, OWN_TOOL_PREFIX, REGEX_ESCAPE,
   REGEX_SPECIAL_CHARS, SETTINGS_FILE, SHELL_QUOTE, TOOL_HOOK_EVENTS, V1_PATH_SEPS, VSCODE_CLAUDE_HOOKS_SETTING,
   VSCODE_DIR_NAME, VSCODE_SETTINGS_FILE, OMP_CONTENT_INFO, OMP_ENABLE_COMMAND, OMP_FLOOR_INFO, OMP_IMPORT_INFO, OMP_MIN_VERSION, OMP_PRINT_MODE_INFO,
-  OMP_SCRIPTS_INFO, PI_PACKAGE_JSON_FILE,
+  OMP_SCRIPTS_INFO, PI_PACKAGE_JSON_FILE, REPLACE_TRIGGER_ENV, REPLACE_TRIGGER_RETIRED_INFO,
 } from "../contracts/constants.ts";
 import type { AdapterRow, AgentId, DoctorRow } from "../contracts/types.ts";
 import { hasReplace } from "../../adapters/table.ts";
-import { codexDirOf, copilotDirOf, homeDirOf, kiroDirOf, ompPluginsDirOf, opencodeDirOf, ownMcpFileOf, piAgentDirOf } from "../project/config-dir.ts";
+import { claudeDirOf, codexDirOf, copilotDirOf, homeDirOf, kiroDirOf, ompPluginsDirOf, opencodeDirOf, ownMcpFileOf, piAgentDirOf } from "../project/config-dir.ts";
 import { hostText } from "./host-text.ts";
 import { detectV1, type V1Scope } from "./detect-v1.ts";
 import { hostConfigValueAt, isNodeCommand, mergeOwnEntries, opencodePluginFile, parseHostConfig, readHostConfig } from "./host-config.ts";
@@ -464,6 +464,24 @@ export function ompInfoLines(env: NodeJS.ProcessEnv, version: string | undefined
   const listed = readJson(files.mcp)?.[OMP_DISABLED_SERVERS_KEY];
   if (!(Array.isArray(listed) && listed.includes(SERVER_KEY))) out.push(OMP_IMPORT_INFO(files.claude, files.mcp));
   return out;
+}
+
+/** D-REPLACE-TRIGGER-CONST-1: one info line when the retired CTX_REPLACE_TRIGGER_BYTES is still set, else none. It reads
+ *  the env block of the Claude Code user and project settings.json (read only, never written), then the process env.
+ *  The value changes nothing; doctor names it only so the user can remove it. */
+export function replaceTriggerInfoLines(agent: AgentId, env: NodeJS.ProcessEnv, project: string | undefined): string[] {
+  const files: string[] = [];
+  const home = homeDirOf(env);
+  if (agent === "claude-code") {
+    if (home !== null) files.push(join(claudeDirOf(env, home), SETTINGS_FILE));
+    if (project !== undefined && project !== "") files.push(join(project, HOST_CONFIG_DIR_NAME, SETTINGS_FILE));
+  }
+  const where = [...new Set(files)].filter((f) => {
+    const block = readJson(f)?.env;
+    return typeof block === "object" && block !== null && REPLACE_TRIGGER_ENV in block;
+  });
+  if (where.length > 0) return [REPLACE_TRIGGER_RETIRED_INFO(where.join(" and "))];
+  return env[REPLACE_TRIGGER_ENV] === undefined ? [] : [REPLACE_TRIGGER_RETIRED_INFO("the process env")];
 }
 
 /** D4 — old entries: every finding's reason in one row, joined "; ". */

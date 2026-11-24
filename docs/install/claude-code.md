@@ -68,7 +68,7 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 - Hooks do not run when the plugin is disabled (`claude plugin enable context-mode@context-mode`; setup does this for you) or when `disableAllHooks` is `true` in a Claude Code settings file. Doctor fails with the fix for both; it never edits your settings.
 - `claude mcp add` by hand adds the MCP server only, with no hooks. Use `context-mode setup --print claude-code` instead.
 - Skill and rule files under `~/.claude` (or `$CLAUDE_CONFIG_DIR`), such as `skills/<skill>/references/*.md`, rule files and `CLAUDE.md`, reach the model whole at any size (#1326). This also holds when `skills/<skill>` is a symlink to a folder outside `~/.claude`, for example a dotfiles repo (#1345).
-- A tool output over 4,096 bytes comes back as a short search pointer. To get larger outputs whole, set `CTX_REPLACE_TRIGGER_BYTES` (a positive integer of bytes, for example `8192`) in the environment Claude Code starts from. A higher value saves less context: 8192 saves about 23% of tool bytes against 42% at 4096 on our bench.
+- A tool output over 4,096 bytes is stored whole and comes back as a short search pointer; `ctx_search` reads any part of it back. Saving on our bench: 42% of tool bytes.
 
 ## Report a problem
 

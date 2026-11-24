@@ -15,7 +15,7 @@ import type {
   AdapterRow, CtxDoctorInput, DbHandle, DoctorCheckId, DoctorRow, ProjectContext, ToolContext, ToolReply,
 } from "../contracts/types.ts";
 import { ownBundleDir } from "../ops/bundle-dir.ts";
-import { checkDoubleFire, checkHostConfig, checkV1Leftovers, ompInfoLines } from "../ops/doctor-config.ts";
+import { checkDoubleFire, checkHostConfig, checkV1Leftovers, ompInfoLines, replaceTriggerInfoLines } from "../ops/doctor-config.ts";
 import { checkDb, checkIndex } from "../ops/doctor-db.ts";
 import type { DbCheck } from "../ops/doctor-db.ts";
 import { bundleVersion, checkMcp, checkMode, checkNode, checkProject, checkRuntimes, checkShell, checkVersion, needsProjectRow, noProjectRow, projectOrMissing } from "../ops/doctor-env.ts";
@@ -228,12 +228,15 @@ export async function doctorReply(ctx: ToolContext, host: DoctorHost): Promise<T
   const docs = look === undefined ? [] : [DOCTOR_DOCS_LABEL + DOCTOR_DOCS_LINK(look.id)];
   // D-OMP-DOCTOR-1: OMP host-limit lines (ADR-0026 support matrix); the version is OMP's own when the host names it.
   const info = adapter.id === "omp" ? ompInfoLines(host.env, ctx.clientInfo?.version) : [];
+  // D-REPLACE-TRIGGER-CONST-1: the retired CTX_REPLACE_TRIGGER_BYTES, when still set, gets one info line (never a row).
+  const known = projectOrMissing(ctx);
+  info.push(...replaceTriggerInfoLines(adapter.id, host.env, "missing" in known ? host.env.CLAUDE_PROJECT_DIR : known.project.worktree));
   const whole = [envLine, table, ...docs, ...info, ...notes].join("\n");
   const bytes = Buffer.byteLength(whole, "utf8");
   if (bytes <= REPORT_CAP) return { text: whole, isError: false, sandboxBytes: bytes }; // step 4
   // D-NO-LOSSY-CUT-1: over the cap, the whole report is stored first; the reply holds the FAIL rows and the pointer.
   // D-1410-DOCTOR-NO-PROJECT-1: with no project there is no store, so the whole report is the reply.
-  const p = projectOrMissing(ctx);
+  const p = known;
   if ("missing" in p) return { text: whole, isError: false, sandboxBytes: bytes };
   const db = await openDb(p.project);
   try {
