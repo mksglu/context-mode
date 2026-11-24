@@ -767,6 +767,7 @@ exit 0`);
   // while the real `opencode mcp list --pure` (1.19.5) printed "✓ context-mode connected / ✗ slowsrv failed" after 32.6 s.
   // On 1.x the list check reads `opencode debug config --pure` (the config the CLI loaded, no server started, no plugin
   // load), as D-OC2-LIST-1 does on 2.x.
+  const SKIP_SH_1413 = { skip: process.platform === "win32" && "fake agent binaries are sh scripts" };
   function fakeOpencode1(s, log, { version = `echo "1.19.5"`, config } = {}) {
     const file = path.join(s.home, ".config", "opencode", "opencode.json");
     const dump = path.join(s.root, "dump.mjs");
@@ -812,6 +813,56 @@ exit 0`);
     const list = res.agents[0].checks.find((c) => c.name === "list");
     assert.ok(list && !list.ok && list.detail.includes("opencode --version printed no version") && list.detail.includes("error: unknown option"), JSON.stringify(res.agents[0].checks));
     assert.ok(!readFileSync(log, "utf8").includes("--pure"), readFileSync(log, "utf8"));
+  });
+
+  // #1413 (D-1413-CODEX-LIST-1, Codex on darwin-arm64): "list: codex mcp list does not list context-mode" (rolled back),
+  // while parse, mcp, hook, hook-registered, hook-runs and skills passed. `codex mcp list` (codex-rs/cli/src/mcp_cmd.rs
+  // run_list) builds the AuthManager and runs OAuth discovery for every server over the network (5 s cap each) and
+  // reads the keyring, so it ran past the 10 s budget (live, codex 0.172.0: 5.17 s for one unreachable HTTP server).
+  // `codex mcp get context-mode --json` (run_get) loads the configured servers, plugin servers included, and looks up
+  // the exact name: no auth, no network (0.02 s). It exits 1 with "Error: No MCP server named '<name>' found." on stderr.
+  const CODEX_GET_JSON = JSON.stringify({ name: "context-mode", enabled: true, disabled_reason: null, transport: { type: "stdio", command: NODE, args: ["server.mjs", "--agent", "codex"], env: null, env_vars: [], cwd: null }, enabled_tools: null, disabled_tools: null, startup_timeout_sec: null, tool_timeout_sec: null }, null, 2);
+  function fakeCodexMcp(s, log, { get } = {}) {
+    fakeBin(s.root, "codex", `echo "$@" >> "${log}"
+case "$1 $2" in
+  "mcp list") sleep 12; echo "context-mode  node  server.mjs --agent codex  -  -  enabled  Unsupported" ;;
+  "mcp get") ${get ?? `if [ "$3" = context-mode ]; then printf '%s\\n' '${CODEX_GET_JSON}'; else echo "Error: No MCP server named '$3' found." >&2; exit 1; fi`} ;;
+  "plugin list") printf '%s\\n' '{"installed":[],"available":[]}' ;;
+esac
+exit 0`);
+  }
+
+  test("[#1413] setup: a slow codex mcp list does not fail the list check; it reads codex mcp get context-mode --json (D-1413-CODEX-LIST-1)", SKIP_SH_1413, async (t) => {
+    const s = sandbox(t);
+    const log = path.join(s.root, "codex.log");
+    fakeCodexMcp(s, log);
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "r" });
+    assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+    assert.ok(res.agents[0].checks.some((c) => c.name === "list" && c.ok), JSON.stringify(res.agents[0].checks));
+    const ran = readFileSync(log, "utf8");
+    assert.ok(ran.includes("mcp get context-mode --json"), ran);
+    assert.ok(!ran.includes("mcp list"), ran);
+  });
+
+  test("[#1413] setup: codex mcp get that has no context-mode is a FAIL that quotes the host's line (D-1413-CODEX-LIST-1)", SKIP_SH_1413, async (t) => {
+    const s = sandbox(t);
+    const log = path.join(s.root, "codex.log");
+    fakeCodexMcp(s, log, { get: `echo "Error: No MCP server named '$3' found." >&2; exit 1` });
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "r" });
+    assert.equal(res.agents[0].status, "FAIL", JSON.stringify(res.agents[0], null, 2));
+    const list = res.agents[0].checks.find((c) => c.name === "list");
+    assert.ok(list && !list.ok && !list.warn, JSON.stringify(res.agents[0].checks));
+    assert.equal(list.detail, "codex mcp get context-mode --json does not find context-mode: Error: No MCP server named 'context-mode' found.");
+  });
+
+  test("[#1413] setup: a codex list command that does not answer in time names the timeout, not \"does not list\" (D-1413-CODEX-LIST-1)", SKIP_SH_1413, async (t) => {
+    const s = sandbox(t);
+    const log = path.join(s.root, "codex.log");
+    fakeCodexMcp(s, log, { get: "sleep 12" });
+    const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "r" });
+    const list = res.agents[0].checks.find((c) => c.name === "list");
+    assert.ok(list && !list.ok, JSON.stringify(res.agents[0].checks));
+    assert.equal(list.detail, "codex mcp get context-mode --json did not answer in 10 s (SIGTERM); run it in a terminal");
   });
 
   // D-OC2-LIST-1 (#1308, Raidan-Ai, Windows, OpenCode 2): "list: opencode mcp list --standalone does not list
