@@ -775,6 +775,31 @@ describe("ADR-0013 repo: main-only release workflow", () => {
     assert.ok(needsOf("main-rollback").includes("ci"));
   });
 
+  test("[MAIN-ONLY] release.yml reuses the green main CI of the same sha; ci runs when there is none (D-REL-CI-REUSE-1)", () => {
+    const v = body("ci-verified");
+    assert.ok(v.includes("actions: read") && v.includes("contents: read"), v.join("|"));
+    assert.deepEqual(v.filter((x) => x.endsWith(": write")), [], "ci-verified writes nothing");
+    for (const l of ["GH_TOKEN: ${{ github.token }}", "SHA: ${{ github.sha }}", "REPO: ${{ github.repository }}",
+      "green: ${{ steps.check.outputs.green }}", 'run: node scripts/release/ci-verified.mjs >> "$GITHUB_OUTPUT"']) assert.ok(v.includes(l), l);
+    // ci tests github.sha (workflow_call checks out the dispatched ref), the same sha ci-verified checks.
+    assert.deepEqual(needsOf("ci"), ["route", "ci-verified"]);
+    assert.ok(body("ci").includes("uses: ./.github/workflows/ci.yml"));
+    assert.ok(body("ci").includes("if: ${{ !cancelled() && !(needs.route.outputs.layout == 'main' && needs.ci-verified.outputs.green == 'true') }}"),
+      "ci skips only on the main path with a verified green run; the tag path always runs it");
+    const ok = "(needs.ci.result == 'success' || (needs.ci.result == 'skipped' && needs.ci-verified.outputs.green == 'true'))";
+    for (const j of ["main-plan", "main-rollback"]) {
+      assert.deepEqual(needsOf(j), ["ci-verified", "ci", "route"], j);
+      const c = body(j).find((x) => x.startsWith("if:"));
+      assert.ok(c.startsWith("if: ${{ !cancelled() && ") && c.endsWith(" && " + ok + " }}"), j + ": " + c);
+    }
+    // A skipped ci is an ancestor of every main job, so each one names !cancelled() and the success of the job before it.
+    const prev = { "main-build": "main-plan", "main-smoke": "main-build", "main-npm": "main-smoke", "main-commit": "main-npm", "main-github-release": "main-commit", "main-close-issues": "main-github-release" };
+    for (const [j, p] of Object.entries(prev)) {
+      const c = body(j).find((x) => x.startsWith("if:"));
+      assert.ok(c.startsWith("if: ${{ !cancelled() && needs." + p + ".result == 'success' && "), j + ": " + c);
+    }
+  });
+
   test("[MAIN-ONLY] release.yml main path names no branch but main (no release, no release-staging, no reset)", () => {
     for (const j of MAIN_JOBS) {
       const b = body(j).join("\n");

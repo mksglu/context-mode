@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PROTECTION_ENDPOINT, SETTINGS, protectionDrift } from "../scripts/release/branch-protection.mjs";
+import { isSha, jobsReject, runReject, verify } from "../scripts/release/ci-verified.mjs";
 
 describe("ADR-0013: plan.mjs on main", { concurrency: CONC }, () => {
   // Main-only release plan (docs/architecture/release/MAIN-ONLY.md, owner decision 2026-10-28): `plan.mjs --main --channel next|latest`
@@ -1135,5 +1136,69 @@ describe("ADR-0013: dev tree version", { concurrency: CONC }, () => {
     for (const l of job.split("\n").filter((x) => x.trim().startsWith("run:"))) assert.ok(!l.includes("${{"), l);
     assert.ok(!job.includes("refs/heads/main") && !job.includes("ref: main") && !job.includes("ref: release"), "never main or release");
     assert.ok(yml.indexOf("\n  github-release:") < at, "after the GitHub release");
+  });
+});
+
+describe("ADR-0013: ci-verified.mjs (D-REL-CI-REUSE-1)", { concurrency: CONC }, () => {
+  // release.yml job ci-verified: the release reuses a green ci.yml push run on main for the exact sha, and runs ci.yml
+  // itself in every other case. Pure functions with GitHub API shaped objects; the CLI with no gh token falls back.
+  const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const SHA = "0123456789abcdef0123456789abcdef01234567";
+  const run = (o = {}) => ({ id: 7, head_sha: SHA, head_branch: "main", event: "push", path: ".github/workflows/ci.yml", status: "completed", conclusion: "success", ...o });
+  const job = (o = {}) => ({ name: "ci (ubuntu-latest, node 26)", status: "completed", conclusion: "success", ...o });
+  const jobs12 = () => Array.from({ length: 12 }, (_, i) => job({ name: "job " + i }));
+
+  test("a green push run on main for the sha with every job success is reused", () => {
+    const v = verify(SHA, [run()], () => jobs12());
+    assert.equal(v.green, true, v.reason);
+    assert.equal(v.runId, 7);
+    assert.equal(verify(SHA, [run({ path: ".github/workflows/ci.yml@refs/heads/main" })], () => jobs12()).green, true);
+  });
+
+  test("any other run is no proof: the release runs ci.yml", () => {
+    for (const [why, r] of [
+      ["other sha", run({ head_sha: SHA.replace("0", "f") })], ["other branch", run({ head_branch: "v2" })],
+      ["not a push", run({ event: "workflow_call" })], ["other workflow", run({ path: ".github/workflows/release.yml" })],
+      ["still running", run({ status: "in_progress", conclusion: null })], ["red", run({ conclusion: "failure" })],
+      ["cancelled", run({ conclusion: "cancelled" })],
+    ]) {
+      assert.notEqual(runReject(r, SHA), null, why);
+      assert.equal(verify(SHA, [r], () => jobs12()).green, false, why);
+    }
+    assert.equal(verify(SHA, [], () => jobs12()).green, false, "no run");
+    assert.equal(verify(SHA, undefined, () => jobs12()).green, false, "no list");
+  });
+
+  test("a run counts only when it has jobs and every job ended success", () => {
+    assert.equal(jobsReject(jobs12()), null);
+    assert.notEqual(jobsReject([]), null);
+    for (const c of ["failure", "skipped", "cancelled", "neutral", null]) {
+      const j = jobs12(); j[5] = job({ name: "windows hosts (windows-latest)", conclusion: c });
+      assert.ok(jobsReject(j).includes("windows hosts (windows-latest)"), String(c));
+      assert.equal(verify(SHA, [run()], () => j).green, false, String(c));
+    }
+  });
+
+  test("the first green run wins over an earlier red run of the same sha; a short or odd sha is never green", () => {
+    const v = verify(SHA, [run({ id: 1, conclusion: "failure" }), run({ id: 2 })], () => jobs12());
+    assert.equal(v.green, true); assert.equal(v.runId, 2);
+    for (const s of ["", "4627924", SHA.toUpperCase(), SHA + "0", undefined]) {
+      assert.equal(isSha(s), false, String(s));
+      assert.equal(verify(s, [run({ head_sha: s })], () => jobs12()).green, false, String(s));
+    }
+  });
+
+  test("CLI: an API error prints green=false for $GITHUB_OUTPUT and exits 0, so the release runs ci.yml", (t) => {
+    const bin = mkdtempSync(path.join(tmpdir(), "cm-civ-"));
+    t.after(() => rmSync(bin, { recursive: true, force: true }));
+    const win = process.platform === "win32";
+    writeFileSync(path.join(bin, win ? "gh.cmd" : "gh"), win ? "@echo gh: HTTP 403 1>&2\r\n@exit /b 1\r\n" : "#!/bin/sh\necho 'gh: HTTP 403' >&2\nexit 1\n");
+    if (!win) chmodSync(path.join(bin, "gh"), 0o755);
+    const r = spawnSync(process.execPath, [path.join(REPO, "scripts", "release", "ci-verified.mjs")], {
+      encoding: "utf8", shell: false, env: { ...process.env, PATH: bin + path.delimiter + process.env.PATH, SHA, REPO: "o/r" },
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, "green=false\n");
+    assert.ok(r.stderr.startsWith("ci-verified: run ci.yml, GitHub API error"), r.stderr);
   });
 });

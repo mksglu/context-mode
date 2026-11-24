@@ -6,6 +6,7 @@
 # MAIN-ONLY (docs/architecture/release/MAIN-ONLY.md, D-MO-2): a dispatch on main takes the main-* jobs (one click: channel next or
 # latest; version from the commits since the last tag on main; npm; one release commit and tag on main; GitHub release).
 # Every other start keeps the old jobs until merge day. Job route decides; the merge-day checklist deletes the old jobs.
+# D-REL-CI-REUSE-1: the main path reuses a green ci.yml push run on main for the same sha (job ci-verified) and runs ci only without one.
 # Every ${{ }} value a shell reads goes through env, never into the run text.
 # publish-npm: ADR-0019 D2, DEVIATIONS D-NPM-PUB-1.
 # DEVIATIONS D-M6-arch-3, D-M6-arch-5, D-M6-Y1-1..5.
@@ -58,7 +59,34 @@ defaults:
 env:
   CLAUDE_CODE_NPM: "@anthropic-ai/claude-code@2.1.283"
 jobs:
+  # D-REL-CI-REUSE-1: a dispatch on main reuses the green main CI of the exact sha. ci-verified asks the Actions API for a
+  # ci.yml push run on main for github.sha (the commit ci.yml tests here) whose run and every job ended success. When it
+  # finds one, the ci job below skips; in every other case (none, red, API error) the release runs ci.yml as before.
+  ci-verified:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      green: ${{ steps.check.outputs.green }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - id: check
+        name: green ci.yml push run on main for this exact sha (run and every job success)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: node scripts/release/ci-verified.mjs >> "$GITHUB_OUTPUT"
   ci:
+    needs: [route, ci-verified]
+    if: ${{ !cancelled() && !(needs.route.outputs.layout == 'main' && needs.ci-verified.outputs.green == 'true') }}
     uses: ./.github/workflows/ci.yml
   route:
     runs-on: ubuntu-latest
@@ -308,8 +336,8 @@ jobs:
         run: node scripts/release/rollback.mjs --sha "$SHA"
   # ---- MAIN-ONLY path (D-MO-2): only branch named is main ----
   main-plan:
-    needs: [ci, route]
-    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
+    needs: [ci-verified, ci, route]
+    if: ${{ !cancelled() && needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' && (needs.ci.result == 'success' || (needs.ci.result == 'skipped' && needs.ci-verified.outputs.green == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -348,7 +376,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
   main-build:
     needs: [route, main-plan]
-    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
+    if: ${{ !cancelled() && needs.main-plan.result == 'success' && needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -383,7 +411,7 @@ jobs:
           if-no-files-found: error
   main-smoke:
     needs: [route, main-plan, main-build]
-    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
+    if: ${{ !cancelled() && needs.main-build.result == 'success' && needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' }}
     strategy:
       fail-fast: false
       matrix:
@@ -426,7 +454,7 @@ jobs:
         continue-on-error: true   # tier-2 per GS2
   main-npm:
     needs: [route, main-plan, main-smoke]
-    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' && !inputs.dry_run }}
+    if: ${{ !cancelled() && needs.main-smoke.result == 'success' && needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' && !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: npm-publish
@@ -476,7 +504,7 @@ jobs:
         run: node scripts/release/npm-names.mjs publish-shims --pkg release-out --version "$VERSION" --tag "$NPM_TAG"
   main-commit:
     needs: [route, main-plan, main-npm]
-    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' && !inputs.dry_run }}
+    if: ${{ !cancelled() && needs.main-npm.result == 'success' && needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' && !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -499,7 +527,7 @@ jobs:
         run: node scripts/release/commit-main.mjs --pkg release-out --version "$VERSION"
   main-github-release:
     needs: [route, main-plan, main-commit]
-    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' && !inputs.dry_run }}
+    if: ${{ !cancelled() && needs.main-commit.result == 'success' && needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' && !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -525,7 +553,7 @@ jobs:
   # its agent's own update command, loses the label and closes as completed. It never fails the release.
   main-close-issues:
     needs: [route, main-plan, main-github-release]
-    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' && !inputs.dry_run }}
+    if: ${{ !cancelled() && needs.main-github-release.result == 'success' && needs.route.outputs.layout == 'main' && inputs.mode != 'rollback' && !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     continue-on-error: true
@@ -546,8 +574,8 @@ jobs:
           VERSION: ${{ needs.main-plan.outputs.version }}
         run: node .github/scripts/fixed-on-main.mjs close --version "$VERSION"
   main-rollback:
-    needs: [ci, route]
-    if: ${{ needs.route.outputs.layout == 'main' && inputs.mode == 'rollback' }}
+    needs: [ci-verified, ci, route]
+    if: ${{ !cancelled() && needs.route.outputs.layout == 'main' && inputs.mode == 'rollback' && (needs.ci.result == 'success' || (needs.ci.result == 'skipped' && needs.ci-verified.outputs.green == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

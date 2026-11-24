@@ -54,7 +54,7 @@ Inputs:
 - `dry_run` (boolean, default false): plan, build and smoke only; the job summary shows the version, the notes and the "Who gets this" table. npm, the release commit and the GitHub Release do not run (D-REL-WHO-1).
 
 Order (each step needs the one before it):
-1. `ci` (reused workflow) on the `main` head.
+1. `ci` (reused workflow) on the `main` head. When `ci.yml` already ran green on a push to `main` for that exact sha (the run and every job success), the `ci-verified` job proves it through the Actions API and the release reuses that result; otherwise the release runs `ci.yml` itself (D-REL-CI-REUSE-1).
 2. `plan`: version from conventional commits since the last `v2.*` tag on `main` (first release 2.0.0, as now). `next` adds `-next.N`. Notes grouped from the same commits. Reads only; no side effect. The notes end with "Who gets this": the agents that the changed files reach, each with its channel (GitHub or npm) and its own update command; only docs, tests or CI changed: nothing to release (D-REL-WHO-1).
 3. `build`: build, `SHA256SUMS`, artifact.
 4. `smoke`: Claude and Codex (tier 1), Gemini and Qwen (tier 2), on a local git clone of the built tree.
