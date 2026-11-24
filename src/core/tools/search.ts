@@ -3,7 +3,7 @@
 // ctx_search: relevance (ContentStore, BM25 / RRF for scope "project", session first) or timeline
 // (ContentStore + SessionDB + auto-memory, oldest first, epoch-ms `after` cursor).
 import { z } from "zod/v4";
-import { DECISION_SOURCE, LABEL_PAGE_BYTES, OUTPUT_CAP, SEARCH_PAGE_SIZE, SEARCH_REPLY_HITS, SNIPPET_MAX_BYTES } from "../contracts/constants.ts";
+import { DECISION_SOURCE, LABEL_PAGE_BYTES, MAX_CHUNK_BYTES, OUTPUT_CAP, SEARCH_PAGE_SIZE, SEARCH_REPLY_HITS, SNIPPET_MAX_BYTES } from "../contracts/constants.ts";
 import { formatError } from "../contracts/errors.ts";
 import type { CtxSearchInput, DbHandle, Hit, SearchScope, TimelineRow, ToolContext, ToolReply } from "../contracts/types.ts";
 import { capBytes } from "../sandbox/cap.ts";
@@ -147,7 +147,10 @@ function pageSize(input: CtxSearchInput): number {
 }
 
 // `extra` asks for hits past the page, so the caller knows whether a `More:` line has anything behind it.
-function page(db: DbHandle, q: string, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext, offset: number, extra = 0): Hit[] {
+// `h9` counts the queries that take the H9 path (no query word in the source); with `list` false that path returns no
+// rows, so relevance() can read the source in order first and lists by position only when it does not
+// (D-1372-ORDERED-READ-1).
+function page(db: DbHandle, q: string, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext, offset: number, extra = 0, h9 = { n: 0, list: true }): Hit[] {
   const size = pageSize(input) + extra;
   if (input.source === DECISION_SOURCE && q.trim() === "") {
     return ftsListSource(db, DECISION_SOURCE, scope, ctx.project, ctx.sessionId, size, offset);
@@ -158,6 +161,8 @@ function page(db: DbHandle, q: string, input: CtxSearchInput, scope: SearchScope
   if (hits.length > 0 || input.source === undefined) return hits;
   const any = offset === 0 ? hits : ftsQuery(db, q, scope, ctx.project, ctx.sessionId, 1, 0, input.source);
   if (any.length > 0) return hits;
+  h9.n++;
+  if (!h9.list) return [];
   return ftsListSource(db, input.source, scope, ctx.project, ctx.sessionId, size, offset);
 }
 
@@ -270,15 +275,28 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
   const mem = ms.named || offset === 0 ? memoryChunks(ms.rows) : [];
   const count = (hits: Hit[], n: number): number => (ms.named ? Math.min(n, hits.length) : contentIn(hits, n));
   // One hit past the page: a `More:` line is printed only when a hit is left behind it (D-SEARCH-SMALL-1).
-  const fetched: Hit[][] = input.queries.map((q) => {
+  const h9 = { n: 0, list: false };
+  const listed: number[] = []; // queries on the H9 path, listed by position below unless the source is read in order
+  const fetched: Hit[][] = input.queries.map((q, qi) => {
     if (ms.named) {
       const want = offset + size + 1;
       const content = indexed ? ftsQuery(db, q, scope, ctx.project, ctx.sessionId, want, 0, input.source) : [];
       return mergeMemory(content, memoryHits(mem, q, want)).slice(offset, want);
     }
-    const content = page(db, q, input, scope, ctx, offset, 1);
+    const before = h9.n;
+    const content = page(db, q, input, scope, ctx, offset, 1, h9);
+    if (h9.n > before) listed.push(qi);
     return mem.length === 0 ? content : mergeMemory(content, memoryHits(mem, q, MEMORY_HITS));
   });
+  // D-1372-ORDERED-READ-1: no query word in the named source -> its text in order (the ranked path is unchanged).
+  if (listed.length > 0 && listed.length === input.queries.length) {
+    const ordered = orderedRead(db, input, scope, ctx, nm);
+    if (ordered !== null) return ordered;
+  }
+  for (const qi of listed) {
+    const content = ftsListSource(db, input.source as string, scope, ctx.project, ctx.sessionId, size + 1, offset);
+    fetched[qi] = mem.length === 0 ? content : mergeMemory(content, memoryHits(mem, input.queries[qi], MEMORY_HITS));
+  }
   const take: number[] = fetched.map((h) => replyHits(h, size));
   const pages: Hit[][] = fetched.map((h, i) => h.slice(0, take[i]));
   // Step 9: every query had zero hits.
@@ -351,6 +369,56 @@ function relevance(db: DbHandle, given: CtxSearchInput, scope: SearchScope, ctx:
   for (const m of more) byPos.set(m.pos, [...(byPos.get(m.pos) ?? []), m.q]);
   for (const [pos, qs] of byPos) moreLines.push("More: " + callText(qs, scope, nm.arg, "offset:" + pos));
   return reply(lines.concat(moreLines).join("\n"), false);
+}
+
+// D-1372-ORDERED-READ-1 (#1372): a `source` call whose queries hold no word of that source (a blank query, or the MCP
+// pointer's tool name) reads the stored text in order, not a ranked listing of short chunks. One head line, then the
+// next stored bytes up to OUTPUT_CAP, then a `More:` line with the byte offset of the next page. The pages put together
+// are the source text: chunks are spans of it, so they join with nothing, except after a block end (a chunk that is
+// neither line-ended nor a full-size cut of a long line), where the chunker dropped the blank-line gap; that gap comes
+// back as one blank line. A query with a word in the source keeps the ranked reply.
+const ORDERED_LINE_BACK = 512; // a page ends after its last newline when one is this close to the cut
+const SOURCE_IN_SCOPE = `
+SELECT 1 AS ok FROM sources WHERE id = :id
+  AND (:scope <> 'session' OR session_id = :session_id)
+  AND (:scope <> 'worktree' OR worktree = :worktree)`;
+
+function sourceText(db: DbHandle, id: number): string {
+  const rows = db.raw.prepare("SELECT body FROM chunks WHERE source_id = ? ORDER BY CAST(ord AS INTEGER)").all(id) as unknown as Array<{ body: string }>;
+  const parts: string[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const body = rows[i].body;
+    parts.push(body);
+    if (i + 1 < rows.length && !body.endsWith("\n") && bytes(body) < MAX_CHUNK_BYTES - 3) parts.push("\n\n");
+  }
+  return parts.join("");
+}
+
+// Called by relevance() when every query took the H9 path of page() (no query word in the source).
+function orderedRead(db: DbHandle, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext, nm: Named): ToolReply | null {
+  const pick = nm.pick;
+  if (pick === null || pick.id === null || input.source === undefined || input.source === DECISION_SOURCE) return null;
+  const where = { id: pick.id, scope, session_id: ctx.sessionId, worktree: ctx.project.worktree };
+  if (db.raw.prepare(SOURCE_IN_SCOPE).get(where) === undefined) return null;
+  const buf = Buffer.from(sourceText(db, pick.id), "utf8");
+  const total = buf.length;
+  if (total === 0) return null;
+  const name = isLongLabel(pick.label) ? shownLabel(pick.label, pick.id) : JSON.stringify(pick.label);
+  let start = Math.min(input.offset ?? 0, total);
+  while (start < total && (buf[start] & 0xc0) === 0x80) start++;
+  if (start >= total) return reply("No more text past offset " + start + " in source " + name + " (" + total + " B).", false);
+  const note = nm.note === null ? "" : " " + nm.note;
+  const headOf = (end: number): string => "Source " + name + " in order, bytes " + start + "-" + end + " of " + total + ":" + note;
+  const moreOf = (end: number): string => "More: " + callText([""], scope, nm.arg, "offset:" + end);
+  let end = total;
+  if (bytes(headOf(total)) + 1 + (total - start) > OUTPUT_CAP) {
+    end = start + OUTPUT_CAP - bytes(headOf(total)) - 1 - bytes(moreOf(total)) - 1;
+    while (end > start && (buf[end] & 0xc0) === 0x80) end--;
+    const nl = buf.lastIndexOf(0x0a, end - 1);
+    if (nl >= start && nl + 1 > end - ORDERED_LINE_BACK) end = nl + 1;
+  }
+  const text = buf.subarray(start, end).toString("utf8");
+  return reply(headOf(end) + "\n" + text + (end < total ? "\n" + moreOf(end) : ""), false);
 }
 
 // ADR-0009 §8.1 rule 8 line; `#<seq>` only for journal rows (D-M2-T9-2).
