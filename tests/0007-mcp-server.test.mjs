@@ -398,6 +398,125 @@ describe("ADR-0007 call shape on every host", () => {
     await client.close();
   });
 
+  // #1398: a folder the user added to the session (Claude Code /add-dir, --add-dir, permissions.additionalDirectories;
+  // Codex --add-dir, sandbox writable_roots) is inside the boundary the host enforces (#852 "restore the boundary the
+  // host believes it is enforcing"), so ctx_index and ctx_execute(file=) accept it by default, with no setting. Every
+  // folder the host did not grant stays OUTSIDE_ROOT, and that error names the rule and how to add a folder.
+  // Wire probed on the hosts: Claude Code 2.1.331 negotiates 2026-07-28 and answers roots/list only as an MRTR input
+  // request (it then retries the same tools/call with inputResponses); Codex 0.169.0-alpha.11.1 sends the granted
+  // folders in _meta codex/sandbox-state-meta permissionProfile.file_system.entries ({type:path} with access write).
+  const CC_ENVELOPE = {
+    "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+    "io.modelcontextprotocol/clientInfo": { name: "claude-code", title: "Claude Code", version: "2.1.331" },
+    "io.modelcontextprotocol/clientCapabilities": { roots: { listChanged: true }, elicitation: { form: {}, url: {} } },
+  };
+  const ccClient = async (t) => {
+    const client = spawnBundle(join(bundleDir, "server.mjs"), { HOME: root, USERPROFILE: root, CLAUDE_PROJECT_DIR: repo }, ["--agent", "claude-code"], { cwd: repo });
+    t.after(() => client.kill());
+    await client.request("server/discover", { _meta: CC_ENVELOPE });
+    return client;
+  };
+  // Claude Code's MRTR loop: answer each roots/list input request with the session's roots, retry the same call.
+  async function ccCall(client, name, args, roots) {
+    let params = { name, arguments: args, _meta: CC_ENVELOPE };
+    for (let round = 1; ; round++) {
+      const r = await client.request("tools/call", params);
+      if (r.resultType !== "input_required") return { r, round };
+      assert.ok(round < 3, "more than two input rounds: " + JSON.stringify(r));
+      const inputResponses = {};
+      for (const [key, ask] of Object.entries(r.inputRequests ?? {})) {
+        assert.equal(ask.method, "roots/list", JSON.stringify(ask));
+        inputResponses[key] = { roots: roots.map((p) => ({ uri: pathToFileURL(p).href })) };
+      }
+      params = { name, arguments: args, _meta: CC_ENVELOPE, inputResponses, ...(r.requestState === undefined ? {} : { requestState: r.requestState }) };
+    }
+  }
+  // A folder outside the containment root (root = parent of the repo dir), as /add-dir ../../manuals would be.
+  const outsideDir = (t, file, text) => {
+    const d = realpathSync.native(mkdtempSync(join(tmpdir(), "cm-1398-")));
+    t.after(() => rmSync(d, { recursive: true, force: true }));
+    writeFileSync(join(d, file), text);
+    return d;
+  };
+  const codexGrant = (...writeDirs) => ({
+    [SANDBOX_META]: {
+      sandboxCwd: pathToFileURL(repo).href,
+      permissionProfile: { type: "managed", file_system: { type: "restricted", entries: [
+        { path: { type: "special", value: { kind: "root" } }, access: "read" },
+        { path: { type: "path", path: repo }, access: "write" },
+        ...writeDirs.map((p) => ({ path: { type: "path", path: p }, access: "write" })),
+        { path: { type: "special", value: { kind: "slash_tmp" } }, access: "write" },
+        { path: { type: "special", value: { kind: "tmpdir" } }, access: "write" },
+      ] } },
+    },
+  });
+
+  test("#1398 claude-code: ctx_index indexes a folder the session added (/add-dir), once Claude Code lists it as a root", async (t) => {
+    const added = outsideDir(t, "guide.md", "# Guide\n\nr1398 added folder\n");
+    const client = await ccClient(t);
+    const { r } = await ccCall(client, "ctx_index", { path: join(added, "guide.md") }, [repo, added]);
+    assert.notEqual(r.isError, true, r.content[0].text);
+    assert.ok(r.content[0].text.startsWith("Indexed "), r.content[0].text);
+    await client.close();
+  });
+
+  test("#1398 claude-code: ctx_execute(file=) reads a file in a folder the session added", async (t) => {
+    const added = outsideDir(t, "notes.txt", "r1398-marker\n");
+    const client = await ccClient(t);
+    const code = "console.log(require('fs').readFileSync(process.env.CTX_FILE, 'utf8').trim())";
+    const { r } = await ccCall(client, "ctx_execute", { language: "javascript", code, file: join(added, "notes.txt") }, [repo, added]);
+    assert.notEqual(r.isError, true, r.content[0].text);
+    assert.ok(r.content[0].text.includes("r1398-marker"), r.content[0].text);
+    await client.close();
+  });
+
+  test("#1398 claude-code: a folder the host did not list stays outside, and the error names the rule and how to add a folder", async (t) => {
+    const added = outsideDir(t, "guide.md", "# Guide\n");
+    const other = outsideDir(t, "secret.md", "# not granted\n");
+    const client = await ccClient(t);
+    const { r } = await ccCall(client, "ctx_index", { path: join(other, "secret.md") }, [repo, added]);
+    assert.equal(r.isError, true, r.content[0].text);
+    const text = r.content[0].text;
+    assert.ok(oneLine(text), text);
+    assert.ok(text.includes(other), text);
+    assert.ok(text.includes("add-dir"), "the error must say how to add a folder to the session: " + text);
+    await client.close();
+  });
+
+  test("#1398 claude-code: a call inside the project completes in one round (no roots round trip)", async (t) => {
+    writeFileSync(join(repo, "r1398-in.md"), "# In project\n");
+    const client = await ccClient(t);
+    const { r, round } = await ccCall(client, "ctx_index", { path: "r1398-in.md" }, [repo]);
+    assert.notEqual(r.isError, true, r.content[0].text);
+    assert.equal(round, 1, "an in-project call must not ask the host for roots");
+    await client.close();
+  });
+
+  test("#1398 codex: ctx_index indexes a folder from --add-dir / writable_roots (sandbox-state-meta write entry)", async (t) => {
+    const added = outsideDir(t, "guide.md", "# Guide\n\nr1398 codex added folder\n");
+    const client = codexClient(repo);
+    t.after(() => client.kill());
+    await hello(client);
+    const r = await client.request("tools/call", { name: "ctx_index", arguments: { path: join(added, "guide.md") }, _meta: codexGrant(added) });
+    assert.notEqual(r.isError, true, r.content[0].text);
+    assert.ok(r.content[0].text.startsWith("Indexed "), r.content[0].text);
+    await client.close();
+  });
+
+  test("#1398 codex: the read-only disk root and the tmp entries grant nothing; the error says how to add a folder", async (t) => {
+    const added = outsideDir(t, "guide.md", "# Guide\n");
+    const other = outsideDir(t, "secret.md", "# not granted\n"); // under tmpdir: the tmpdir/slash_tmp entries must not count
+    const client = codexClient(repo);
+    t.after(() => client.kill());
+    await hello(client);
+    const r = await client.request("tools/call", { name: "ctx_index", arguments: { path: join(other, "secret.md") }, _meta: codexGrant(added) });
+    assert.equal(r.isError, true, r.content[0].text);
+    const text = r.content[0].text;
+    assert.ok(oneLine(text), text);
+    assert.ok(text.includes("add-dir"), "the error must say how to add a folder to the session: " + text);
+    await client.close();
+  });
+
   // #1411: a zcode hook row and a zcode MCP call from the same ZCode session land in one session, so ctx_stats
   // reports "This session" with the hook-journaled shell call.
   test("zcode: a hook row and an MCP call with ZCode's _meta session_id share one session (ctx_stats This session)", async (t) => {
