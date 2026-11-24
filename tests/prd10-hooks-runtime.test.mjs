@@ -979,6 +979,15 @@ describe("PRD-v2 section 10: dispatch, replace and handle line (GP3, GP6)", () =
 });
 
 // serial: sets process.env.HOME in before(); process.env is shared by every test in the file
+// A compaction happens in a long session: fill the journal so BM25 IDF is that of a real session (recall tests).
+const FILLER = [
+  "rename the config loader", "update the changelog for the release", "bump the version in package.json",
+  "add a retry to the http client", "write docs for the cli flags", "move the date helpers to utils",
+  "check the coverage report", "split the large router file", "tidy the readme headings",
+  "add a test for the date parser", "remove the unused logger import", "sort the imports in main",
+];
+const ASK_ERROR = "why did the zebraquux migration fail with ETIMEDOUT";
+
 describe("PRD-v2 section 10: compaction delivery, recall and decision rows (GP6)", () => {
   // Unit tests for the M4 branches of src/core/hooks/dispatch.ts: compactSummary "none" delivery through
   // renderState (impl/09 §4.3 step 1.2-1.3, §4.4 step 2.4; DECISIONS-r6 D6) and the ADR-0009 §8.2 decision
@@ -1123,14 +1132,6 @@ describe("PRD-v2 section 10: compaction delivery, recall and decision rows (GP6)
 
   // ---------- turn-boundary recall (DECISIONS-r11 B) ----------
 
-  // A compaction happens in a long session: fill the journal so BM25 IDF is that of a real session.
-  const FILLER = [
-    "rename the config loader", "update the changelog for the release", "bump the version in package.json",
-    "add a retry to the http client", "write docs for the cli flags", "move the date helpers to utils",
-    "check the coverage report", "split the large router file", "tidy the readme headings",
-    "add a test for the date parser", "remove the unused logger import", "sort the imports in main",
-  ];
-
   async function longSession(agent, s, promptEvent) {
     for (const p of [...FILLER, ...FILLER]) await handleHook(agent, payload(s, { hook_event_name: promptEvent, prompt: p }), env);
     await handleHook(agent, payload(s, {
@@ -1139,8 +1140,6 @@ describe("PRD-v2 section 10: compaction delivery, recall and decision rows (GP6)
     }), env);
     await waitRows("SELECT seq FROM events WHERE session_id = ?", [s], 2 * FILLER.length + 1);
   }
-
-  const ASK_ERROR = "why did the zebraquux migration fail with ETIMEDOUT";
 
   test("[M7] recall/no-compaction-zero-bytes: a prompt naming an earlier error adds nothing before a compaction", async () => {
     const s = sid();
@@ -2020,6 +2019,48 @@ describe("PRD-v2 section 10: hook entry argv and stdin handling (GP7)", () => {
     assert.deepEqual(src.map((x) => x.bytes_total), [Buffer.byteLength(full)], "one source row for the output");
     assert.ok(readRows("SELECT ord FROM chunks WHERE source_id = ?", src[0].id).length > 0, "chunks stored");
     assert.ok(readRows("SELECT ord FROM line_units WHERE source_id = ?", src[0].id).length > 0, "line units stored");
+  });
+
+  // #1401 follow-up (@ryanleecode, systemfsoftware/context-mode#4): after a compaction, a prompt runs recall
+  // (DECISIONS-r11 B). Another process holds the write lock (a second session indexes an output): the prompt still
+  // gets its recall block, fast, and the row still goes out once per session (the seen marker lands after the lock).
+  test("#1401: a compacted-session UserPromptSubmit under a held write lock still returns the recall block, once", async () => {
+    const s = "lk3";
+    const ups = (prompt) => JSON.stringify({ session_id: s, cwd: repo, hook_event_name: "UserPromptSubmit", prompt });
+    for (const p of [...FILLER, ...FILLER]) assert.equal(timedRun(ups(p)).status, 0);
+    assert.equal(timedRun(JSON.stringify({ session_id: s, cwd: repo, hook_event_name: "PostToolUse", tool_name: "Bash",
+      tool_use_id: "toolu_lk3", tool_input: { command: "npm run migrate:zebraquux" },
+      tool_response: { stdout: "", stderr: "zebraquux migration failed: ETIMEDOUT connecting to db-replica-7", is_error: true } })).status, 0);
+    let err = [];
+    for (const end = Date.now() + 5000; err.length === 0 && Date.now() < end; await new Promise((r) => setTimeout(r, 20))) {
+      err = readRows("SELECT seq FROM events WHERE session_id = ? AND kind = 'toolerr'", s);
+    }
+    assert.equal(err.length, 1, "the toolerr row is in the journal");
+    const compact = timedRun(JSON.stringify({ session_id: s, cwd: repo, hook_event_name: "SessionStart", source: "compact" }));
+    assert.equal(compact.status, 0, compact.stderr);
+    assert.notEqual(compact.stdout, "", "the state block after the compaction");
+    const release = await holdWriteLock(projectDb());
+    let r;
+    try {
+      r = timedRun(ups(ASK_ERROR));
+    } finally {
+      await release();
+    }
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(r.ms < HOOK_TIMEOUT_MS / 2, `hook took ${r.ms} ms under a held write lock; stderr: ${r.stderr}`);
+    assert.equal(r.stderr, "", "no hook error under the lock");
+    assert.notEqual(r.stdout, "", "the recall block, not an empty answer");
+    const text = JSON.parse(r.stdout).hookSpecificOutput.additionalContext;
+    assert.ok(text.startsWith(RECALL_OPEN_TAG + "\n") && text.endsWith("\n" + RECALL_CLOSE_TAG), text);
+    assert.ok(text.includes("#" + err[0].seq + " toolerr Bash: "), text);
+    assert.ok(text.includes("zebraquux migration failed: ETIMEDOUT connecting to db-replica-7"), text);
+    // The lock is free: the same question does not send the row again, and the prompt row written under the lock is kept.
+    const again = timedRun(ups(ASK_ERROR));
+    assert.equal(again.status, 0, again.stderr);
+    const next = again.stdout === "" ? null : JSON.parse(again.stdout).hookSpecificOutput.additionalContext;
+    assert.ok(next === null || !next.includes("#" + err[0].seq + " "), "row sent twice: " + String(next));
+    const asked = readRows("SELECT body FROM events WHERE session_id = ? AND kind = 'prompt' AND body = ?", s, ASK_ERROR);
+    assert.equal(asked.length, 2, "both prompt rows are in the journal");
   });
 
   test("GP7/codex-session-project-dir: codex sessions in X and Y write to their own project", () => {

@@ -22,7 +22,7 @@ import { ctxResume } from "../src/core/tools/resume.ts";
 import { pickRecall, recallLine } from "../src/core/compaction/recall.ts";
 import { ctxSearch } from "../src/core/tools/search.ts";
 import { ctxIndex } from "../src/core/tools/index.ts";
-import { ftsInsert } from "../src/core/store/fts.ts";
+import { ftsInsert, insertUnits, queryUnits } from "../src/core/store/fts.ts";
 import { indexText } from "../src/core/index/text.ts";
 
 describe("ADR-0009 section 1: journal, ported v1 session-journal cases", { concurrency: CONC }, () => {
@@ -1079,6 +1079,52 @@ describe("ADR-0009 section 7: memory recall", { concurrency: CONC }, () => {
     const p = "why did the login test time out on waitForSelector submit";
     const a = pickRecall(journal(), p, new Set()).text;
     for (let i = 0; i < 5; i++) assert.equal(pickRecall(journal(), p, new Set()).text, a);
+  });
+
+  // #1401 follow-up (@ryanleecode, systemfsoftware/context-mode#4): one project store holds the line units of every
+  // session. The recall query (hook recall after a compaction, ctx_resume) ranks this session's units only, so its
+  // cost follows this session, not the whole store: 40 other sessions with 1000 units each that share the asked words
+  // keep the cost near the cost with this session alone, and this session's answer stays the same, every unit kept.
+  test("#1401 recall/session-scoped-units: the unit query cost follows this session, not the other sessions' units", async () => {
+    const root = mkdtempSync(join(tmpdir(), "cm-units-scope-"));
+    const key = "u".repeat(16);
+    const project = { projectKey: key, projectDir: join(root, "projects", key), dbPath: join(root, "projects", key, "context.db"), worktree: root, agent: "claude-code" };
+    const db = await openDb(project);
+    try {
+      const PLANTED = "walrusbeam deploy rolled back after 41 health check failures on canary-3";
+      const line = (i) => "step " + i + " of the release pipeline finished in " + (i % 17) + " s on runner " + (i % 5);
+      const store = (sid, label, n, planted) => {
+        const units = Array.from({ length: n }, (_, i) => ({ ord: i, body: planted !== undefined && i === 7 ? planted : line(i) }));
+        const { sourceId } = indexText(db, project, sid, label, units.map((u) => u.body).join("\n"), "text");
+        insertUnits(db, sourceId, sid, units);
+        return sourceId;
+      };
+      const ASK = "why did the walrusbeam deploy roll back on the release pipeline runner";
+      const median = (f) => {
+        const t = [];
+        for (let i = 0; i < 15; i++) { const a = performance.now(); f(); t.push(performance.now() - a); }
+        return t.sort((a, b) => a - b)[7];
+      };
+      const mine = store("mine", "Bash:cat deploy.log#toolu_1", 200, PLANTED);
+      const before = queryUnits(db, "mine", ASK, 64);
+      const alone = median(() => queryUnits(db, "mine", ASK, 64));
+      for (let k = 0; k < 40; k++) store("other" + k, "Bash:cat other" + k + ".log#toolu_o" + k, 1000);
+      const after = queryUnits(db, "mine", ASK, 64);
+      const withOthers = median(() => queryUnits(db, "mine", ASK, 64));
+      const noUnits = median(() => queryUnits(db, "nobody", ASK, 64));
+      // Recall quality holds: the asked-for line is first, the result is full and holds only this session's units.
+      assert.equal(after[0].body, PLANTED);
+      assert.equal(after.length, before.length);
+      assert.equal(after.length, 64);
+      assert.ok(after.every((u) => u.sourceId === mine), "only this session's units");
+      assert.deepEqual(queryUnits(db, "nobody", ASK, 64), []);
+      const bound = alone * 5 + 3;
+      assert.ok(withOthers < bound, `this session: ${withOthers.toFixed(2)} ms with 40000 other units, ${alone.toFixed(2)} ms alone (bound ${bound.toFixed(2)} ms)`);
+      assert.ok(noUnits < bound, `a session with no units: ${noUnits.toFixed(2)} ms with 40000 other units (bound ${bound.toFixed(2)} ms)`);
+    } finally {
+      closeDb(db);
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
