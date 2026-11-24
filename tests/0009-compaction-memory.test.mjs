@@ -1112,14 +1112,23 @@ describe("ADR-0009 section 7: memory recall", { concurrency: CONC }, () => {
       const after = queryUnits(db, "mine", ASK, 64);
       const withOthers = median(() => queryUnits(db, "mine", ASK, 64));
       const noUnits = median(() => queryUnits(db, "nobody", ASK, 64));
-      // Recall quality holds: the asked-for line is first, the result is full and holds only this session's units.
+      // The store-wide form (2.2.2): MATCH over every session's units, then the session filter on each match.
+      const match = ASK.split(" ").filter((w) => !["did", "the", "on"].includes(w)).map((w) => '"' + w + '"*').join(" OR "); // ASK minus its stopwords
+      const storeWideSql = "SELECT u.source_id AS sourceId, u.ord AS ord, -bm25(line_units) AS score FROM line_units u JOIN sources s ON s.id = u.source_id " +
+        "WHERE line_units MATCH ? AND u.session_id = ? ORDER BY bm25(line_units) LIMIT 64";
+      const storeWide = median(() => db.raw.prepare(storeWideSql).all(match, "mine"));
+      // Recall quality holds: the asked-for line is first, the result is full, holds only this session's units, and is
+      // the store-wide result row for row (bm25 keeps its whole-table statistics).
       assert.equal(after[0].body, PLANTED);
       assert.equal(after.length, before.length);
       assert.equal(after.length, 64);
       assert.ok(after.every((u) => u.sourceId === mine), "only this session's units");
+      assert.deepEqual(after.map((u) => [u.sourceId, u.ord]), db.raw.prepare(storeWideSql).all(match, "mine").map((r) => [r.sourceId, r.ord]));
       assert.deepEqual(queryUnits(db, "nobody", ASK, 64), []);
+      // The other sessions' units outside this session's rowid span are not read: at most half the store-wide cost.
+      // (Prefix terms and bm25 statistics still read the term lists of the whole table, so not the cost alone.)
+      assert.ok(withOthers < storeWide / 2, `this session: ${withOthers.toFixed(2)} ms with 40000 other units, store-wide ${storeWide.toFixed(2)} ms, ${alone.toFixed(2)} ms alone`);
       const bound = alone * 5 + 3;
-      assert.ok(withOthers < bound, `this session: ${withOthers.toFixed(2)} ms with 40000 other units, ${alone.toFixed(2)} ms alone (bound ${bound.toFixed(2)} ms)`);
       assert.ok(noUnits < bound, `a session with no units: ${noUnits.toFixed(2)} ms with 40000 other units (bound ${bound.toFixed(2)} ms)`);
     } finally {
       closeDb(db);

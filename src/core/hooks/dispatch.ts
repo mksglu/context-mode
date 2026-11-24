@@ -34,7 +34,7 @@ import { chunkText } from "../index/chunk.ts";
 import { moreLine, selectChunksInMemory } from "../index/select.ts";
 import { shapeDigest } from "../index/shape.ts";
 import { appendDetached } from "./detached.ts";
-import { hookDb, isBusy, spool, writeDetached, writeOrSpool, type SpoolOp } from "./spool.ts";
+import { hookDb, isBusy, readSeen, spool, writeDetached, writeOrSpool, type SpoolOp } from "./spool.ts";
 import { askedWords } from "./handle-query.ts";
 import { answerDecisions, askOptionLabels, optionEchoDecision, type DecisionPart } from "./decision.ts";
 import { shouldHint } from "./throttle.ts";
@@ -241,26 +241,6 @@ function compactBoundary(value: string): { seq: number; source: number } {
   }
 }
 
-function seenSeqs(value: string | null): number[] {
-  if (value === null) return [];
-  try {
-    const v = JSON.parse(value) as unknown;
-    return Array.isArray(v) ? v.filter((n): n is number => typeof n === "number") : [];
-  } catch {
-    return [];
-  }
-}
-
-function seenUnitKeys(value: string | null): string[] {
-  if (value === null) return [];
-  try {
-    const v = JSON.parse(value) as unknown;
-    return Array.isArray(v) ? v.filter((k): k is string => typeof k === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
 // No compaction in this session (or a row without UserPromptSubmit additionalContext): ALLOW, zero added
 // bytes. After one: BM25 of this session's rows and the same worktree's prior-session rows against the
 // prompt; whole rows over RECALL_MIN_SCORE, within RECALL_BUDGET_BYTES; a row goes out once per session.
@@ -271,16 +251,18 @@ async function recall(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectC
   if (compacted === null) return ALLOW;
   const boundary = compactBoundary(compacted);
   const seenKey = RECALL_SEEN_META_PREFIX + ev.sessionId;
-  const seen = seenSeqs(metaGet(db, seenKey));
+  const seen = readSeen(project, db, seenKey).filter((n): n is number => typeof n === "number");
   // r3-ledger: one ranked query over this session's line units, by the current prompt only (D-1330-RECALL-PROMPT-1).
   const unitsKey = RECALL_UNITS_SEEN_META_PREFIX + ev.sessionId;
-  const seenUnits = seenUnitKeys(metaGet(db, unitsKey));
+  const seenUnits = readSeen(project, db, unitsKey).filter((k): k is string => typeof k === "string");
   const units = queryUnits(db, ev.sessionId, recallQueryText(prompt), RECALL_UNIT_CANDIDATES, boundary.source);
   const rows = readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS, boundary.seq);
   const picked = pickRecall(rows, prompt, new Set(seen), units, new Set(seenUnits));
   if (picked.text === "") return ALLOW;
-  if (picked.seqs.length > 0) metaSet(db, seenKey, JSON.stringify([...seen, ...picked.seqs]));
-  if (picked.units !== undefined) metaSet(db, unitsKey, JSON.stringify([...seenUnits, ...picked.units]));
+  // D-1401-SEEN-SPOOL-1 (#1401): the prompt path takes no write lock. The sent-once lists are written detached, like
+  // the prompt row; under another writer's lock they wait in the spool, and readSeen reads them back from there.
+  if (picked.seqs.length > 0) writeDetached(project, { t: "seen", key: seenKey, add: picked.seqs }, "recall");
+  if (picked.units !== undefined) writeDetached(project, { t: "seen", key: unitsKey, add: picked.units }, "recall");
   return { kind: "hint", text: picked.text, onceKey: RECALL_KEY };
 }
 

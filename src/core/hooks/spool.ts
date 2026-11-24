@@ -9,7 +9,7 @@ import {
   HOOK_BUSY_MS, HOOK_SPOOL_DIR, SPOOL_CLAIM_STALE_MS, SPOOL_DRAIN_MS, SQLITE_BUSY_CODE, SQLITE_PRIMARY_CODE_MASK,
 } from "../contracts/constants.ts";
 import type { Chunk, DbHandle, NewJournalRow, ProjectContext } from "../contracts/types.ts";
-import { openDb, withWrite } from "../store/db.ts";
+import { metaGet, metaSet, openDb, withWrite } from "../store/db.ts";
 import { appendEvent } from "../journal/append.ts";
 import { deleteChunkRows, insertChunks, insertUnits, reserveSource, type SourceDraft } from "../store/fts.ts";
 import { chunkText } from "../index/chunk.ts";
@@ -19,7 +19,12 @@ import { buildUnits } from "../index/units.ts";
  * the reserved source row (null: not written yet), max the chunk size, units whether line units are written too. */
 export type SpoolOp =
   | { t: "row"; row: NewJournalRow; at: number }
-  | { t: "src"; id: number | null; src: SourceDraft; text: string; max: number; units: boolean };
+  | { t: "src"; id: number | null; src: SourceDraft; text: string; max: number; units: boolean }
+  | { t: "seen"; key: string; add: Array<number | string> };
+
+// D-1401-SEEN-SPOOL-1: a "seen" op (recall's sent-once list) carries this tag in its file name, so readSeen reads
+// only those small files back, never an output text.
+const SEEN_TAG = ".seen";
 
 const OP_SUFFIX = ".json";
 const CLAIM_SUFFIX = ".claim";
@@ -56,7 +61,7 @@ export function spool(project: ProjectContext, op: SpoolOp): void {
   const name = String(Date.now()).padStart(NAME_TIME_DIGITS, "0") + "-" + String(process.pid) + "-" + String(nameSeq++).padStart(NAME_SEQ_DIGITS, "0");
   const tmp = join(dir, name + TMP_SUFFIX);
   writeFileSync(tmp, JSON.stringify(op));
-  renameSync(tmp, join(dir, name + OP_SUFFIX));
+  renameSync(tmp, join(dir, name + (op.t === "seen" ? SEEN_TAG : "") + OP_SUFFIX));
 }
 
 // Apply one op. cur.op follows the work: once the source row is reserved, cur.op carries its id, so a busy
@@ -64,6 +69,15 @@ export function spool(project: ProjectContext, op: SpoolOp): void {
 function runOp(db: DbHandle, op: SpoolOp, chunks: Chunk[] | undefined, cur: { op: SpoolOp }): number | null {
   if (op.t === "row") {
     appendEvent(db, op.row, op.at);
+    return null;
+  }
+  if (op.t === "seen") {
+    // A union with what the meta row holds: two writers of one list both land, in any order.
+    withWrite(db, (h) => {
+      const have = parseList(metaGet(h, op.key));
+      const add = op.add.filter((v) => !have.includes(v));
+      if (add.length > 0) metaSet(h, op.key, JSON.stringify([...have, ...add]));
+    });
     return null;
   }
   const c = chunks ?? chunkText(op.text, "text", op.max);
@@ -97,6 +111,51 @@ function runOp(db: DbHandle, op: SpoolOp, chunks: Chunk[] | undefined, cur: { op
   return id;
 }
 
+function parseList(value: string | null): Array<number | string> {
+  if (value === null) return [];
+  try {
+    const v = JSON.parse(value) as unknown;
+    return Array.isArray(v) ? v.filter((x): x is number | string => typeof x === "number" || typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * D-1401-SEEN-SPOOL-1: the sent-once list of `key`, spooled entries first, then the meta row. A drain applies a file
+ * before it unlinks it, so an entry is in one of the two at every point. Read-only: no lock wait.
+ */
+export function readSeen(project: ProjectContext, db: DbHandle, key: string): Array<number | string> {
+  const out: Array<number | string> = [];
+  const dir = spoolDir(project);
+  let names: string[] = [];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    // no spool dir: nothing waits
+  }
+  for (const name of names) {
+    const base = name.endsWith(CLAIM_SUFFIX) ? name.slice(0, -CLAIM_SUFFIX.length) : name;
+    if (!base.endsWith(SEEN_TAG + OP_SUFFIX)) continue;
+    let op: SpoolOp | null = null;
+    for (const n of [name, base + CLAIM_SUFFIX, base]) {
+      try {
+        op = JSON.parse(readFileSync(join(dir, n), "utf8")) as SpoolOp;
+        break;
+      } catch {
+        // renamed by a drainer between readdir and read: try the other name; gone: it is in the meta row
+      }
+    }
+    if (op !== null && op.t === "seen" && op.key === key) out.push(...op.add);
+  }
+  for (const v of parseList(metaGet(db, key))) if (!out.includes(v)) out.push(v);
+  return out;
+}
+
+// D-1401-SEEN-SPOOL-1: the time until which this process takes the lock as busy. One hook run waits at most once
+// (HOOK_BUSY_MS) for another writer's lock; its later detached writes in that window go to the spool at once.
+let busyUntil = 0;
+
 /** Apply `op` now; on a busy lock, spool what is left. Returns the source id of a "src" op when it is known. */
 export function writeOrSpool(project: ProjectContext, db: DbHandle, op: SpoolOp, chunks?: Chunk[]): number | null {
   const cur = { op };
@@ -104,6 +163,7 @@ export function writeOrSpool(project: ProjectContext, db: DbHandle, op: SpoolOp,
     return runOp(db, op, chunks, cur);
   } catch (err) {
     if (!isBusy(err)) throw err;
+    busyUntil = Date.now() + HOOK_BUSY_MS;
     spool(project, cur.op);
     return cur.op.t === "src" ? cur.op.id : null;
   }
@@ -114,11 +174,18 @@ export function writeDetached(project: ProjectContext, op: SpoolOp, what: string
   void (async () => {
     try {
       const db = await hookDb(project);
-      if (drain(project, db)) spool(project, op); // the lock is busy: the row waits behind the older ones
-      else writeOrSpool(project, db, op, chunks);
+      if (Date.now() < busyUntil) {
+        spool(project, op);
+      } else if (drain(project, db)) {
+        busyUntil = Date.now() + HOOK_BUSY_MS;
+        spool(project, op); // the lock is busy: the row waits behind the older ones
+      } else {
+        writeOrSpool(project, db, op, chunks);
+      }
     } catch (err) {
       try {
         if (!isBusy(err)) throw err;
+        busyUntil = Date.now() + HOOK_BUSY_MS;
         spool(project, op);
       } catch (e) {
         process.stderr.write("hooks: " + what + " write failed: " + message(e) + "\n");

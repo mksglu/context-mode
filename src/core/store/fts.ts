@@ -183,13 +183,15 @@ export function deleteChunkRows(raw: DatabaseSync, scope: ChunkScope): number {
   if (scope === "all") {
     raw.exec("INSERT INTO chunks_tri(chunks_tri) VALUES ('delete-all')");
     raw.exec("DELETE FROM line_units");
+    raw.exec("UPDATE sources SET unit_lo = NULL, unit_hi = NULL WHERE unit_lo IS NOT NULL");
     return Number(raw.prepare("DELETE FROM chunks").run().changes);
   }
-  const [where, arg] = "sourceId" in scope
-    ? ["source_id = ?", scope.sourceId]
-    : ["source_id IN (SELECT id FROM sources WHERE label = ?)", scope.label];
+  const [where, arg, own] = "sourceId" in scope
+    ? ["source_id = ?", scope.sourceId, "id = ?"]
+    : ["source_id IN (SELECT id FROM sources WHERE label = ?)", scope.label, "label = ?"];
   raw.prepare(TRI_DELETE + " WHERE " + where).run(arg);
   raw.prepare("DELETE FROM line_units WHERE " + where).run(arg);
+  raw.prepare("UPDATE sources SET unit_lo = NULL, unit_hi = NULL WHERE " + own).run(arg); // D-1401-UNITS-SPAN-1
   return Number(raw.prepare("DELETE FROM chunks WHERE " + where).run(arg).changes);
 }
 
@@ -838,10 +840,17 @@ export function insertUnits(db: DbHandle, sourceId: number, sessionId: string, u
     const from = start;
     withWrite(db, (h) => {
       const ins = h.raw.prepare("INSERT INTO line_units(body, source_id, session_id, ord) VALUES (?, ?, ?, ?)");
+      let lo = Number.MAX_SAFE_INTEGER;
+      let hi = 0;
       for (let i = from; i < end; i++) {
         const u = units[i] as { ord: number; body: string };
-        ins.run(u.body, sourceId, sessionId, u.ord);
+        const rid = Number(ins.run(u.body, sourceId, sessionId, u.ord).lastInsertRowid);
+        if (rid < lo) lo = rid;
+        if (rid > hi) hi = rid;
       }
+      // D-1401-UNITS-SPAN-1: the source row keeps the rowid span of its units (same transaction), for queryUnits.
+      h.raw.prepare("UPDATE sources SET unit_lo = min(coalesce(unit_lo, ?), ?), unit_hi = max(coalesce(unit_hi, ?), ?) WHERE id = ?")
+        .run(lo, lo, hi, hi, sourceId);
     });
     start = end;
   }
@@ -885,10 +894,18 @@ export function queryUnits(
   const match = searchTerms(q).join(" OR ");
   if (match === "" || sessionId === "") return [];
   // #1394: maxSourceId keeps out units of outputs stored after the latest compaction (still in live context).
-  const rows = db.raw.prepare(
+  // D-1401-UNITS-SPAN-1 (#1401): the query reads only the rowid span of this session's units (the sources rows keep
+  // each output's span), so other sessions' units outside it cost nothing, and a session with no units costs no
+  // query. One query: each FTS query expands the prefix terms once. bm25 takes its statistics from the whole table,
+  // so the scores and the top `limit` are the ones the store-wide query gave.
+  const span = stmt(db.raw,
+    "SELECT MIN(unit_lo) AS lo, MAX(unit_hi) AS hi FROM sources WHERE session_id = ? AND id <= ? AND unit_lo IS NOT NULL",
+  ).get(sessionId, maxSourceId) as { lo: number | null; hi: number | null } | undefined;
+  if (span === undefined || span.lo === null || span.hi === null) return [];
+  const rows = stmt(db.raw,
     "SELECT u.source_id AS source_id, u.ord AS ord, u.body AS body, -bm25(line_units) AS score, s.label AS label " +
     "FROM line_units u JOIN sources s ON s.id = u.source_id " +
-    "WHERE line_units MATCH ? AND u.session_id = ? AND s.id <= ? ORDER BY bm25(line_units) LIMIT ?",
-  ).all(match, sessionId, maxSourceId, limit) as Array<{ source_id: number; ord: number; body: string; score: number; label: string }>;
+    "WHERE line_units MATCH ? AND u.rowid BETWEEN ? AND ? AND u.session_id = ? AND s.id <= ? ORDER BY bm25(line_units) LIMIT ?",
+  ).all(match, span.lo, span.hi, sessionId, maxSourceId, limit) as Array<{ source_id: number; ord: number; body: string; score: number; label: string }>;
   return rows.map((r) => ({ sourceId: Number(r.source_id), ord: Number(r.ord), label: r.label, body: r.body, score: r.score }));
 }

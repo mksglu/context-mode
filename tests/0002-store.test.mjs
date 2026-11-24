@@ -486,7 +486,7 @@ describe("ADR-0002: schema", { concurrency: CONC }, () => {
 
   test("SCHEMA_VERSION equals the constants.ts SCHEMA_VERSION", () => {
     assert.equal(SCHEMA_VERSION, C.SCHEMA_VERSION);
-    assert.equal(SCHEMA_VERSION, 6); // D-PATH-LABEL-1: v6 path labels use forward slashes; D-M5-arch-2: v2 adds the cost dedup index; D-SEARCH-3: v3 chunks title + porter; D-SEARCH-4: v4 trigram; r3-ledger: v5 line_units
+    assert.equal(SCHEMA_VERSION, 7); // D-1401-UNITS-SPAN-1: v7 per-source line unit rowid span; D-PATH-LABEL-1: v6 path labels use forward slashes; D-M5-arch-2: v2 adds the cost dedup index; D-SEARCH-3: v3 chunks title + porter; D-SEARCH-4: v4 trigram; r3-ledger: v5 line_units
   });
 
   test("v2 (D-M5-arch-2): a fresh DB has the partial unique index events(session_id, turn) WHERE kind = 'cost'", () => {
@@ -680,6 +680,45 @@ describe("ADR-0002: schema", { concurrency: CONC }, () => {
     }
   });
 
+  // The v7 parts (D-1401-UNITS-SPAN-1) off a fresh DB: the shape of a version-6 store.
+  const UNDO_V7 = "DROP INDEX idx_sources_session; ALTER TABLE sources DROP COLUMN unit_lo; ALTER TABLE sources DROP COLUMN unit_hi;";
+
+  // D-1401-UNITS-SPAN-1 (#1401): a version-6 store gets the rowid span of each source's units from one pass; every
+  // unit stays, and the session-scoped unit query returns what the store-wide one returned.
+  test("v7 (D-1401-UNITS-SPAN-1): a version-6 DB keeps every line unit and gets each source's unit span", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cm-schema-"));
+    try {
+      const db = freshDb(dir);
+      applyMigrations(db, 0);
+      db.exec(UNDO_V7);
+      db.exec("PRAGMA user_version = 6");
+      const src = db.prepare("INSERT INTO sources(session_id, worktree, agent, kind, label, bytes_total, chunk_count, created_ts, created_at, accessed_ts) VALUES (?,'w','claude-code','content',?,1,1,1,'t',1)");
+      src.run("a", "a1");
+      src.run("b", "b1");
+      src.run("a", "a2");
+      const unit = db.prepare("INSERT INTO line_units(body, source_id, session_id, ord) VALUES (?, ?, ?, ?)");
+      // Interleaved writers: a1, b1, a1 again, then a2.
+      for (const [sid, sess, n] of [[1, "a", 3], [2, "b", 4], [1, "a", 2], [3, "a", 3]]) {
+        for (let i = 0; i < n; i++) unit.run("lighthouse keeper log line " + sess + sid + " " + i, sid, sess, i);
+      }
+      const before = db.prepare("SELECT rowid, body FROM line_units ORDER BY rowid").all();
+      applyMigrations(db, 6);
+      assert.equal(db.prepare("PRAGMA user_version").get().user_version, SCHEMA_VERSION);
+      assert.deepEqual(db.prepare("SELECT rowid, body FROM line_units ORDER BY rowid").all(), before);
+      assert.deepEqual(db.prepare("SELECT id, unit_lo AS lo, unit_hi AS hi FROM sources ORDER BY id").all().map((r) => [r.id, r.lo, r.hi]),
+        [[1, 1, 9], [2, 4, 7], [3, 10, 12]]);
+      const h = { raw: db, path: join(dir, "c.db") };
+      const got = fts.queryUnits(h, "a", "lighthouse keeper", 64);
+      assert.equal(got.length, 8, "every unit of session a, none of b");
+      assert.ok(got.every((u) => u.sourceId !== 2));
+      assert.deepEqual(fts.queryUnits(h, "b", "lighthouse keeper", 64).map((u) => u.sourceId), [2, 2, 2, 2]);
+      assert.deepEqual(fts.queryUnits(h, "none", "lighthouse keeper", 64), []);
+      db.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // D-PATH-LABEL-1: a version-5 DB with backslash path labels (written on Windows before the fix) keeps every row and
   // reads them under the forward-slash label; content and url labels are not touched.
   test("v6 (D-PATH-LABEL-1): a version-5 DB migrates path labels to forward slashes and loses no source or chunk", () => {
@@ -687,6 +726,7 @@ describe("ADR-0002: schema", { concurrency: CONC }, () => {
     try {
       const db = freshDb(dir);
       applyMigrations(db, 0);
+      db.exec(UNDO_V7);
       db.exec("PRAGMA user_version = 5");
       const src = db.prepare("INSERT INTO sources(session_id, worktree, agent, kind, label, bytes_total, chunk_count, created_ts, created_at, accessed_ts) VALUES ('s','w','claude-code',?,?,1,1,1,'t',1)");
       src.run("path", "data\\sqlite-fts5-docs.html");
@@ -896,8 +936,8 @@ describe("ADR-0002: cost row dedup", { concurrency: CONC }, () => {
     };
   }
 
-  test("[M5] SCHEMA_VERSION is 6 after the Usage/cost dedup migration (2), the search title + porter migration (3, D-SEARCH-3), the trigram table (4, D-SEARCH-4) and line units (5, r3-ledger) and path labels (6, D-PATH-LABEL-1)", () => {
-    assert.equal(SCHEMA_VERSION, 6);
+  test("[M5] SCHEMA_VERSION is 7 after the Usage/cost dedup migration (2), the search title + porter migration (3, D-SEARCH-3), the trigram table (4, D-SEARCH-4), line units (5, r3-ledger), path labels (6, D-PATH-LABEL-1) and unit spans (7, D-1401-UNITS-SPAN-1)", () => {
+    assert.equal(SCHEMA_VERSION, 7);
   });
 
   test("[M5] cost-dedup/usage-events-idempotent-per-turn: 3 step-finish events in one turn journal once", async (t) => {

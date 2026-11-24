@@ -139,6 +139,18 @@ export const DDL_V6: string = `
 UPDATE sources SET label = replace(label, char(92), '/') WHERE kind = 'path' AND instr(label, char(92)) > 0;
 `;
 
+// Version 7 (D-1401-UNITS-SPAN-1, #1401): the rowid span of each source's line units, so recall reads only this
+// session's units (line_units.session_id is UNINDEXED: a MATCH ranked every unit of every session). Existing units
+// get their span from one pass over line_units; every unit stays.
+export const DDL_V7: string = `
+ALTER TABLE sources ADD COLUMN unit_lo INTEGER;
+ALTER TABLE sources ADD COLUMN unit_hi INTEGER;
+CREATE INDEX IF NOT EXISTS idx_sources_session ON sources(session_id, id);
+UPDATE sources SET unit_lo = g.lo, unit_hi = g.hi
+  FROM (SELECT source_id, MIN(rowid) AS lo, MAX(rowid) AS hi FROM line_units GROUP BY source_id) AS g
+  WHERE g.source_id = sources.id;
+`;
+
 // Ascending by version; step N brings the DB from N-1 to N.
 const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
   { version: 1, sql: DDL },
@@ -147,6 +159,7 @@ const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
   { version: 4, sql: DDL_V4 },
   { version: 5, sql: DDL_V5 },
   { version: 6, sql: DDL_V6 },
+  { version: 7, sql: DDL_V7 },
 ];
 
 export function applyMigrations(db: DatabaseSync, fromVersion: number): void {
