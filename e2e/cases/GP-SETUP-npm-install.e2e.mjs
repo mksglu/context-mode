@@ -42,6 +42,10 @@ if (agent === "opencode" && has("--version")) {
 } else if (agent === "opencode" && has("debug") && has("config")) {
   if (!existsSync(ocConf)) process.exit(1);
   process.stdout.write(readFileSync(ocConf, "utf8"));
+} else if (agent === "codex" && has("mcp") && has("get")) {
+  // D-1413-CODEX-LIST-1: real codex prints the entry as JSON, or exits 1 when the name is not in config.toml.
+  if (!fileHolds(path.join(home, ".codex", "config.toml"))) { console.error("No MCP server named 'context-mode' found."); process.exit(1); }
+  console.log(JSON.stringify({ name: "context-mode", enabled: true }));
 } else if (has("list")) {
   const own = agent === "codex" ? fileHolds(path.join(home, ".codex", "config.toml"))
     : agent === "opencode" ? fileHolds(path.join(home, ".config", "opencode", "opencode.json")) : existsSync(state);
