@@ -7,7 +7,8 @@ import { CONC } from "./_lib/concurrency.mjs";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path, { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 import { AGENT_IDS } from "../src/core/contracts/agents.ts";
 import * as C from "../src/core/contracts/constants.ts";
 import { HOOK_HOST_FILE } from "../src/core/contracts/constants.ts";
@@ -567,12 +568,15 @@ describe("ADR-0018: contracts (concurrent)", { concurrency: CONC }, () => {
   });
 });
 
-// D-R48-TRIGGER-1 (#1326 coreycoburn): REPLACE_TRIGGER_BYTES is a documented setting, env CTX_REPLACE_TRIGGER_BYTES.
-test("D-R48-TRIGGER-1: CTX_REPLACE_TRIGGER_BYTES sets the replace trigger; a bad value keeps 4096 (#1326)", () => {
-  assert.equal(C.REPLACE_TRIGGER_ENV, "CTX_REPLACE_TRIGGER_BYTES");
-  assert.equal(C.REPLACE_TRIGGER_BYTES_DEFAULT, 4096);
-  assert.equal(C.readReplaceTrigger(undefined), 4096);
-  assert.equal(C.readReplaceTrigger(""), 4096);
-  assert.equal(C.readReplaceTrigger("8192"), 8192);
-  for (const bad of ["0", "-5", "1.5", "abc", "1e400"]) assert.equal(C.readReplaceTrigger(bad), 4096, bad);
+// D-REPLACE-TRIGGER-CONST-1 (amends D-R48-TRIGGER-1, #1326): owner rule "ana kural hicbir zaman flag env kullanmiyoruz".
+// REPLACE_TRIGGER_BYTES is the constant 4096 (the bench default); no env value changes it, in any process.
+test("D-REPLACE-TRIGGER-CONST-1: REPLACE_TRIGGER_BYTES is 4096 whatever CTX_REPLACE_TRIGGER_BYTES holds", () => {
+  assert.equal(C.REPLACE_TRIGGER_BYTES, 4096);
+  const url = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "core", "contracts", "constants.ts")).href;
+  const probe = `const m = await import(${JSON.stringify(url)}); process.stdout.write(String(m.REPLACE_TRIGGER_BYTES));`;
+  for (const value of ["8192", "1e9", "1"]) {
+    const r = spawnSync(process.execPath, ["--input-type=module", "-e", probe], { encoding: "utf8", env: { ...process.env, CTX_REPLACE_TRIGGER_BYTES: value } });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, "4096", `CTX_REPLACE_TRIGGER_BYTES=${value} must not change the trigger`);
+  }
 });

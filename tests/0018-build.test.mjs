@@ -1004,6 +1004,25 @@ describe("ADR-0019 build: npm package", () => {
     });
   }
 
+  // D-REPLACE-TRIGGER-CONST-1 (amends D-R48-TRIGGER-1): owner rule "ana kural hicbir zaman flag env kullanmiyoruz".
+  // The built hook replaces a 5000 B Bash output (over the 4096 B trigger) whatever CTX_REPLACE_TRIGGER_BYTES holds.
+  test("[D-REPLACE-TRIGGER-CONST-1] built hook.mjs replaces a 5000 B Bash output with CTX_REPLACE_TRIGGER_BYTES set or unset", () => {
+    const big = Array.from({ length: 100 }, (_, i) => `line ${String(i).padStart(3, "0")} ` + "x".repeat(40)).join("\n") + "\n";
+    assert.equal(Buffer.byteLength(big, "utf8"), 5000);
+    for (const value of [undefined, "8192", "32768", "1e9"]) {
+      const dir = mkdtempSync(path.join(scratch, "trigger-"));
+      assert.equal(spawnSync("git", ["init", "-q", dir]).status, 0);
+      const env = { PATH: process.env.PATH ?? "", HOME: dir, USERPROFILE: dir, CLAUDE_PROJECT_DIR: dir, ...(value === undefined ? {} : { CTX_REPLACE_TRIGGER_BYTES: value }) };
+      const input = JSON.stringify({ hook_event_name: "PostToolUse", session_id: "s9001", cwd: dir, tool_name: "Bash", tool_input: { command: "cat big.log" }, tool_use_id: "t1", tool_response: { stdout: big, stderr: "", interrupted: false, isImage: false } });
+      const r = spawnSync(process.execPath, [path.join(out, "hook.mjs"), "--agent", "claude-code"], { encoding: "utf8", input, env, cwd: dir });
+      assert.equal(r.status, 0, r.stderr);
+      const replaced = r.stdout === "" ? undefined : JSON.parse(r.stdout).hookSpecificOutput?.updatedToolOutput?.stdout;
+      assert.equal(typeof replaced, "string", `CTX_REPLACE_TRIGGER_BYTES=${value ?? "(unset)"}: the 5000 B output must be replaced, got ${r.stdout.slice(0, 200)}`);
+      assert.ok(replaced.includes("ctx_search"), replaced);
+      assert.ok(Buffer.byteLength(replaced, "utf8") < 5000, replaced);
+    }
+  });
+
   test("[M7] cli/hook-v1-platform-map: every v1 platform name maps to its v2 agent id", async () => {
     const { V1_PLATFORM_AGENT } = await import("../src/entries/cli.ts");
     assert.deepEqual(V1_PLATFORM_AGENT, {

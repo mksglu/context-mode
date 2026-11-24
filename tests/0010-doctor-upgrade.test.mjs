@@ -2450,6 +2450,56 @@ describe("ADR-0010 ctx_doctor tool: all checks and order", { concurrency: CONC }
     if (reply.text.includes("| FAIL |")) assert.match(reply.text, /context-mode setup --agents codex/);
     assert.ok(Buffer.byteLength(reply.text, "utf8") <= 4096, "report stays within REPORT_CAP");
   });
+
+  // D-REPLACE-TRIGGER-CONST-1 (amends D-R48-TRIGGER-1): owner rule "ana kural hicbir zaman flag env kullanmiyoruz".
+  // The trigger is the constant 4096, so a CTX_REPLACE_TRIGGER_BYTES the user still sets does nothing. Doctor tells the
+  // truth: one INFO line under the table (not a WARN or FAIL row) naming where the value sits; doctor never writes it.
+  test("[D-REPLACE-TRIGGER-CONST-1] CTX_REPLACE_TRIGGER_BYTES in the env or a Claude Code settings env block: one INFO line; unset: none", async (t) => {
+    const { doctorReply } = await import("../src/core/tools/doctor.ts");
+    const NAME = "CTX_REPLACE_TRIGGER_BYTES";
+    const linesOf = (text) => text.split("\n").filter((l) => l.includes(NAME));
+    const writeEnv = (file, value) => {
+      mkdirSync(path.dirname(file), { recursive: true });
+      writeFileSync(file, JSON.stringify({ env: { [NAME]: value } }), "utf8");
+    };
+    async function run(home, worktree, extra = {}) {
+      const base = ctxFor(home);
+      const ctx = { ...base, project: { ...base.project, worktree, containmentRoot: worktree } };
+      const env = { HOME: home, USERPROFILE: home, PATH: process.env.PATH ?? "", CLAUDE_PROJECT_DIR: worktree, ...extra };
+      return doctorReply(ctx, { env, bundleDir: path.join(home, "no-bundle"), piCwd: undefined });
+    }
+    const infoLine = (text, where) => {
+      const lines = linesOf(text);
+      assert.equal(lines.length, 1, `${where}: one line names ${NAME}\n${text}`);
+      const [line] = lines;
+      assert.equal(line.startsWith("|"), false, `${where}: an info line, not a table row: ${line}`);
+      assert.equal(line.includes("WARN") || line.includes("FAIL"), false, `${where}: INFO, never WARN or FAIL: ${line}`);
+      assert.ok(line.includes("4096"), `${where}: names the 4096 B trigger: ${line}`);
+      assert.ok(line.includes("ctx_search"), `${where}: says how to read stored output back: ${line}`);
+      return line;
+    };
+
+    const clean = tmp(t);
+    assert.deepEqual(linesOf((await run(clean, clean)).text), [], "unset: no line names the env");
+
+    const procEnv = tmp(t);
+    infoLine((await run(procEnv, procEnv, { [NAME]: "8192" })).text, "process env");
+
+    const user = tmp(t);
+    const userFile = path.join(user, ".claude", "settings.json");
+    writeEnv(userFile, "32768");
+    const userBody = readFileSync(userFile, "utf8");
+    const project = path.join(user, "proj");
+    mkdirSync(project);
+    assert.ok(infoLine((await run(user, project)).text, "user settings").includes(userFile), "names the user settings file");
+    assert.equal(readFileSync(userFile, "utf8"), userBody, "doctor never writes the settings file");
+
+    const proj = tmp(t);
+    const projDir = path.join(proj, "proj");
+    const projFile = path.join(projDir, ".claude", "settings.json");
+    writeEnv(projFile, "1e9");
+    assert.ok(infoLine((await run(proj, projDir)).text, "project settings").includes(projFile), "names the project settings file");
+  });
 });
 
 describe("ADR-0010 ctx_upgrade tool", { concurrency: CONC }, () => {

@@ -979,6 +979,16 @@ describe("ADR-0015 repo: doc facts", () => {
   const read = (p) => readFileSync(new URL("../" + p, import.meta.url), "utf8");
   const json = (p) => JSON.parse(read(p));
 
+  // D-REPLACE-TRIGGER-CONST-1 (amends D-R48-TRIGGER-1): owner rule "ana kural hicbir zaman flag env kullanmiyoruz".
+  // The replace trigger is the constant 4096; no doc tells users to set CTX_REPLACE_TRIGGER_BYTES. Only the dated
+  // DEVIATIONS history may name it.
+  test("[D-REPLACE-TRIGGER-CONST-1] no doc names CTX_REPLACE_TRIGGER_BYTES as a setting (DEVIATIONS history only)", () => {
+    const HISTORY = new Set(["docs/architecture/DEVIATIONS.md"]);
+    const docs = execFileSync("git", ["ls-files", "*.md"], { cwd: ROOT, encoding: "utf8" }).split("\n").filter((f) => f !== "" && !HISTORY.has(f));
+    const naming = docs.filter((f) => existsSync(path.join(ROOT, f)) && readRoot(f).includes("CTX_REPLACE_TRIGGER_BYTES"));
+    assert.deepEqual(naming, [], "these docs still name CTX_REPLACE_TRIGGER_BYTES");
+  });
+
   test("docs/tools.md names the doctor check range from DOCTOR_CHECK_ORDER", () => {
     const md = read("docs/tools.md");
     const first = DOCTOR_CHECK_ORDER[0];
