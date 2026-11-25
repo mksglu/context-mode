@@ -931,6 +931,16 @@ describe("PRD-v2 section 9: child env", () => {
     for (const v of Object.values(out)) assert.equal(typeof v, "string");
   });
 
+  test("[#1417] buildChildEnv sets PYTHONUTF8=1 by default and keeps a parent PYTHONUTF8 of any case", () => {
+    assert.equal(buildChildEnv({ PATH: "/bin" }).PYTHONUTF8, "1");
+    assert.equal(buildChildEnv({ PATH: "/bin", PYTHONUTF8: "0" }).PYTHONUTF8, "0");
+    const mixed = buildChildEnv({ PATH: "/bin", PythonUtf8: "0" });
+    assert.equal(mixed.PythonUtf8, "0");
+    assert.equal("PYTHONUTF8" in mixed, false);
+    assert.equal("PYTHONIOENCODING" in buildChildEnv({ PATH: "/bin" }), false);
+    assert.equal(buildChildEnv({ PATH: "/bin" }, { PYTHONUTF8: "0" }).PYTHONUTF8, "0");
+  });
+
   test("buildChildEnv is pure: never throws, never mutates the parent object", () => {
     const parent = { PATH: "/bin", NODE_OPTIONS: "x" };
     const copy = { ...parent };
@@ -955,7 +965,7 @@ describe("PRD-v2 section 9: child env", () => {
     const winPath = "C:\\Program Files\\GitHub CLI;C:\\Program Files\\Git\\usr\\bin;C:\\Windows\\system32";
     const out = buildChildEnv({ Path: winPath, NODE_OPTIONS: "x" });
     assert.equal(out.Path, winPath);
-    assert.deepEqual(Object.keys(out), ["Path"]);
+    assert.deepEqual(Object.keys(out), ["Path", "PYTHONUTF8"]); // #1417: one Path key; PYTHONUTF8 is the sandbox UTF-8 default
   });
 
   test("[M2] GP4/windows-inherited-path (unit): a shell child resolves a binary the way the parent PATH does", async () => {

@@ -20,7 +20,13 @@ function isStripped(key: string): boolean {
   return name.startsWith(NODE_PREFIX) && name.endsWith(OPTIONS_SUFFIX);
 }
 
-/** Pure: copies `parent` (string values only), drops preload vars, then applies `extra` last. */
+// #1417, ADR-0025 (#1325 side note) "Sandbox runs set PYTHONUTF8=1", as v1.0.169 executor.js did: on
+// Windows CPython writes a pipe in the ANSI code page (cp1252, cp1254) and the sandbox reads UTF-8.
+// UTF-8 mode makes python write UTF-8. A parent PYTHONUTF8 (any case) keeps its own value, and
+// PYTHONIOENCODING is never set, so a user's own PYTHONIOENCODING still wins (DEVIATIONS D-1417-UTF8-1).
+const UTF8_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({ PYTHONUTF8: "1" });
+
+/** Pure: copies `parent` (string values only), drops preload vars, adds the UTF-8 defaults the parent lacks, then applies `extra` last. */
 export function buildChildEnv(parent: NodeJS.ProcessEnv, extra?: Record<string, string>): Record<string, string> {
   const env: Record<string, string> = {};
   for (const key of Object.keys(parent)) {
@@ -28,6 +34,8 @@ export function buildChildEnv(parent: NodeJS.ProcessEnv, extra?: Record<string, 
     if (value === undefined || isStripped(key)) continue;
     env[key] = value;
   }
+  const names = new Set(Object.keys(env).map((key) => key.toUpperCase()));
+  for (const key of Object.keys(UTF8_DEFAULTS)) if (!names.has(key)) env[key] = UTF8_DEFAULTS[key];
   if (extra !== undefined) {
     for (const key of Object.keys(extra)) env[key] = extra[key];
   }
