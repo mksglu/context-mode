@@ -134,6 +134,9 @@ export function retryHostInstall({ label, attempt, waits = HOST_WAITS_MS, sleep 
 /** OMP's GitHub release base (the repo OMP's install script clones for --source). */
 export const OMP_RELEASE_BASE = "https://github.com/can1357/oh-my-pi/releases/download/";
 
+/** One release download may take this long before it counts as a failed try (D-OMP-CI-5). */
+export const OMP_FETCH_TIMEOUT_MS = 300_000;
+
 /** Release asset name for a Node platform/arch, or null when OMP ships no binary for it. */
 export function ompAssetName(platform, arch) {
   const os = platform === "win32" ? "windows" : platform === "darwin" ? "darwin" : platform === "linux" ? "linux" : "";
@@ -162,7 +165,7 @@ async function fetchTries(url, label, log = console.error) {
   const waits = HOST_WAITS_MS;
   for (let k = 1; k <= waits.length + 1; k++) {
     try {
-      const r = await fetch(url, { redirect: "follow" });
+      const r = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(OMP_FETCH_TIMEOUT_MS) });
       if (r.ok) return Buffer.from(await r.arrayBuffer());
       log("ci-install: " + label + " try " + k + " HTTP " + r.status);
     } catch (e) {

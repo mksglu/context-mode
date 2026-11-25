@@ -567,6 +567,18 @@ describe("ADR-0013 repo: CI install retry", () => {
     }
   });
 
+  test("[omp release] each OMP native install step has a time limit and hands off on failure (D-OMP-CI-5)", () => {
+    const y = readFileSync(root + ".github/workflows/ci.yml", "utf8");
+    const parts = y.split("      - name: omp 18.20.0 (native install script").slice(1);
+    assert.equal(parts.length, 4);
+    for (const p of parts) {
+      const head = p.split("\n      - ")[0];
+      assert.ok(head.includes("\n        timeout-minutes: 6\n"), head.split("\n")[0]);
+      assert.ok(head.includes("\n        continue-on-error: true\n"), head.split("\n")[0]);
+    }
+    assert.ok(y.includes("--omp v18.20.0"), "the D-OMP-CI-4 step still follows");
+  });
+
   test("[omp release] asset names follow OMP's release, and an unknown target gets none", () => {
     assert.equal(ompAssetName("linux", "x64"), "omp-linux-x64");
     assert.equal(ompAssetName("darwin", "arm64"), "omp-darwin-arm64");

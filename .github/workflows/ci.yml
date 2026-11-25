@@ -102,6 +102,9 @@ jobs:
       # The download host can fail: 3 tries, then omp --version fails the job, so a missing omp is never a silent skip.
       - name: omp 18.20.0 (native install script) for the omp fire tests (D-OMP-CI-1)
         if: runner.os != 'Windows'
+        # D-OMP-CI-5: a stalled download ends here; the D-OMP-CI-4 step then installs omp, and omp --version gates the job.
+        timeout-minutes: 6
+        continue-on-error: true
         shell: bash
         env:
           PI_INSTALL_DIR: ${{ runner.temp }}/omp-bin
@@ -111,6 +114,9 @@ jobs:
       # irm | iex cannot pass flags, so Windows runs the same script as a scriptblock.
       - name: omp 18.20.0 (native install script, Windows) for the omp fire tests (D-OMP-CI-1)
         if: runner.os == 'Windows'
+        # D-OMP-CI-5: a stalled download ends here; the D-OMP-CI-4 step then installs omp, and omp --version gates the job.
+        timeout-minutes: 6
+        continue-on-error: true
         shell: pwsh
         env:
           PI_INSTALL_DIR: ${{ runner.temp }}\omp-bin
@@ -222,6 +228,9 @@ jobs:
       # D-OMP-CI-2: the omp row of the matrix runs setup and doctor against the real omp, so this job installs it too.
       - name: omp 18.20.0 (native install script) for the omp host row (D-OMP-CI-2)
         if: runner.os != 'Windows'
+        # D-OMP-CI-5: a stalled download ends here; the D-OMP-CI-4 step then installs omp, and omp --version gates the job.
+        timeout-minutes: 6
+        continue-on-error: true
         shell: bash
         env:
           PI_INSTALL_DIR: ${{ runner.temp }}/omp-bin
@@ -230,6 +239,9 @@ jobs:
           echo "$PI_INSTALL_DIR" >> "$GITHUB_PATH"
       - name: omp 18.20.0 (native install script, Windows) for the omp host row (D-OMP-CI-2)
         if: runner.os == 'Windows'
+        # D-OMP-CI-5: a stalled download ends here; the D-OMP-CI-4 step then installs omp, and omp --version gates the job.
+        timeout-minutes: 6
+        continue-on-error: true
         shell: pwsh
         env:
           PI_INSTALL_DIR: ${{ runner.temp }}\omp-bin
