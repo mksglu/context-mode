@@ -1051,7 +1051,7 @@ describe("PRD-v2 section 9: child env", () => {
     try {
       const out = await withLegacyLocale(() => ctxExecute.handler({ language: "python", code: "print(" + JSON.stringify(UTF8_PROBE) + ")" }, ctxRoot(root)));
       assert.equal(out.isError, false, out.text);
-      assert.equal(out.text, UTF8_PROBE + "\n");
+      assert.equal(out.text.replaceAll("\r\n", "\n"), UTF8_PROBE + "\n"); // Windows python prints CRLF
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -1078,7 +1078,7 @@ describe("PRD-v2 section 9: child env", () => {
     try {
       const out = await ctxExecute.handler({ language: "python", code: "import sys; print(sys.stdout.encoding, 'é')" }, ctxRoot(root));
       assert.equal(out.isError, false, out.text);
-      assert.equal(out.text, "ascii \\xe9\n");
+      assert.equal(out.text.replaceAll("\r\n", "\n"), "ascii \\xe9\n"); // Windows python prints CRLF
     } finally {
       if (saved === undefined) delete process.env.PYTHONIOENCODING; else process.env.PYTHONIOENCODING = saved;
       rmSync(root, { recursive: true, force: true });
