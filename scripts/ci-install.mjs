@@ -124,7 +124,83 @@ export function retryHostInstall({ label, attempt, waits = HOST_WAITS_MS, sleep 
   return { ok: false, tries, fault, text: last.text };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv[2] === "--npm") {
+// ---------- D-OMP-CI-4: OMP binary from its GitHub release when OMP's install script gets no build ----------
+// 2026-11-25: build.stencil.so (the host OMP's own install script asks) answered {"error":"no_build"} for every
+// target and version, so `omp.sh/install --binary --ref v18.20.0` installed nothing and CI stopped at `omp --version`
+// (run 45606232499, 4 attempts). The same tag's binaries and SHA256SUMS.txt sit on OMP's own GitHub release. This
+// step runs after OMP's script: when omp already starts it does nothing; else it downloads the same tag from that
+// release and checks the SHA-256 from the release's own SHA256SUMS.txt before it puts the binary in place.
+
+/** OMP's GitHub release base (the repo OMP's install script clones for --source). */
+export const OMP_RELEASE_BASE = "https://github.com/can1357/oh-my-pi/releases/download/";
+
+/** Release asset name for a Node platform/arch, or null when OMP ships no binary for it. */
+export function ompAssetName(platform, arch) {
+  const os = platform === "win32" ? "windows" : platform === "darwin" ? "darwin" : platform === "linux" ? "linux" : "";
+  const cpu = arch === "x64" ? "x64" : arch === "arm64" ? "arm64" : "";
+  if (os === "" || cpu === "") return null;
+  return "omp-" + os + "-" + cpu + (os === "windows" ? ".exe" : "");
+}
+
+/** The SHA-256 SUMS line for `name` ("<hex>  <name>"), lower case, or null. */
+export function sha256For(sums, name) {
+  for (const line of String(sums).split("\n")) {
+    const parts = line.trim().split(" ").filter((p) => p !== "");
+    if (parts.length === 2 && parts[1] === name && parts[0].length === 64) return parts[0].toLowerCase();
+  }
+  return null;
+}
+
+/** True when `<dir>/omp(.exe) --version` exits 0. */
+export function ompStarts(dir, platform = process.platform) {
+  const bin = path.join(dir, platform === "win32" ? "omp.exe" : "omp");
+  if (!existsSync(bin)) return false;
+  return spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 60_000 }).status === 0;
+}
+
+async function fetchTries(url, label, log = console.error) {
+  const waits = HOST_WAITS_MS;
+  for (let k = 1; k <= waits.length + 1; k++) {
+    try {
+      const r = await fetch(url, { redirect: "follow" });
+      if (r.ok) return Buffer.from(await r.arrayBuffer());
+      log("ci-install: " + label + " try " + k + " HTTP " + r.status);
+    } catch (e) {
+      log("ci-install: " + label + " try " + k + " " + (e?.cause?.code ?? e?.message ?? e));
+    }
+    if (k <= waits.length) await new Promise((res) => setTimeout(res, waits[k - 1]));
+  }
+  return null;
+}
+
+/** Puts OMP `tag` into `dir` from its GitHub release unless an omp there already starts. Returns an exit code. */
+export async function installOmpFromRelease(tag, dir, { platform = process.platform, arch = process.arch, log = console.error } = {}) {
+  const target = path.resolve(dir);
+  if (ompStarts(target, platform)) { log("ci-install: omp " + tag + " present from OMP's install script"); return 0; }
+  const name = ompAssetName(platform, arch);
+  if (name === null) { log("ci-install: OMP ships no binary for " + platform + "-" + arch); return 1; }
+  const sums = await fetchTries(OMP_RELEASE_BASE + tag + "/SHA256SUMS.txt", "omp SHA256SUMS " + tag, log);
+  const want = sums === null ? null : sha256For(sums.toString("utf8"), name);
+  if (want === null) { log("ci-install: no SHA-256 for " + name + " in the " + tag + " release"); return 1; }
+  const body = await fetchTries(OMP_RELEASE_BASE + tag + "/" + name, "omp " + name + " " + tag, log);
+  if (body === null) return 1;
+  const { createHash } = await import("node:crypto");
+  const got = createHash("sha256").update(body).digest("hex");
+  if (got !== want) { log("ci-install: checksum mismatch for " + name + ": expected " + want + ", got " + got); return 1; }
+  const { mkdirSync, writeFileSync, renameSync, chmodSync } = await import("node:fs");
+  mkdirSync(target, { recursive: true });
+  const final = path.join(target, platform === "win32" ? "omp.exe" : "omp");
+  const tmp = final + ".download";
+  writeFileSync(tmp, body);
+  if (platform !== "win32") chmodSync(tmp, 0o755);
+  renameSync(tmp, final);
+  log("ci-install: omp " + tag + " installed from its GitHub release (" + name + ", sha256 " + want.slice(0, 12) + ")");
+  return ompStarts(target, platform) ? 0 : 1;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv[2] === "--omp") {
+  process.exit(await installOmpFromRelease(process.argv[3], process.argv[4]));
+} else if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv[2] === "--npm") {
   const args = process.argv.slice(3);
   const r = retryHostInstall({
     label: "npm " + args.join(" "),

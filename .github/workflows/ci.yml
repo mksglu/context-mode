@@ -117,6 +117,11 @@ jobs:
         run: |
           foreach ($i in 1..3) { try { & ([scriptblock]::Create((irm https://omp.sh/install.ps1))) -Binary -Ref v18.20.0; break } catch { Start-Sleep 20 } }
           "$env:PI_INSTALL_DIR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      # D-OMP-CI-4: build.stencil.so, which the host OMP's install script asks, can answer no_build (2026-11-25, every target).
+      # Then the same tag comes from OMP's GitHub release, SHA-256 checked against that release's SHA256SUMS.txt.
+      # When OMP's script installed omp, this step only runs omp --version and stops.
+      - name: omp 18.20.0 from its GitHub release when the install script got no build (D-OMP-CI-4)
+        run: node scripts/ci-install.mjs --omp v18.20.0 "${{ runner.temp }}/omp-bin"
       - run: omp --version
         name: omp version (D-OMP-CI-1)
       - run: node build/build.mjs --generated-only
@@ -231,6 +236,11 @@ jobs:
         run: |
           foreach ($i in 1..3) { try { & ([scriptblock]::Create((irm https://omp.sh/install.ps1))) -Binary -Ref v18.20.0; break } catch { Start-Sleep 20 } }
           "$env:PI_INSTALL_DIR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      # D-OMP-CI-4: build.stencil.so, which the host OMP's install script asks, can answer no_build (2026-11-25, every target).
+      # Then the same tag comes from OMP's GitHub release, SHA-256 checked against that release's SHA256SUMS.txt.
+      # When OMP's script installed omp, this step only runs omp --version and stops.
+      - name: omp 18.20.0 from its GitHub release when the install script got no build (D-OMP-CI-4)
+        run: node scripts/ci-install.mjs --omp v18.20.0 "${{ runner.temp }}/omp-bin"
       - run: omp --version
         name: omp version (D-OMP-CI-2)
       - run: node e2e/checks/windows-hosts.mjs

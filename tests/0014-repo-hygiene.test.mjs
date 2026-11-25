@@ -10,7 +10,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 import { HOOK_WORDS, LINE_PREFIX, agentRows, checkAgentLines, renderAgentBlocks, renderAgentLines, writeAgentLines } from "../build/readme-agents.mjs";
-import { HOST_WAITS_MS, installWithRetry, missingPackages, registryFault, retryHostInstall } from "../scripts/ci-install.mjs";
+import { HOST_WAITS_MS, installWithRetry, missingPackages, registryFault, retryHostInstall, ompAssetName, sha256For, installOmpFromRelease, OMP_RELEASE_BASE } from "../scripts/ci-install.mjs";
 import { ADAPTERS } from "../src/adapters/table.ts";
 import { AGENT_IDS } from "../src/core/contracts/agents.ts";
 import { DOCTOR_CHECK_ORDER, REPORT_CAP, REPORT_SOURCE_LABEL } from "../src/core/contracts/constants.ts";
@@ -551,6 +551,47 @@ describe("ADR-0013 repo: CI install retry", () => {
     assert.ok(!/- run: npm install/.test(y));
     // 3 dev installs; the host CLI installs use the --npm mode of the same script (D-CI-HOST-INSTALL-1).
     assert.equal(y.split("- run: node scripts/ci-install.mjs").length - 1 - (y.split("- run: node scripts/ci-install.mjs --npm ").length - 1), 3);
+  });
+
+  // D-OMP-CI-4: OMP's install script asks build.stencil.so, which answered no_build on 2026-11-25. Both OMP jobs then
+  // take the same tag from OMP's GitHub release, SHA-256 checked, and only after OMP's own script ran.
+  test("[omp release] both OMP jobs run the release step after OMP's install script and before omp --version (D-OMP-CI-4)", () => {
+    const y = readFileSync(root + ".github/workflows/ci.yml", "utf8");
+    const step = 'run: node scripts/ci-install.mjs --omp v18.20.0 "${{ runner.temp }}/omp-bin"';
+    assert.equal(y.split(step).length - 1, 2);
+    for (const id of ["D-OMP-CI-1", "D-OMP-CI-2"]) {
+      const ver = y.indexOf("name: omp version (" + id + ")");
+      assert.ok(ver > 0, id);
+      const rel = y.lastIndexOf(step, ver);
+      assert.ok(rel > 0 && y.lastIndexOf("omp.sh/install", rel) > 0, id + ": release step sits after OMP's script, before omp --version");
+    }
+  });
+
+  test("[omp release] asset names follow OMP's release, and an unknown target gets none", () => {
+    assert.equal(ompAssetName("linux", "x64"), "omp-linux-x64");
+    assert.equal(ompAssetName("darwin", "arm64"), "omp-darwin-arm64");
+    assert.equal(ompAssetName("win32", "x64"), "omp-windows-x64.exe");
+    assert.equal(ompAssetName("freebsd", "x64"), null);
+    assert.equal(ompAssetName("linux", "ia32"), null);
+    assert.equal(OMP_RELEASE_BASE, "https://github.com/can1357/oh-my-pi/releases/download/");
+  });
+
+  test("[omp release] sha256For reads the exact name from SHA256SUMS.txt and nothing else", () => {
+    const a = "a".repeat(64), b = "B".repeat(64);
+    const sums = a + "  omp-linux-x64\n" + b + "  omp-linux-x64.sig\nshort  omp-darwin-arm64\n";
+    assert.equal(sha256For(sums, "omp-linux-x64"), a);
+    assert.equal(sha256For(sums, "omp-linux-x64.sig"), "b".repeat(64));
+    assert.equal(sha256For(sums, "omp-darwin-arm64"), null);
+    assert.equal(sha256For(sums, "omp-windows-x64.exe"), null);
+  });
+
+  test("[omp release] no target binary and no SHA-256 line both exit 1 and write no file", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "omp-rel-"));
+    const lines = [];
+    assert.equal(await installOmpFromRelease("v18.20.0", dir, { platform: "freebsd", arch: "x64", log: (l) => lines.push(l) }), 1);
+    assert.deepEqual(lines, ["ci-install: OMP ships no binary for freebsd-x64"]);
+    assert.deepEqual(readdirSync(dir), []);
+    rmSync(dir, { recursive: true, force: true });
   });
 
   // D-CI-HOST-INSTALL-1: host CLI installs (npm i -g <agent CLI>) retry with a growing wait and name a registry fault.
