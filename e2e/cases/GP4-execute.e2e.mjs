@@ -353,6 +353,21 @@ test("[M2] GP4/windows-shim-interpreter", { skip: !IS_WIN }, async () => {
   golden("windows-shim-interpreter", reply);
 });
 
+test("[M2] GP4/python-utf8-under-ansi-code-page (#1417)", async () => {
+  // #1417: on Windows CPython writes a pipe in the ANSI code page (cp1252, cp1254); the server reads
+  // UTF-8. A legacy 8-bit locale gives the same bytes on POSIX. The sandbox sets the child's UTF-8
+  // mode (ADR-0025 #1325 side note), so the text comes back exact.
+  const probe = "café naïve € ğüşİı → 🤖";
+  const env = { ...ENV, LC_ALL: process.platform === "darwin" ? "tr_TR.ISO8859-9" : "tr_TR.ISO-8859-9", LANG: "tr_TR.ISO-8859-9" };
+  delete env.PYTHONUTF8;
+  delete env.PYTHONIOENCODING;
+  const reply = await callExecute({ language: "python", code: "print(" + JSON.stringify(probe) + ")" }, env);
+  const text = reply.content?.[0]?.text ?? "";
+  if (reply.isError === true && text.startsWith("No python runtime")) return; // no python on this runner
+  assert.equal(reply.isError, false, text);
+  assert.equal(text, probe + "\n");
+});
+
 // --- M5: in-process plugin execute cases ---
 test("[M5] GP4/abort-signal-pi-cancel: a running ctx_execute call is killed and returns a cancel reply when Pi cancels (#1182 #1093 #904)", async () => {
   const bundlePath = path.join(path.resolve(__dirname, "..", ".."), "release-out", "pi", "index.js");
