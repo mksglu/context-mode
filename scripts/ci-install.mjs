@@ -9,7 +9,7 @@
 // with 3 tries and a growing wait (HOST_WAITS_MS). When npm names a registry 404/5xx or a network fault (ETIMEDOUT,
 // ECONNRESET, EAI_AGAIN) for a package that is not ours, one line says so. All 3 tries red is exit 1.
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -201,8 +201,22 @@ export async function installOmpFromRelease(tag, dir, { platform = process.platf
   return ompStarts(target, platform) ? 0 : 1;
 }
 
+/**
+ * D-OMP-CI-6: adds `dir` to the file that GITHUB_PATH names, so later steps find omp.
+ * The install script step writes the same line, but only when it ends before its 6 min limit (D-OMP-CI-5).
+ * Returns true when it wrote the line. No GITHUB_PATH (a local run) writes nothing.
+ */
+export function addToGithubPath(dir, env = process.env) {
+  const file = env.GITHUB_PATH;
+  if (!file) return false;
+  appendFileSync(file, path.resolve(dir) + "\n");
+  return true;
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv[2] === "--omp") {
-  process.exit(await installOmpFromRelease(process.argv[3], process.argv[4]));
+  const code = await installOmpFromRelease(process.argv[3], process.argv[4]);
+  if (code === 0) addToGithubPath(process.argv[4]);
+  process.exit(code);
 } else if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv[2] === "--npm") {
   const args = process.argv.slice(3);
   const r = retryHostInstall({

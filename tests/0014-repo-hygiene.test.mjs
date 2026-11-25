@@ -10,7 +10,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 import { HOOK_WORDS, LINE_PREFIX, agentRows, checkAgentLines, renderAgentBlocks, renderAgentLines, writeAgentLines } from "../build/readme-agents.mjs";
-import { HOST_WAITS_MS, installWithRetry, missingPackages, registryFault, retryHostInstall, ompAssetName, sha256For, installOmpFromRelease, OMP_RELEASE_BASE } from "../scripts/ci-install.mjs";
+import { HOST_WAITS_MS, installWithRetry, missingPackages, registryFault, retryHostInstall, ompAssetName, sha256For, installOmpFromRelease, OMP_RELEASE_BASE, addToGithubPath } from "../scripts/ci-install.mjs";
 import { ADAPTERS } from "../src/adapters/table.ts";
 import { AGENT_IDS } from "../src/core/contracts/agents.ts";
 import { DOCTOR_CHECK_ORDER, REPORT_CAP, REPORT_SOURCE_LABEL } from "../src/core/contracts/constants.ts";
@@ -604,6 +604,25 @@ describe("ADR-0013 repo: CI install retry", () => {
     assert.deepEqual(lines, ["ci-install: OMP ships no binary for freebsd-x64"]);
     assert.deepEqual(readdirSync(dir), []);
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  // D-OMP-CI-6: run 45636245183 installed omp from the release, then "omp: command not found" (the timed-out step never wrote GITHUB_PATH).
+  test("[omp release] addToGithubPath appends the omp dir to GITHUB_PATH, and writes nothing without it", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "omp-path-"));
+    const file = path.join(dir, "github_path");
+    writeFileSync(file, "/already/there\n");
+    assert.equal(addToGithubPath(path.join(dir, "omp-bin"), { GITHUB_PATH: file }), true);
+    assert.equal(readFileSync(file, "utf8"), "/already/there\n" + path.join(dir, "omp-bin") + "\n");
+    assert.equal(addToGithubPath(path.join(dir, "omp-bin"), {}), false);
+    assert.deepEqual(readdirSync(dir), ["github_path"]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("[omp release] the --omp CLI adds its dir to GITHUB_PATH only after a good install", () => {
+    const src = readFileSync(new URL("../scripts/ci-install.mjs", import.meta.url), "utf8");
+    const cli = src.slice(src.indexOf('process.argv[2] === "--omp"'));
+    assert.ok(cli.indexOf("if (code === 0) addToGithubPath(process.argv[4]);") > 0, "CLI adds the dir on exit 0");
+    assert.ok(cli.indexOf("addToGithubPath") < cli.indexOf("process.exit(code)"), "before exit");
   });
 
   // D-CI-HOST-INSTALL-1: host CLI installs (npm i -g <agent CLI>) retry with a growing wait and name a registry fault.
