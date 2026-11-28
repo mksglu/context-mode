@@ -1,5 +1,5 @@
 {
-  "read_at": "2026-11-27",
+  "read_at": "2026-11-28",
   "series": {
     "github_clones": "[day, clones, unique cloners] per UTC day. GitHub REST /repos/mksglu/context-mode/traffic/clones (keeps 14 days). Counts git clones and fetches of the repo: Claude Code, Codex, Gemini CLI and Qwen Code plugin installs and updates, CI machines and people.",
     "github_views": "[day, views, unique visitors] per UTC day. GitHub REST /repos/mksglu/context-mode/traffic/views (keeps 14 days).",
@@ -48,7 +48,8 @@
     ["2026-11-22",18944,4283],
     ["2026-11-23",23155,6338],
     ["2026-11-24",40346,6761],
-    ["2026-11-25",38351,7105]
+    ["2026-11-25",38351,7105],
+    ["2026-11-26",27148,6099]
   ],
   "github_views": [
     ["2026-10-20",1608,1086],
@@ -87,7 +88,8 @@
     ["2026-11-22",1463,912],
     ["2026-11-23",1620,1147],
     ["2026-11-24",1961,1194],
-    ["2026-11-25",1783,1299]
+    ["2026-11-25",1783,1299],
+    ["2026-11-26",1855,1232]
   ],
   "github_clones_14d": [
     ["2026-11-03",646294,63364],
@@ -114,7 +116,8 @@
     ["2026-11-24",567722,59264],
     ["2026-11-25",548044,58019],
     ["2026-11-26",546067,56268],
-    ["2026-11-27",525340,53874]
+    ["2026-11-27",525340,53874],
+    ["2026-11-28",476025,50875]
   ],
   "github_views_14d": [
     ["2026-11-03",34391,17382],
@@ -141,7 +144,8 @@
     ["2026-11-24",33970,15986],
     ["2026-11-25",33332,15979],
     ["2026-11-26",32287,15867],
-    ["2026-11-27",30444,14965]
+    ["2026-11-27",30444,14965],
+    ["2026-11-28",28434,14131]
   ],
   "github_referrers": [
     ["2026-11-03",[["github.com",6959,5029],["Google",6856,4628],["t.co",788,634],["Bing",652,439],["youtube.com",414,321],["search.brave.com",374,230],["teams.public.onecdn.static.microsoft",182,126],["linkedin.com",153,119],["reddit.com",141,101],["DuckDuckGo",125,88]]],
@@ -168,7 +172,8 @@
     ["2026-11-24",[["Google",9426,6187],["github.com",3323,2163],["Bing",623,383],["search.brave.com",353,234],["insidersai.com.br",347,299],["t.co",326,231],["teams.public.onecdn.static.microsoft",278,184],["youtube.com",208,164],["DuckDuckGo",201,131],["contextmode.ai",198,124]]],
     ["2026-11-25",[["Google",9353,6146],["github.com",3260,2142],["Bing",610,371],["search.brave.com",351,238],["insidersai.com.br",327,284],["t.co",307,213],["teams.public.onecdn.static.microsoft",292,195],["youtube.com",212,165],["DuckDuckGo",189,125],["contextmode.ai",181,115]]],
     ["2026-11-26",[["Google",8947,5880],["github.com",3167,2103],["Bing",583,344],["search.brave.com",359,244],["insidersai.com.br",300,255],["t.co",300,209],["teams.public.onecdn.static.microsoft",295,198],["youtube.com",214,159],["contextmode.ai",190,112],["DuckDuckGo",182,121]]],
-    ["2026-11-27",[["Google",8281,5602],["github.com",3055,2027],["Bing",515,295],["search.brave.com",344,237],["teams.public.onecdn.static.microsoft",286,193],["t.co",275,189],["insidersai.com.br",267,227],["youtube.com",211,148],["DuckDuckGo",172,116],["linkedin.com",166,111]]]
+    ["2026-11-27",[["Google",8281,5602],["github.com",3055,2027],["Bing",515,295],["search.brave.com",344,237],["teams.public.onecdn.static.microsoft",286,193],["t.co",275,189],["insidersai.com.br",267,227],["youtube.com",211,148],["DuckDuckGo",172,116],["linkedin.com",166,111]]],
+    ["2026-11-28",[["Google",7724,5278],["github.com",2868,1947],["Bing",479,273],["search.brave.com",329,232],["t.co",268,183],["teams.public.onecdn.static.microsoft",253,176],["insidersai.com.br",246,211],["youtube.com",213,147],["DuckDuckGo",148,103],["contextmode.ai",143,78]]]
   ],
   "stars": [
     ["2026-11-03",33327],
@@ -195,7 +200,8 @@
     ["2026-11-24",34425],
     ["2026-11-25",34452],
     ["2026-11-26",34495],
-    ["2026-11-27",34528]
+    ["2026-11-27",34528],
+    ["2026-11-28",34550]
   ],
   "npm_totals": [
     ["2026-11-03",709316,39992,100405],
@@ -222,7 +228,8 @@
     ["2026-11-24",913632,56064,226933],
     ["2026-11-25",929499,58580,233807],
     ["2026-11-26",939401,60645,241103],
-    ["2026-11-27",955973,58883,248792]
+    ["2026-11-27",955973,58883,248792],
+    ["2026-11-28",965849,59654,253233]
   ],
   "npm_versions_last_week": [
     ["2026-11-03",35411,4498,83,246],
@@ -249,7 +256,8 @@
     ["2026-11-24",15614,136,40314,183],
     ["2026-11-25",15805,91,42684,131],
     ["2026-11-26",15873,87,44685,136],
-    ["2026-11-27",15162,127,43594,127]
+    ["2026-11-27",15162,127,43594,127],
+    ["2026-11-28",15287,135,44232,246]
   ],
   "v1_marketplace": [
     ["2026-02-25",211,"0b70e68d458516b0f9944bc8a555988341553a9c"],
